@@ -1,1 +1,4 @@
 rootProject.name = 'deep-dive'
+
+include 'coupon-issue'
+project(':coupon-issue').projectDir = file('labs/coupon-issue')
