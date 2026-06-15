@@ -1,12 +1,27 @@
 package dev.deepdive.coupon.core;
 
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
 import java.util.Objects;
 
-public final class CouponStock {
+@Entity
+@Table(name = "coupon_stock")
+public class CouponStock {
 
-    private final Long couponId;
-    private final int totalQuantity;
+    @Id
+    @Column(name = "id")
+    private Long couponId;
+
+    @Column(name = "total_quantity", nullable = false)
+    private int totalQuantity;
+
+    @Column(name = "quantity", nullable = false)
     private int remainingQuantity;
+
+    protected CouponStock() {
+    }
 
     public CouponStock(Long couponId, int totalQuantity) {
         if (totalQuantity < 0) {

@@ -3,20 +3,16 @@ package dev.deepdive.coupon.service;
 import dev.deepdive.coupon.core.CouponStock;
 import dev.deepdive.coupon.repository.CouponRepository;
 import java.util.Objects;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
-@Service
-public class CouponIssueService {
+public final class SynchronizedCouponIssueService {
 
     private final CouponRepository couponRepository;
 
-    public CouponIssueService(CouponRepository couponRepository) {
+    public SynchronizedCouponIssueService(CouponRepository couponRepository) {
         this.couponRepository = Objects.requireNonNull(couponRepository, "쿠폰 저장소는 필수입니다.");
     }
 
-    @Transactional
-    public void issue(Long couponId) {
+    public synchronized void issue(Long couponId) {
         CouponStock couponStock = couponRepository.findById(couponId)
                 .orElseThrow(() -> new IllegalArgumentException("쿠폰 재고를 찾을 수 없습니다. couponId=" + couponId));
         couponStock.decrease();
