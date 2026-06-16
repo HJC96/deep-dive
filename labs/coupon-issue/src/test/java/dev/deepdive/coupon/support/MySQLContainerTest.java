@@ -1,6 +1,7 @@
 package dev.deepdive.coupon.support;
 
 import dev.deepdive.coupon.repository.CouponRepository;
+import dev.deepdive.coupon.repository.VersionedCouponRepository;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -41,9 +42,13 @@ public abstract class MySQLContainerTest {
     @Autowired
     protected CouponRepository couponRepository;
 
+    @Autowired
+    protected VersionedCouponRepository versionedCouponRepository;
+
     @BeforeEach
     void resetDatabase() {
         couponRepository.deleteAllInBatch();
+        versionedCouponRepository.deleteAllInBatch();
     }
 
     protected double measureIssueTimeMillis(

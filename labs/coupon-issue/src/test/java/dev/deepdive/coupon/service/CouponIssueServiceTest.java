@@ -3,6 +3,7 @@ package dev.deepdive.coupon.service;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.deepdive.coupon.core.CouponStock;
+import dev.deepdive.coupon.core.VersionedCouponStock;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -30,6 +31,12 @@ class CouponIssueServiceTest extends MySQLContainerTest {
     @Autowired
     private CouponIssueService couponIssueService;
 
+    @Autowired
+    private PessimisticLockCouponIssueService pessimisticLockCouponIssueService;
+
+    @Autowired
+    private OptimisticLockCouponIssueService optimisticLockCouponIssueService;
+
     private SynchronizedCouponIssueService synchronizedCouponIssueService;
     private AtomicUpdateCouponIssueService atomicUpdateCouponIssueService;
 
@@ -37,6 +44,7 @@ class CouponIssueServiceTest extends MySQLContainerTest {
     void setUp() throws Exception {
         warmUpOnce();
         couponRepository.save(new CouponStock(COUPON_ID, QUANTITY));
+        versionedCouponRepository.save(new VersionedCouponStock(COUPON_ID, QUANTITY));
         synchronizedCouponIssueService = new SynchronizedCouponIssueService(couponRepository);
         atomicUpdateCouponIssueService = new AtomicUpdateCouponIssueService(couponRepository);
     }
@@ -141,16 +149,85 @@ class CouponIssueServiceTest extends MySQLContainerTest {
         }
     }
 
-    // 측정 전에 발급 경로(findById+save, 원자적 UPDATE)를 미리 실행해 콜드 스타트를 걷어낸다.
+    @Test
+    void 비관적_락으로_동시에_200번_발급하면_재고가_0이_된다() throws Exception {
+        CountDownLatch start = new CountDownLatch(1);
+        CountDownLatch done = new CountDownLatch(REQUEST_COUNT);
+        ExecutorService executor = Executors.newFixedThreadPool(THREAD_POOL_SIZE);
+
+        try {
+            for (int i = 0; i < REQUEST_COUNT; i++) {
+                executor.execute(() -> {
+                    try {
+                        start.await();
+                        pessimisticLockCouponIssueService.issue(COUPON_ID);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    } finally {
+                        done.countDown();
+                    }
+                });
+            }
+
+            long startedAt = System.nanoTime();
+            start.countDown();
+            done.await();
+            System.out.printf("비관적 락: %.3fms%n", (System.nanoTime() - startedAt) / 1_000_000.0);
+
+            CouponStock couponStock = couponRepository.findById(COUPON_ID).orElseThrow();
+            assertThat(couponStock.remainingQuantity()).isEqualTo(0);
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
+    void 낙관적_락은_충돌_시_재시도하면_동시에_200번_발급해도_재고가_0이_된다() throws Exception {
+        CountDownLatch start = new CountDownLatch(1);
+        CountDownLatch done = new CountDownLatch(REQUEST_COUNT);
+        ExecutorService executor = Executors.newFixedThreadPool(THREAD_POOL_SIZE);
+
+        try {
+            for (int i = 0; i < REQUEST_COUNT; i++) {
+                executor.execute(() -> {
+                    try {
+                        start.await();
+                        optimisticLockCouponIssueService.issue(COUPON_ID);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    } finally {
+                        done.countDown();
+                    }
+                });
+            }
+
+            long startedAt = System.nanoTime();
+            start.countDown();
+            done.await();
+            System.out.printf("낙관적 락(재시도): %.3fms%n", (System.nanoTime() - startedAt) / 1_000_000.0);
+
+            // 충돌한 요청도 재시도 끝에 모두 성공하므로 재고가 0까지 줄어든다.
+            VersionedCouponStock couponStock = versionedCouponRepository.findById(COUPON_ID).orElseThrow();
+            assertThat(couponStock.remainingQuantity()).isEqualTo(0);
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    // 측정 전에 발급 경로(findById+save, 비관적 락, 원자적 UPDATE)를 미리 실행해 콜드 스타트를 걷어낸다.
     private void warmUpOnce() throws Exception {
         if (warmedUp) {
             return;
         }
         couponRepository.save(new CouponStock(WARMUP_COUPON_ID, Integer.MAX_VALUE));
+        versionedCouponRepository.save(new VersionedCouponStock(WARMUP_COUPON_ID, Integer.MAX_VALUE));
         AtomicUpdateCouponIssueService atomicWarmup = new AtomicUpdateCouponIssueService(couponRepository);
 
         measureIssueTimeMillis(WARMUP_ITERATIONS, THREAD_POOL_SIZE, () -> couponIssueService.issue(WARMUP_COUPON_ID));
+        measureIssueTimeMillis(WARMUP_ITERATIONS, THREAD_POOL_SIZE, () -> pessimisticLockCouponIssueService.issue(WARMUP_COUPON_ID));
         measureIssueTimeMillis(WARMUP_ITERATIONS, THREAD_POOL_SIZE, () -> atomicWarmup.issue(WARMUP_COUPON_ID));
+        // 낙관적 락은 동시 실행 시 충돌→재시도가 폭주하므로, 콜드 스타트 제거만 목적인 워밍업은 단일 스레드로 돌린다.
+        measureIssueTimeMillis(WARMUP_ITERATIONS, 1, () -> optimisticLockCouponIssueService.issue(WARMUP_COUPON_ID));
 
         warmedUp = true;
     }
