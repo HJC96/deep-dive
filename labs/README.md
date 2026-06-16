@@ -4,4 +4,5 @@
 
 ## 목록
 
-- `coupon-issue`: 쿠폰 발급 동시성 문제 실험
+- `coupon-issue`: 동시성 문제 실험실
+- `java-sandbox`: Java 실험실
