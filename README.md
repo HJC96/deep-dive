@@ -4,7 +4,7 @@
 
 ## 모듈
 
-- `coupon-issue` — 선착순 쿠폰 발급 동시성 문제. 락 없음 / synchronized / 원자적 UPDATE / 비관적 락 / 낙관적 락 비교
+- `coupon-issue` — 선착순 쿠폰 발급 동시성 문제. 락 없음 / synchronized / 원자적 UPDATE / 비관적 락 / 낙관적 락 / 네임드 락 비교
 - `java-sandbox` — 디자인 패턴, 리플렉션 등 자바 문법 실험용 공간
 
 ## 실행

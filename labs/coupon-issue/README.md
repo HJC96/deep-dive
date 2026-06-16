@@ -9,6 +9,7 @@
 - 원자적 `UPDATE`
 - 비관적 락 (`SELECT ... FOR UPDATE`)
 - 낙관적 락 (`@Version`)
+- 네임드 락 (MySQL `GET_LOCK`)
 
 ## 공통 환경
 
@@ -46,7 +47,7 @@ public void issue(Long couponId) {
 
 - 기대값: `200 - 200 = 0`
 - 실제 결과: 최종 재고가 `0`이 아닐 수 있음
-- 테스트 단언: `isNotEqualTo(0)`
+- 테스트 단언문: `isNotEqualTo(0)`
 
 이유:
 
@@ -129,7 +130,7 @@ public synchronized void issue(Long couponId) {
 결과:
 
 - 최종 재고: `0`
-- 테스트 단언: `isEqualTo(0)`
+- 테스트 단언문: `isEqualTo(0)`
 
 이유:
 
@@ -212,7 +213,7 @@ int decreaseQuantity(@Param("couponId") Long couponId);
 
 - 이번 테스트의 성공 발급 수: 200개
 - 최종 재고: `0`
-- 테스트 단언: `issuedCount == 200`, `remainingQuantity == 0`
+- 테스트 단언문: `issuedCount == 200`, `remainingQuantity == 0`
 
 이유:
 
@@ -306,20 +307,20 @@ public void issue(Long couponId) {
 결과:
 
 - 최종 재고: `0`
-- 테스트 단언: `isEqualTo(0)`
+- 테스트 단언문: `isEqualTo(0)`
 
 이유:
 
-- `PESSIMISTIC_WRITE`는 조회 시점에 해당 row에 쓰기 락(`SELECT ... FOR UPDATE`)을 건다.
-- 락을 잡은 트랜잭션이 커밋/롤백할 때까지 다른 트랜잭션의 같은 row 조회는 대기한다.
-- 읽기-계산-쓰기 구간이 트랜잭션 단위로 직렬화되므로 lost update가 없다.
-- `synchronized`와 달리 애플리케이션이 아니라 **DB가 락을 관리**하므로, 서버가 여러 대여도 동작한다.
+- `PESSIMISTIC_WRITE`는 조회 시점에 row에 쓰기 락(`SELECT ... FOR UPDATE`)
+- 락 잡은 트랜잭션이 커밋/롤백할 때까지 다른 트랜잭션의 같은 row 조회는 대기
+- 읽기-계산-쓰기가 트랜잭션 단위로 직렬화 → lost update 없음
+- `synchronized`와 달리 앱이 아닌 **DB가 락 관리** → 서버 여러 대여도 동작
 
 한계:
 
-- 전 구간을 직렬화하므로 동시 요청이 많이 몰리면 처리량이 떨어진다.
-- 락 대기가 길어지면 커넥션을 오래 점유하고, 최악의 경우 락 타임아웃·데드락이 생길 수 있다.
-- 락을 잡는 동안 커넥션 풀을 물고 있어, 동시 요청이 많으면 풀 고갈 위험이 있다.
+- 전 구간 직렬화 → 동시 요청 많이 몰리면 처리량 저하
+- 락 대기 길어지면 커넥션 오래 점유, 최악의 경우 락 타임아웃·데드락
+- 락 잡는 동안 커넥션 풀 점유 → 동시 요청 많으면 풀 고갈 위험
 
 ```mermaid
 sequenceDiagram
@@ -417,22 +418,22 @@ public void issueOnce(Long couponId) {
 결과:
 
 - 최종 재고: `0`
-- 테스트 단언: `isEqualTo(0)`
+- 테스트 단언문: `isEqualTo(0)`
 
 이유:
 
-- 읽을 때 `version`을 함께 가져온다.
-- 커밋 시 `UPDATE ... WHERE version = 읽은값`으로 갱신한다.
-- 그 사이 다른 트랜잭션이 먼저 커밋해 `version`이 바뀌었으면 `affected rows = 0` → `ObjectOptimisticLockingFailureException`.
-- 충돌한 요청은 **실패**하므로, 재시도 없이는 재고가 `0`까지 줄지 않는다.
-- 재시도 루프가 충돌한 요청을 새 트랜잭션에서 다시 시도해 결국 모두 성공시킨다.
+- 읽을 때 `version`도 함께 조회
+- 커밋 시 `UPDATE ... WHERE version = 읽은값`으로 갱신
+- 그 사이 다른 트랜잭션이 먼저 커밋해 `version`이 바뀌었으면 `affected rows = 0` → `ObjectOptimisticLockingFailureException`
+- 충돌한 요청은 **실패** → 재시도 없이는 재고가 `0`까지 안 줄어듦
+- 재시도 루프가 충돌 요청을 새 트랜잭션에서 다시 시도 → 결국 모두 성공
 
 한계 (낙관적 락의 단점):
 
-- **충돌이 곧 실패다.** 락으로 막는 게 아니라 "충돌했음을 사후에 감지"하는 방식이라, 충돌하면 예외가 난다.
-- **재시도 로직이 사실상 필수다.** 충돌을 그냥 두면 요청이 실패하므로, 호출 측이나 서비스가 재시도(+백오프)를 직접 구현해야 한다. 비관적 락·원자적 `UPDATE`에는 없는 추가 코드다.
-- **재시도가 트랜잭션 바깥에 있어야 한다.** 충돌 예외는 커밋 시점에 나고 그 트랜잭션은 롤백되므로, 같은 `@Transactional` 안에서 잡아 재시도할 수 없다. 그래서 트랜잭션 경계와 재시도 루프를 분리하게 된다.
-- **동시 요청이 몰리면 비효율적이다.** 같은 row를 여러 스레드가 동시에 다투면 대부분 충돌 → 재시도가 폭주한다. 이 실험에서도 200개를 한 row에 몰아 재시도가 쌓이면서 다른 방식보다 훨씬 느리다(아래 실행 시간 참고). 동시 충돌이 드문 상황에 적합한 전략이다.
+- **충돌이 곧 실패** — 락으로 막는 게 아니라 "충돌을 사후에 감지"하는 방식이라 충돌 시 예외
+- **재시도 로직이 사실상 필수** — 그냥 두면 요청 실패 → 재시도(+백오프)를 직접 구현해야 함. 비관적 락·원자적 `UPDATE`엔 없는 추가 코드
+- **재시도가 트랜잭션 바깥이어야 함** — 충돌 예외는 커밋 시점에 나고 그 트랜잭션은 롤백 → 같은 `@Transactional` 안에서 재시도 불가 → 경계와 루프를 분리
+- **동시 요청 몰리면 비효율** — 같은 row를 여럿이 다투면 대부분 충돌 → 재시도 폭주. 이 실험도 200개를 한 row에 몰아 다른 방식보다 훨씬 느림(아래 실행 시간). 동시 충돌이 드문 상황에 적합
 
 ```mermaid
 sequenceDiagram
@@ -483,23 +484,128 @@ sequenceDiagram
 
 주의 (재시도 + `self` 호출):
 
-- `@Transactional` 빈은 Spring이 **프록시로 한 겹 감싼다.** 트랜잭션을 열고 커밋/롤백하는 건 알맹이(원본 객체)가 아니라 이 프록시다.
-- 충돌(=커밋)도 프록시가 메서드를 끝낸 뒤에 처리한다. 한 번 충돌하면 그 트랜잭션은 끝난것이고 재시도란 곧 **트랜잭션을 새로 여는 것**이다
-- 그래서 **시도 1회 = 트랜잭션 1개**가 되도록, 한 번의 시도를 `issueOnce`(`@Transactional`)로 두고 → 그걸 반복(재시도)하는 루프 `issue`는 트랜잭션 밖에 둔다
-- `this.issueOnce()`는 알맹이가 자기 메서드를 직접 부르는 것이라 프록시를 건너뛴다 → 트랜잭션이 안 열림. 프록시 참조인 `self`로 호출해야 한다
+- `@Transactional` 빈은 Spring이 **프록시로 한 겹 감쌈** → 트랜잭션을 열고 커밋/롤백하는 건 알맹이(원본)가 아니라 프록시
+- 충돌(=커밋)도 프록시가 메서드를 끝낸 뒤 처리 → 한 번 충돌하면 그 트랜잭션은 끝, 재시도란 곧 **새 트랜잭션 열기**
+- 그래서 **시도 1회 = 트랜잭션 1개**가 되도록, 한 번의 시도를 `issueOnce`(`@Transactional`)로 두고 → 반복하는 루프 `issue`는 트랜잭션 밖
+- `this.issueOnce()`는 알맹이가 자기 메서드를 직접 호출 → 프록시 우회 → 트랜잭션 안 열림. 프록시 참조 `self`로 호출
 - `self`는 자기 자신을 주입받아 확보 (순환 참조 회피용 `@Lazy`)
-- 재시도를 별도 클래스(퍼사드)로 빼면 `self`/`@Lazy` 없이도 된다. 퍼사드가 주입받은 서비스는 **이미 프록시**라(Spring이 다른 빈엔 프록시를 넣어줌), 그냥 호출해도 프록시를 거쳐 트랜잭션이 열리기 때문. 여기선 한 클래스로 보여주려고 `self`를 씀
+- 재시도를 별도 클래스(퍼사드)로 빼면 `self`/`@Lazy` 불필요 — 주입받은 서비스는 **이미 프록시**라 그냥 호출해도 거쳐감. 여기선 한 클래스로 보여주려고 `self` 사용
+
+## 케이스 6. 네임드 락 (MySQL `GET_LOCK`)
+
+흐름:
+
+```text
+GET_LOCK(키) 획득 -> (별도 트랜잭션에서) SELECT -> -1 -> UPDATE 커밋 -> RELEASE_LOCK(키)
+다른 트랜잭션은 같은 키의 GET_LOCK에서 대기
+```
+
+쿼리:
+
+```java
+@Query(value = "SELECT GET_LOCK(:key, 10)", nativeQuery = true)
+Integer getLock(@Param("key") String key);
+
+@Query(value = "SELECT RELEASE_LOCK(:key)", nativeQuery = true)
+Integer releaseLock(@Param("key") String key);
+```
+
+코드 흐름:
+
+```java
+// getLock/releaseLock을 같은 커넥션에 고정(@Transactional)
+@Transactional
+public void issue(Long couponId) {
+    try {
+        namedLockRepository.getLock(couponId.toString());
+        self.issueOnce(couponId);   // REQUIRES_NEW, 프록시 경유
+    } finally {
+        namedLockRepository.releaseLock(couponId.toString());
+    }
+}
+
+// 차감은 별도 트랜잭션, 락 풀기 전에 커밋
+@Transactional(propagation = Propagation.REQUIRES_NEW)
+public void issueOnce(Long couponId) {
+    CouponStock stock = couponRepository.findById(couponId).orElseThrow();
+    stock.decrease();
+    couponRepository.save(stock);
+}
+```
+
+결과:
+
+- 최종 재고: `0`
+- 테스트 단언문: `isEqualTo(0)`
+
+이유:
+
+- `GET_LOCK`은 row가 아닌 **문자열 키**에 거는 락 → 같은 키를 노리는 다른 세션은 대기
+- 비관적 락과 달리 테이블·row와 무관 → 락 대상을 애플리케이션이 자유롭게 지정
+- 차감을 `REQUIRES_NEW`로 분리해 **락 풀기 전에 커밋** → 안 그러면 다음 스레드가 안 보이는 재고를 읽어 lost update
+
+주의 (커넥션 2개 + `self` 호출):
+
+- 락 잡는 커넥션(`@Transactional`)과 차감 커넥션(`REQUIRES_NEW`)이 **동시에 2개** 필요
+- `getLock`/`releaseLock`은 **같은 커넥션**에서 해야 풀림 → `@Transactional`로 한 커넥션에 고정
+- `self.issueOnce()`로 프록시를 거쳐야 `REQUIRES_NEW`가 적용 (낙관적 락과 같은 self 주입)
+- 락 대기 스레드도 커넥션 점유 → 실서비스에선 풀 고갈 방지 위해 **락 전용 DataSource 분리** 권장 (이 실험은 단순화 위해 같은 DataSource + 넉넉한 풀)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Test as 테스트 스레드
+    participant Executor as ExecutorService
+    participant StartLatch as start CountDownLatch
+    participant DoneLatch as done CountDownLatch
+    participant A as 요청 A
+    participant B as 요청 B
+    participant Service as NamedLockCouponIssueService
+    participant DB as "MySQL(quantity = 200)"
+
+    Test->>Executor: 200개 발급 작업 제출
+    Executor->>A: 작업 할당
+    Executor->>B: 작업 할당
+    A->>StartLatch: await()
+    B->>StartLatch: await()
+
+    Test->>StartLatch: countDown()
+    StartLatch-->>A: 대기 해제
+    StartLatch-->>B: 대기 해제
+
+    A->>Service: issue(1L)
+    activate Service
+    Note over A,DB: A가 GET_LOCK("1") 획득
+    B->>Service: issue(1L)
+    Note over B,DB: B는 GET_LOCK("1") 대기
+    Service->>DB: (REQUIRES_NEW) SELECT 200 → UPDATE 199 커밋
+    Note over A,DB: A가 RELEASE_LOCK("1")
+    deactivate Service
+    A->>DoneLatch: countDown()
+
+    activate Service
+    Note over B,DB: B가 락 획득
+    Service->>DB: (REQUIRES_NEW) SELECT 199 → UPDATE 198 커밋
+    Note over B,DB: B가 RELEASE_LOCK("1")
+    deactivate Service
+    B->>DoneLatch: countDown()
+    Test->>DoneLatch: await()
+    DoneLatch-->>Test: 모든 작업 완료
+
+    Note over DB: 키 단위로 직렬화되어 재고가 정확히 차감
+```
 
 ## 실행 시간
 
 예시 출력:
 
 ```text
-락 없음: 95.219ms
-synchronized: 936.464ms
-원자적 UPDATE: 310.832ms
-비관적 락: 365.205ms
-낙관적 락(재시도): 2542.703ms
+락 없음: 97.899ms
+synchronized: 1039.150ms
+원자적 UPDATE: 386.068ms
+비관적 락: 1013.324ms
+네임드 락: 797.801ms
+낙관적 락(재시도): 3242.969ms
 ```
 
 > 낙관적 락이 가장 느린 이유: 200개 요청이 한 row를 다투면서 충돌 → 재시도가 반복되기 때문이다. 이렇게 동시 요청이 한꺼번에 몰리는 선착순 쿠폰 같은 상황에는 잘 맞지 않는다.

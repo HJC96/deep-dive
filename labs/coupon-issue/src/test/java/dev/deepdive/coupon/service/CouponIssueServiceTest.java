@@ -37,6 +37,9 @@ class CouponIssueServiceTest extends MySQLContainerTest {
     @Autowired
     private OptimisticLockCouponIssueService optimisticLockCouponIssueService;
 
+    @Autowired
+    private NamedLockCouponIssueService namedLockCouponIssueService;
+
     private SynchronizedCouponIssueService synchronizedCouponIssueService;
     private AtomicUpdateCouponIssueService atomicUpdateCouponIssueService;
 
@@ -214,6 +217,38 @@ class CouponIssueServiceTest extends MySQLContainerTest {
         }
     }
 
+    @Test
+    void 네임드_락으로_동시에_200번_발급하면_재고가_0이_된다() throws Exception {
+        CountDownLatch start = new CountDownLatch(1);
+        CountDownLatch done = new CountDownLatch(REQUEST_COUNT);
+        ExecutorService executor = Executors.newFixedThreadPool(THREAD_POOL_SIZE);
+
+        try {
+            for (int i = 0; i < REQUEST_COUNT; i++) {
+                executor.execute(() -> {
+                    try {
+                        start.await();
+                        namedLockCouponIssueService.issue(COUPON_ID);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    } finally {
+                        done.countDown();
+                    }
+                });
+            }
+
+            long startedAt = System.nanoTime();
+            start.countDown();
+            done.await();
+            System.out.printf("네임드 락: %.3fms%n", (System.nanoTime() - startedAt) / 1_000_000.0);
+
+            CouponStock couponStock = couponRepository.findById(COUPON_ID).orElseThrow();
+            assertThat(couponStock.remainingQuantity()).isEqualTo(0);
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
     // 측정 전에 발급 경로(findById+save, 비관적 락, 원자적 UPDATE)를 미리 실행해 콜드 스타트를 걷어낸다.
     private void warmUpOnce() throws Exception {
         if (warmedUp) {
@@ -228,6 +263,7 @@ class CouponIssueServiceTest extends MySQLContainerTest {
         measureIssueTimeMillis(WARMUP_ITERATIONS, THREAD_POOL_SIZE, () -> atomicWarmup.issue(WARMUP_COUPON_ID));
         // 낙관적 락은 동시 실행 시 충돌→재시도가 폭주하므로, 콜드 스타트 제거만 목적인 워밍업은 단일 스레드로 돌린다.
         measureIssueTimeMillis(WARMUP_ITERATIONS, 1, () -> optimisticLockCouponIssueService.issue(WARMUP_COUPON_ID));
+        measureIssueTimeMillis(WARMUP_ITERATIONS, THREAD_POOL_SIZE, () -> namedLockCouponIssueService.issue(WARMUP_COUPON_ID));
 
         warmedUp = true;
     }
