@@ -2,3 +2,6 @@ rootProject.name = 'deep-dive'
 
 include 'coupon-issue'
 project(':coupon-issue').projectDir = file('labs/coupon-issue')
+
+include 'java-sandbox'
+project(':java-sandbox').projectDir = file('labs/java-sandbox')
