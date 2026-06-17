@@ -10,10 +10,12 @@
 - 비관적 락 (`SELECT ... FOR UPDATE`)
 - 낙관적 락 (`@Version`)
 - 네임드 락 (MySQL `GET_LOCK`)
+- Redis 분산락 (`SET NX`)
 
 ## 공통 환경
 
 - Testcontainers MySQL 8.0.36
+- Redis 분산락 케이스만 Testcontainers Redis 7.2.5 추가 사용
 - Spring Data JPA `CouponRepository` (`coupon_stock` 테이블)
 - 낙관적 락만 `@Version`을 가진 별도 엔티티 `VersionedCouponStock`(`versioned_coupon_stock` 테이블) + `VersionedCouponRepository` 사용
   - `@Version`이 모든 발급 경로에 영향을 주지 않도록 엔티티를 분리한다. 같은 `CouponStock`에 `@Version`을 두면 "락 없음" 케이스마저 커밋 시 버전 검사를 받아 `ObjectOptimisticLockingFailureException`이 나고 lost update가 재현되지 않는다.
@@ -595,6 +597,115 @@ sequenceDiagram
     Note over DB: 키 단위로 직렬화되어 재고가 정확히 차감
 ```
 
+## 케이스 7. Redis 분산락 (`SET NX`)
+
+흐름:
+
+```text
+Redis 락 획득 -> SELECT -> 메모리에서 -1 -> flush/commit 시 UPDATE -> Redis 락 해제
+다른 요청은 같은 Redis key가 사라질 때까지 재시도
+```
+
+코드 흐름:
+
+```java
+public void issue(Long couponId) {
+    String lockKey = "coupon:issue:lock:" + couponId;
+
+    lock(lockKey);
+    try {
+        couponIssueService.issue(couponId);
+    } finally {
+        redisTemplate.delete(lockKey);
+    }
+}
+
+private void lock(String lockKey) {
+    while (true) {
+        if (Boolean.TRUE.equals(redisTemplate.opsForValue().setIfAbsent(lockKey, "LOCK", Duration.ofSeconds(30)))) {
+            return;
+        }
+        Thread.sleep(10);
+    }
+}
+```
+
+결과:
+
+- 최종 재고: `0`
+- 테스트 단언문: `isZero()`
+
+이유:
+
+- Redis에 락 key가 없으면 `SET NX` 성공 → 락 획득
+- Redis에 락 key가 있으면 `SET NX` 실패 → 잠깐 대기 후 재시도
+- 락은 `1 -> 0`처럼 카운트하지 않음
+- `key 있음`: 잠김
+- `key 없음`: 락 없음
+- 재고 차감은 기존 `CouponIssueService`가 담당
+- `CouponIssueService.issue()`는 `@Transactional`이므로 DB 차감은 트랜잭션 안에서 처리
+
+한계:
+
+- 락 TTL이 너무 짧으면 작업 중 락 만료 위험
+- 락 TTL이 너무 길면 장애 시 대기 시간 증가
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Test as 테스트 스레드
+    participant Executor as ExecutorService
+    participant StartLatch as start CountDownLatch
+    participant DoneLatch as done CountDownLatch
+    participant A as 요청 A
+    participant B as 요청 B
+    participant RedisService as RedisLockCouponIssueService
+    participant Redis as Redis
+    participant CouponService as CouponIssueService
+    participant DB as "MySQL(quantity = 200)"
+
+    Test->>Executor: 200개 발급 작업 제출
+    Executor->>A: 작업 할당
+    Executor->>B: 작업 할당
+    A->>StartLatch: await()
+    B->>StartLatch: await()
+
+    Test->>StartLatch: countDown()
+    StartLatch-->>A: 대기 해제
+    StartLatch-->>B: 대기 해제
+
+    A->>RedisService: issue(1L)
+    RedisService->>Redis: SET coupon:issue:lock:1 LOCK NX EX 30
+    Redis-->>RedisService: OK
+    RedisService->>CouponService: issue(1L)
+    CouponService->>DB: SELECT quantity = 200
+    CouponService->>CouponService: 200 - 1 = 199
+    CouponService->>DB: UPDATE quantity = 199
+
+    B->>RedisService: issue(1L)
+    RedisService->>Redis: SET coupon:issue:lock:1 LOCK NX EX 30
+    Redis-->>RedisService: 실패
+    Note over B,Redis: key가 있어서 락 획득 실패, 잠깐 대기 후 재시도
+
+    RedisService->>Redis: DEL coupon:issue:lock:1
+    A->>DoneLatch: countDown()
+
+    RedisService->>Redis: SET coupon:issue:lock:1 LOCK NX EX 30
+    Redis-->>RedisService: OK
+    RedisService->>CouponService: issue(1L)
+    CouponService->>DB: SELECT quantity = 199
+    CouponService->>CouponService: 199 - 1 = 198
+    CouponService->>DB: UPDATE quantity = 198
+    RedisService->>Redis: DEL coupon:issue:lock:1
+    B->>DoneLatch: countDown()
+
+    Test->>DoneLatch: await()
+    DoneLatch-->>Test: 모든 작업 완료
+
+    Note over Redis: 락은 숫자 감소가 아니라 key 존재 여부로 판단
+    Note over DB: Redis 락으로 직렬화되어 재고가 정확히 차감
+```
+
 ## 실행 시간
 
 예시 출력:
@@ -606,6 +717,7 @@ synchronized: 1039.150ms
 비관적 락: 1013.324ms
 네임드 락: 797.801ms
 낙관적 락(재시도): 3242.969ms
+Redis 분산락: 1552.831ms
 ```
 
 > 낙관적 락이 가장 느린 이유: 200개 요청이 한 row를 다투면서 충돌 → 재시도가 반복되기 때문이다. 이렇게 동시 요청이 한꺼번에 몰리는 선착순 쿠폰 같은 상황에는 잘 맞지 않는다.
