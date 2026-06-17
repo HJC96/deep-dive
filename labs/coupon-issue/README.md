@@ -11,20 +11,29 @@
 - 낙관적 락 (`@Version`)
 - 네임드 락 (MySQL `GET_LOCK`)
 - Redis 분산락 (`SET NX`)
+- Redis 원자적 재고 차감 (Lua)
+- Redisson 분산락 (`RLock`)
 
 ## 공통 환경
 
 - Testcontainers MySQL 8.0.36
-- Redis 분산락 케이스만 Testcontainers Redis 7.2.5 추가 사용
-- Spring Data JPA `CouponRepository` (`coupon_stock` 테이블)
-- 낙관적 락만 `@Version`을 가진 별도 엔티티 `VersionedCouponStock`(`versioned_coupon_stock` 테이블) + `VersionedCouponRepository` 사용
-  - `@Version`이 모든 발급 경로에 영향을 주지 않도록 엔티티를 분리한다. 같은 `CouponStock`에 `@Version`을 두면 "락 없음" 케이스마저 커밋 시 버전 검사를 받아 `ObjectOptimisticLockingFailureException`이 나고 lost update가 재현되지 않는다.
-- 테스트 시작 전 `coupon_stock`, `versioned_coupon_stock` 초기화
+- Redis 관련 케이스는 Testcontainers Redis 7.2.5 추가 사용
 - 실험 대상 쿠폰: ID `1L`, 재고 200개
-- 요청 수: 200개
-- 동시 시작: `start` 래치
-- 종료 대기: `done` 래치
+- 기본 요청 수: 200개
+- 초과 요청 수: 250개 (`원자적 UPDATE`, `Redis Lua`처럼 성공/실패를 반환하는 케이스)
 - 실행 시간: 테스트 콘솔에 `ms` 출력
+
+Mermaid 색상 기준:
+
+- 파랑: 테스트 실행 도구 (`테스트 스레드`, `ExecutorService`, latch)
+- 초록: 요청 스레드
+- 주황: 애플리케이션 코드
+- 분홍: 외부 저장소 (`MySQL`, `Redis`)
+
+테스트 단언문 표기 기준:
+
+- 최종 재고만 검증하는 케이스는 핵심 메서드만 표기 (`isEqualTo(0)`)
+- 성공 수처럼 별도 변수를 함께 검증하는 케이스는 AssertJ 호출을 풀어서 표기
 
 ## 케이스 1. 동시성 제어 없음
 
@@ -62,15 +71,22 @@ public void issue(Long couponId) {
 ```mermaid
 sequenceDiagram
     autonumber
+    box rgba(37, 99, 235, 0.40) 테스트 실행
     participant Test as 테스트 스레드
     participant Executor as ExecutorService
     participant StartLatch as start CountDownLatch
     participant DoneLatch as done CountDownLatch
+    end
+    box rgba(22, 163, 74, 0.40) 요청
     participant A as 요청 A
     participant B as 요청 B
+    end
+    box rgba(245, 158, 11, 0.40) 앱
     participant Service as CouponIssueService
-    participant Repository as CouponRepository
+    end
+    box rgba(219, 39, 119, 0.40) 저장소
     participant DB as "MySQL(quantity = 200)"
+    end
 
     Test->>Executor: 200개 발급 작업 제출
     Executor->>A: 작업 할당
@@ -83,20 +99,18 @@ sequenceDiagram
     StartLatch-->>B: 대기 해제
 
     A->>Service: issue(1L)
-    Service->>Repository: findById(1L)
-    Repository->>DB: SELECT quantity
-    DB-->>A: 200
+    Service->>DB: SELECT quantity
+    DB-->>Service: quantity = 200
 
     B->>Service: issue(1L)
-    Service->>Repository: findById(1L)
-    Repository->>DB: SELECT quantity
-    DB-->>B: 200
+    Service->>DB: SELECT quantity
+    DB-->>Service: quantity = 200
 
-    A->>A: 200 - 1 = 199
-    B->>B: 200 - 1 = 199
+    Service->>Service: A) 200 - 1 = 199
+    Service->>Service: B) 200 - 1 = 199
 
-    A->>DB: UPDATE quantity = 199
-    B->>DB: UPDATE quantity = 199
+    Service->>DB: A) UPDATE quantity = 199
+    Service->>DB: B) UPDATE quantity = 199
 
     A->>DoneLatch: countDown()
     B->>DoneLatch: countDown()
@@ -105,12 +119,6 @@ sequenceDiagram
 
     Note over DB: 두 요청 처리 후 최종 재고는 198이 아니라 199
 ```
-
-주의:
-
-- `@Transactional`은 Spring 프록시를 거쳐야 동작
-- `CouponIssueService`는 테스트에서 직접 `new` 하지 않고 Spring 빈으로 주입
-
 ## 케이스 2. synchronized
 
 흐름:
@@ -149,14 +157,22 @@ public synchronized void issue(Long couponId) {
 ```mermaid
 sequenceDiagram
     autonumber
+    box rgba(37, 99, 235, 0.40) 테스트 실행
     participant Test as 테스트 스레드
     participant Executor as ExecutorService
     participant StartLatch as start CountDownLatch
     participant DoneLatch as done CountDownLatch
+    end
+    box rgba(22, 163, 74, 0.40) 요청
     participant A as 요청 A
     participant B as 요청 B
+    end
+    box rgba(245, 158, 11, 0.40) 앱
     participant Service as SynchronizedCouponIssueService
+    end
+    box rgba(219, 39, 119, 0.40) 저장소
     participant DB as "MySQL(quantity = 200)"
+    end
 
     Test->>Executor: 200개 발급 작업 제출
     Executor->>A: 작업 할당
@@ -213,9 +229,11 @@ int decreaseQuantity(@Param("couponId") Long couponId);
 
 결과:
 
+- 요청 수: 250개
 - 이번 테스트의 성공 발급 수: 200개
+- 실패 요청 수: 50개
 - 최종 재고: `0`
-- 테스트 단언문: `issuedCount == 200`, `remainingQuantity == 0`
+- 테스트 단언문: `assertThat(issuedCount.get()).isEqualTo(200)`, `assertThat(remainingQuantity).isEqualTo(0)`
 
 이유:
 
@@ -224,7 +242,7 @@ int decreaseQuantity(@Param("couponId") Long couponId);
 - 애플리케이션 레벨 락 불필요
 - `affected rows = 1`: 성공
 - `affected rows = 0`: 재고 부족
-- 현재 테스트는 요청 수와 재고가 같아서 `0` 케이스까지 직접 검증하지 않음
+- 재고 200개에 요청 250개를 보내므로 초과 50개는 `affected rows = 0`으로 실패
 
 한계:
 
@@ -234,44 +252,49 @@ int decreaseQuantity(@Param("couponId") Long couponId);
 ```mermaid
 sequenceDiagram
     autonumber
+    box rgba(37, 99, 235, 0.40) 테스트 실행
     participant Test as 테스트 스레드
     participant Executor as ExecutorService
     participant StartLatch as start CountDownLatch
     participant DoneLatch as done CountDownLatch
+    end
+    box rgba(22, 163, 74, 0.40) 요청
     participant A as 요청 A
-    participant B as 요청 B
+    participant Z as 요청 Z
+    end
+    box rgba(245, 158, 11, 0.40) 앱
     participant Service as AtomicUpdateCouponIssueService
-    participant Repository as CouponRepository
+    end
+    box rgba(219, 39, 119, 0.40) 저장소
     participant DB as "MySQL(quantity = 200)"
+    end
 
-    Test->>Executor: 200개 발급 작업 제출
+    Test->>Executor: 250개 발급 작업 제출
     Executor->>A: 작업 할당
-    Executor->>B: 작업 할당
+    Executor->>Z: 작업 할당
     A->>StartLatch: await()
-    B->>StartLatch: await()
+    Z->>StartLatch: await()
 
     Test->>StartLatch: countDown()
     StartLatch-->>A: 대기 해제
-    StartLatch-->>B: 대기 해제
+    StartLatch-->>Z: 대기 해제
 
     A->>Service: issue(1L)
-    Service->>Repository: decreaseQuantity(1L)
-    Repository->>DB: UPDATE quantity = quantity - 1 WHERE id = 1 AND quantity >= 1
-    DB-->>Repository: affected rows = 1
-    Repository-->>Service: true
+    Service->>DB: UPDATE quantity = quantity - 1 WHERE id = 1 AND quantity >= 1
+    DB-->>Service: affected rows = 1
 
-    B->>Service: issue(1L)
-    Service->>Repository: decreaseQuantity(1L)
-    Repository->>DB: UPDATE quantity = quantity - 1 WHERE id = 1 AND quantity >= 1
-    DB-->>Repository: affected rows = 1
-    Repository-->>Service: true
+    Note over DB: 200개 요청 성공 후 quantity = 0
+
+    Z->>Service: issue(1L)
+    Service->>DB: UPDATE quantity = quantity - 1 WHERE id = 1 AND quantity >= 1
+    DB-->>Service: affected rows = 0
 
     A->>DoneLatch: countDown()
-    B->>DoneLatch: countDown()
+    Z->>DoneLatch: countDown()
     Test->>DoneLatch: await()
     DoneLatch-->>Test: 모든 작업 완료
 
-    Note over DB: DB가 단일 UPDATE를 원자적으로 처리
+    Note over DB: 250개 요청 중 200개만 성공, 최종 재고 0
 ```
 
 ## 케이스 4. 비관적 락 (`SELECT ... FOR UPDATE`)
@@ -327,14 +350,22 @@ public void issue(Long couponId) {
 ```mermaid
 sequenceDiagram
     autonumber
+    box rgba(37, 99, 235, 0.40) 테스트 실행
     participant Test as 테스트 스레드
     participant Executor as ExecutorService
     participant StartLatch as start CountDownLatch
     participant DoneLatch as done CountDownLatch
+    end
+    box rgba(22, 163, 74, 0.40) 요청
     participant A as 요청 A
     participant B as 요청 B
+    end
+    box rgba(245, 158, 11, 0.40) 앱
     participant Service as PessimisticLockCouponIssueService
+    end
+    box rgba(219, 39, 119, 0.40) 저장소
     participant DB as "MySQL(quantity = 200)"
+    end
 
     Test->>Executor: 200개 발급 작업 제출
     Executor->>A: 작업 할당
@@ -430,24 +461,35 @@ public void issueOnce(Long couponId) {
 - 충돌한 요청은 **실패** → 재시도 없이는 재고가 `0`까지 안 줄어듦
 - 재시도 루프가 충돌 요청을 새 트랜잭션에서 다시 시도 → 결국 모두 성공
 
-한계 (낙관적 락의 단점):
+한계:
 
 - **충돌이 곧 실패** — 락으로 막는 게 아니라 "충돌을 사후에 감지"하는 방식이라 충돌 시 예외
 - **재시도 로직이 사실상 필수** — 그냥 두면 요청 실패 → 재시도(+백오프)를 직접 구현해야 함. 비관적 락·원자적 `UPDATE`엔 없는 추가 코드
-- **재시도가 트랜잭션 바깥이어야 함** — 충돌 예외는 커밋 시점에 나고 그 트랜잭션은 롤백 → 같은 `@Transactional` 안에서 재시도 불가 → 경계와 루프를 분리
 - **동시 요청 몰리면 비효율** — 같은 row를 여럿이 다투면 대부분 충돌 → 재시도 폭주. 이 실험도 200개를 한 row에 몰아 다른 방식보다 훨씬 느림(아래 실행 시간). 동시 충돌이 드문 상황에 적합
+
+참고:
+
+- **재시도가 트랜잭션 바깥이어야 함** — 충돌 예외는 커밋 시점에 나고 그 트랜잭션은 롤백 → 같은 `@Transactional` 안에서 재시도 불가 → 경계와 루프를 분리
 
 ```mermaid
 sequenceDiagram
     autonumber
+    box rgba(37, 99, 235, 0.40) 테스트 실행
     participant Test as 테스트 스레드
     participant Executor as ExecutorService
     participant StartLatch as start CountDownLatch
     participant DoneLatch as done CountDownLatch
+    end
+    box rgba(22, 163, 74, 0.40) 요청
     participant A as 요청 A
     participant B as 요청 B
+    end
+    box rgba(245, 158, 11, 0.40) 앱
     participant Service as OptimisticLockCouponIssueService
+    end
+    box rgba(219, 39, 119, 0.40) 저장소
     participant DB as "MySQL(quantity = 200, version = 0)"
+    end
 
     Test->>Executor: 200개 발급 작업 제출
     Executor->>A: 작업 할당
@@ -546,24 +588,37 @@ public void issueOnce(Long couponId) {
 - 비관적 락과 달리 테이블·row와 무관 → 락 대상을 애플리케이션이 자유롭게 지정
 - 차감을 `REQUIRES_NEW`로 분리해 **락 풀기 전에 커밋** → 안 그러면 다음 스레드가 안 보이는 재고를 읽어 lost update
 
+한계:
+
+- 비관적 락처럼 전 구간 직렬화 → 처리량 저하
+- 락 대기 스레드도 커넥션 점유 → 동시 요청 몰리면 풀 고갈 위험
+- `GET_LOCK`은 MySQL 전용 → DB 종속
+
 주의 (커넥션 2개 + `self` 호출):
 
 - 락 잡는 커넥션(`@Transactional`)과 차감 커넥션(`REQUIRES_NEW`)이 **동시에 2개** 필요
 - `getLock`/`releaseLock`은 **같은 커넥션**에서 해야 풀림 → `@Transactional`로 한 커넥션에 고정
 - `self.issueOnce()`로 프록시를 거쳐야 `REQUIRES_NEW`가 적용 (낙관적 락과 같은 self 주입)
-- 락 대기 스레드도 커넥션 점유 → 실서비스에선 풀 고갈 방지 위해 **락 전용 DataSource 분리** 권장 (이 실험은 단순화 위해 같은 DataSource + 넉넉한 풀)
 
 ```mermaid
 sequenceDiagram
     autonumber
+    box rgba(37, 99, 235, 0.40) 테스트 실행
     participant Test as 테스트 스레드
     participant Executor as ExecutorService
     participant StartLatch as start CountDownLatch
     participant DoneLatch as done CountDownLatch
+    end
+    box rgba(22, 163, 74, 0.40) 요청
     participant A as 요청 A
     participant B as 요청 B
+    end
+    box rgba(245, 158, 11, 0.40) 앱
     participant Service as NamedLockCouponIssueService
+    end
+    box rgba(219, 39, 119, 0.40) 저장소
     participant DB as "MySQL(quantity = 200)"
+    end
 
     Test->>Executor: 200개 발급 작업 제출
     Executor->>A: 작업 할당
@@ -633,17 +688,15 @@ private void lock(String lockKey) {
 결과:
 
 - 최종 재고: `0`
-- 테스트 단언문: `isZero()`
+- 테스트 단언문: `isEqualTo(0)`
 
 이유:
 
 - Redis에 락 key가 없으면 `SET NX` 성공 → 락 획득
 - Redis에 락 key가 있으면 `SET NX` 실패 → 잠깐 대기 후 재시도
-- 락은 `1 -> 0`처럼 카운트하지 않음
 - `key 있음`: 잠김
 - `key 없음`: 락 없음
 - 재고 차감은 기존 `CouponIssueService`가 담당
-- `CouponIssueService.issue()`는 `@Transactional`이므로 DB 차감은 트랜잭션 안에서 처리
 
 한계:
 
@@ -653,16 +706,24 @@ private void lock(String lockKey) {
 ```mermaid
 sequenceDiagram
     autonumber
+    box rgba(37, 99, 235, 0.40) 테스트 실행
     participant Test as 테스트 스레드
     participant Executor as ExecutorService
     participant StartLatch as start CountDownLatch
     participant DoneLatch as done CountDownLatch
+    end
+    box rgba(22, 163, 74, 0.40) 요청
     participant A as 요청 A
     participant B as 요청 B
+    end
+    box rgba(245, 158, 11, 0.40) 앱
     participant RedisService as RedisLockCouponIssueService
-    participant Redis as Redis
     participant CouponService as CouponIssueService
+    end
+    box rgba(219, 39, 119, 0.40) 저장소
+    participant Redis as Redis
     participant DB as "MySQL(quantity = 200)"
+    end
 
     Test->>Executor: 200개 발급 작업 제출
     Executor->>A: 작업 할당
@@ -706,18 +767,226 @@ sequenceDiagram
     Note over DB: Redis 락으로 직렬화되어 재고가 정확히 차감
 ```
 
+## 케이스 8. Redis 원자적 재고 차감 (Lua)
+
+흐름:
+
+```text
+Redis Lua script 한 번 호출 -> 재고 확인 -> 1 이상이면 DECR -> 성공/실패 반환
+```
+
+Lua 스크립트:
+
+```lua
+local stock = tonumber(redis.call('GET', KEYS[1]) or '0')
+if stock < 1 then
+    return 0
+end
+redis.call('DECR', KEYS[1])
+return 1
+```
+
+Java 호출 코드:
+
+```java
+public boolean issue(Long couponId) {
+    Long result = redisTemplate.execute(DECREASE_STOCK_SCRIPT, List.of(stockKey(couponId)));
+    return Long.valueOf(1L).equals(result);
+}
+```
+
+결과:
+
+- Redis key: `coupon:stock:1`
+- 초기 재고: 200개
+- 요청 수: 250개
+- 성공 발급 수: 200개
+- 실패 요청 수: 50개
+- 최종 Redis 재고: `0`
+- 테스트 단언문: `assertThat(issuedCount.get()).isEqualTo(200)`, `assertThat(stock).isEqualTo("0")`
+
+이유:
+
+- `GET`으로 재고 확인하고 `DECR`하는 작업을 Lua script 하나로 묶음
+- Redis는 Lua script 실행 중 다른 명령을 끼워 넣지 않음 → 확인과 차감이 원자적으로 처리
+- DB 락, 애플리케이션 락 없이 Redis 단일 실행으로 끝
+- 재고가 `0`이면 차감하지 않고 실패 반환
+
+한계:
+
+- Redis가 재고의 기준 저장소가 됨
+- DB에 발급 이력을 남겨야 한다면 Redis 차감 이후 동기화 전략 필요
+- 복잡한 정책이 많아지면 Lua script가 읽기 어려워짐
+- Redis 장애, 클러스터, 복제 지연까지 고려하면 운영 설계가 별도로 필요
+
+```mermaid
+sequenceDiagram
+    autonumber
+    box rgba(37, 99, 235, 0.40) 테스트 실행
+    participant Test as 테스트 스레드
+    participant Executor as ExecutorService
+    participant StartLatch as start CountDownLatch
+    participant DoneLatch as done CountDownLatch
+    end
+    box rgba(22, 163, 74, 0.40) 요청
+    participant A as 요청 A
+    participant Z as 요청 Z
+    end
+    box rgba(245, 158, 11, 0.40) 앱
+    participant Service as RedisAtomicCouponIssueService
+    end
+    box rgba(219, 39, 119, 0.40) 저장소
+    participant Redis as "Redis(coupon:stock:1 = 200)"
+    end
+
+    Test->>Executor: 250개 발급 작업 제출
+    Executor->>A: 작업 할당
+    Executor->>Z: 작업 할당
+    A->>StartLatch: await()
+    Z->>StartLatch: await()
+
+    Test->>StartLatch: countDown()
+    StartLatch-->>A: 대기 해제
+    StartLatch-->>Z: 대기 해제
+
+    A->>Service: issue(1L)
+    Service->>Redis: EVAL Lua(GET stock, stock >= 1이면 DECR)
+    Redis-->>Service: 1
+    A->>DoneLatch: countDown()
+
+    Note over Redis: 200개 요청 성공 후 coupon:stock:1 = 0
+
+    Z->>Service: issue(1L)
+    Service->>Redis: EVAL Lua(GET stock, stock >= 1이면 DECR)
+    Redis-->>Service: 0
+    Z->>DoneLatch: countDown()
+
+    Note over Redis: Lua script 전체가 Redis 안에서 원자적으로 실행
+    Note over Redis: 재고가 0이면 DECR하지 않고 0 반환
+
+    Test->>DoneLatch: await()
+    DoneLatch-->>Test: 모든 작업 완료
+
+    Note over Redis: 250개 요청 중 200개만 성공, 최종 재고 0
+```
+
+## 케이스 9. Redisson 분산락 (`RLock`)
+
+흐름:
+
+```text
+Redisson RLock 획득 -> SELECT -> 메모리에서 -1 -> flush/commit 시 UPDATE -> RLock 해제
+다른 요청은 같은 Redis lock key가 풀릴 때까지 대기
+```
+
+코드 흐름:
+
+```java
+public void issue(Long couponId) {
+    RLock lock = redissonClient.getLock("coupon:issue:redisson-lock:" + couponId);
+
+    lock.lock();
+    try {
+        couponIssueService.issue(couponId);
+    } finally {
+        lock.unlock();
+    }
+}
+```
+
+결과:
+
+- 최종 재고: `0`
+- 테스트 단언문: `isEqualTo(0)`
+
+이유:
+
+- Redisson `RLock`이 Redis 기반 락 획득/대기/해제를 처리
+- 직접 `SET NX`, TTL, 재시도 루프를 작성하지 않아도 됨
+- 락 안에서 기존 `CouponIssueService.issue()` 실행 → DB 차감 로직 재사용
+- 같은 쿠폰 ID는 하나씩만 차감 → lost update 없음
+
+한계:
+
+- Redis 락으로 임계 구역을 직렬화 → 처리량 저하
+- 락을 잡은 뒤 DB 작업을 하므로 Redis와 DB를 모두 의존
+- 락 lease time, watchdog, 장애 시 unlock 같은 Redisson 동작 이해 필요
+
+```mermaid
+sequenceDiagram
+    autonumber
+    box rgba(37, 99, 235, 0.40) 테스트 실행
+    participant Test as 테스트 스레드
+    participant Executor as ExecutorService
+    participant StartLatch as start CountDownLatch
+    participant DoneLatch as done CountDownLatch
+    end
+    box rgba(22, 163, 74, 0.40) 요청
+    participant A as 요청 A
+    participant B as 요청 B
+    end
+    box rgba(245, 158, 11, 0.40) 앱
+    participant RedissonService as RedissonLockCouponIssueService
+    participant CouponService as CouponIssueService
+    end
+    box rgba(219, 39, 119, 0.40) 저장소
+    participant Redis as Redis
+    participant DB as "MySQL(quantity = 200)"
+    end
+
+    Test->>Executor: 200개 발급 작업 제출
+    Executor->>A: 작업 할당
+    Executor->>B: 작업 할당
+    A->>StartLatch: await()
+    B->>StartLatch: await()
+
+    Test->>StartLatch: countDown()
+    StartLatch-->>A: 대기 해제
+    StartLatch-->>B: 대기 해제
+
+    A->>RedissonService: issue(1L)
+    RedissonService->>Redis: RLock lock()
+    Redis-->>RedissonService: 락 획득
+    RedissonService->>CouponService: issue(1L)
+    CouponService->>DB: SELECT quantity = 200
+    CouponService->>CouponService: 200 - 1 = 199
+    CouponService->>DB: UPDATE quantity = 199
+
+    B->>RedissonService: issue(1L)
+    RedissonService->>Redis: RLock lock()
+    Note over B,Redis: 같은 락 key라 대기
+
+    RedissonService->>Redis: unlock()
+    A->>DoneLatch: countDown()
+
+    Redis-->>RedissonService: B 락 획득
+    RedissonService->>CouponService: issue(1L)
+    CouponService->>DB: SELECT quantity = 199
+    CouponService->>CouponService: 199 - 1 = 198
+    CouponService->>DB: UPDATE quantity = 198
+    RedissonService->>Redis: unlock()
+    B->>DoneLatch: countDown()
+
+    Test->>DoneLatch: await()
+    DoneLatch-->>Test: 모든 작업 완료
+
+    Note over DB: Redisson 락으로 직렬화되어 재고가 정확히 차감
+```
+
 ## 실행 시간
 
 예시 출력:
 
 ```text
-락 없음: 97.899ms
-synchronized: 1039.150ms
-원자적 UPDATE: 386.068ms
-비관적 락: 1013.324ms
-네임드 락: 797.801ms
-낙관적 락(재시도): 3242.969ms
-Redis 분산락: 1552.831ms
+락 없음: 163.157ms
+synchronized: 933.327ms
+원자적 UPDATE: 369.100ms
+비관적 락: 429.167ms
+낙관적 락(재시도): 3156.127ms
+네임드 락: 1101.326ms
+Redis 분산락: 1312.485ms
+Redis Lua 원자 차감: 41.137ms
+Redisson 분산락: 1312.510ms
 ```
 
 > 낙관적 락이 가장 느린 이유: 200개 요청이 한 row를 다투면서 충돌 → 재시도가 반복되기 때문이다. 이렇게 동시 요청이 한꺼번에 몰리는 선착순 쿠폰 같은 상황에는 잘 맞지 않는다.

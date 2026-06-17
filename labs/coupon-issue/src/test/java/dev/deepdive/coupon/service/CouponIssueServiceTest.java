@@ -21,6 +21,7 @@ class CouponIssueServiceTest extends MySQLContainerTest {
     private static final Long WARMUP_COUPON_ID = 9_999L;
     private static final int QUANTITY = 200;
     private static final int REQUEST_COUNT = 200;
+    private static final int OVER_REQUEST_COUNT = 250;
     private static final int THREAD_POOL_SIZE = 32;
     private static final int WARMUP_ITERATIONS = 1_000;
 
@@ -117,15 +118,15 @@ class CouponIssueServiceTest extends MySQLContainerTest {
     }
 
     @Test
-    void 원자적_update로_동시에_200번_발급하면_재고만큼만_성공한다() throws Exception {
+    void 원자적_update로_재고보다_많이_요청해도_재고만큼만_성공한다() throws Exception {
         AtomicInteger issuedCount = new AtomicInteger();
 
         CountDownLatch start = new CountDownLatch(1);
-        CountDownLatch done = new CountDownLatch(REQUEST_COUNT);
+        CountDownLatch done = new CountDownLatch(OVER_REQUEST_COUNT);
         ExecutorService executor = Executors.newFixedThreadPool(THREAD_POOL_SIZE);
 
         try {
-            for (int i = 0; i < REQUEST_COUNT; i++) {
+            for (int i = 0; i < OVER_REQUEST_COUNT; i++) {
                 executor.execute(() -> {
                     try {
                         start.await();
@@ -146,7 +147,7 @@ class CouponIssueServiceTest extends MySQLContainerTest {
             System.out.printf("원자적 UPDATE: %.3fms%n", (System.nanoTime() - startedAt) / 1_000_000.0);
 
             assertThat(issuedCount.get()).isEqualTo(QUANTITY);
-            assertThat(couponRepository.findById(COUPON_ID).orElseThrow().remainingQuantity()).isZero();
+            assertThat(couponRepository.findById(COUPON_ID).orElseThrow().remainingQuantity()).isEqualTo(0);
         } finally {
             executor.shutdownNow();
         }
