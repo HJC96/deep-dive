@@ -6,3 +6,4 @@
 
 - `coupon-issue`: 동시성 문제 실험실
 - `java-sandbox`: Java 실험실
+- `cache-patterns`: 캐시 패턴 실험실

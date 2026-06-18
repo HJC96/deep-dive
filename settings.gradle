@@ -5,3 +5,6 @@ project(':coupon-issue').projectDir = file('labs/coupon-issue')
 
 include 'java-sandbox'
 project(':java-sandbox').projectDir = file('labs/java-sandbox')
+
+include 'cache-patterns'
+project(':cache-patterns').projectDir = file('labs/cache-patterns')
