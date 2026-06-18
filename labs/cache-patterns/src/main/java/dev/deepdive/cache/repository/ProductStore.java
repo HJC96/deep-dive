@@ -1,4 +1,6 @@
-package dev.deepdive.cache;
+package dev.deepdive.cache.repository;
+
+import dev.deepdive.cache.domain.Product;
 
 import java.util.Optional;
 

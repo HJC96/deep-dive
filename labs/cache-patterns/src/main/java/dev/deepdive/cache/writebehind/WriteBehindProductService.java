@@ -1,4 +1,8 @@
-package dev.deepdive.cache;
+package dev.deepdive.cache.writebehind;
+
+import dev.deepdive.cache.domain.Product;
+import dev.deepdive.cache.infrastructure.Cache;
+import dev.deepdive.cache.repository.ProductStore;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;

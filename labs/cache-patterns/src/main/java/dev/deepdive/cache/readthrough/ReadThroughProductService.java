@@ -1,4 +1,7 @@
-package dev.deepdive.cache;
+package dev.deepdive.cache.readthrough;
+
+import dev.deepdive.cache.domain.Product;
+import dev.deepdive.cache.repository.ProductStore;
 
 import java.util.Optional;
 

@@ -1,5 +1,8 @@
-package dev.deepdive.cache;
+package dev.deepdive.cache.writearound;
 
+import dev.deepdive.cache.domain.Product;
+import dev.deepdive.cache.infrastructure.InMemoryCache;
+import dev.deepdive.cache.repository.InMemoryProductStore;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;

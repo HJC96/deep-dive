@@ -1,4 +1,4 @@
-package dev.deepdive.cache;
+package dev.deepdive.cache.infrastructure;
 
 import java.util.Optional;
 

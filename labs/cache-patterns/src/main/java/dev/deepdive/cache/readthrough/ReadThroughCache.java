@@ -1,4 +1,6 @@
-package dev.deepdive.cache;
+package dev.deepdive.cache.readthrough;
+
+import dev.deepdive.cache.infrastructure.Cache;
 
 import java.util.Objects;
 import java.util.Optional;
