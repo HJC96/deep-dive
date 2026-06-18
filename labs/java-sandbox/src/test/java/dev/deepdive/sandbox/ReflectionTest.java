@@ -1,6 +1,7 @@
 package dev.deepdive.sandbox;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
@@ -37,10 +38,8 @@ class ReflectionTest {
 
     @Test
     void 존재하지_않는_클래스를_로드하면_예외가_발생한다() {
-        org.junit.jupiter.api.Assertions.assertThrows(
-                ClassNotFoundException.class,
-                () -> Class.forName("dev.deepdive.sandbox.NoSuchClass")
-        );
+        assertThatThrownBy(() -> Class.forName("dev.deepdive.sandbox.NoSuchClass"))
+                .isInstanceOf(ClassNotFoundException.class);
     }
 
     // -------------------------------------------------------------------------
