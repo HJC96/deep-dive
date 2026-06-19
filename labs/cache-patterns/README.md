@@ -7,6 +7,7 @@
 목표: 캐시 패턴 5개를 읽기 축과 쓰기 축으로 분해해서 비교
 
 ```mermaid
+%%{init: {"theme": "base", "themeVariables": {"primaryTextColor": "#111827", "secondaryTextColor": "#111827", "tertiaryTextColor": "#111827", "actorTextColor": "#111827", "signalTextColor": "#111827", "labelTextColor": "#111827", "noteTextColor": "#111827", "noteBkgColor": "#ffffff", "noteBorderColor": "#374151", "sequenceNumberColor": "#111827"}}}%%
 flowchart LR
     Client["Client/Test"]
     Read["읽기 요청"]
@@ -52,6 +53,13 @@ flowchart LR
 - Cache Aside: 서비스가 캐시 miss 확인 후 저장소 직접 조회
 - Read Through: 서비스는 캐시만 호출, 캐시가 loader로 저장소 조회
 
+이 예제의 `ReadThroughCache`:
+
+- 비즈니스 서비스 바깥의 캐시 접근 계층을 표현한 래퍼
+- 실제 캐시 저장 공간은 `InMemoryCache`
+- `ReadThroughCache`는 miss 처리와 loader 호출만 담당
+- 서비스 입장에서는 캐시만 호출하고, 저장소 조회 로직은 직접 다루지 않음
+
 ### 2. 쓰기 반영 방식 비교
 
 | 패턴 | 쓰기 흐름 | 쓰기 직후 캐시 | 저장소 반영 시점 | 잘 맞는 상황 |
@@ -62,7 +70,7 @@ flowchart LR
 
 `Write Around`: 캐시에 새 값을 넣지 않는 쓰기 전략
 
-- 기존 캐시 값이 있으면 stale data 가능
+- 기존 캐시 값이 있으면 저장소보다 오래된 값을 반환할 수 있음
 - 이 예제에서는 `cache.evict`로 제거
 
 ## 조합 예시
@@ -103,7 +111,7 @@ flowchart LR
   - 저장소 read/write 횟수
   - Write Behind pending write 개수
 
-## 그룹 1. 읽기 miss 처리 전략
+## 1. 읽기 miss 처리 전략
 
 ### 케이스 1. Cache Aside
 
@@ -150,6 +158,7 @@ public Optional<Product> findById(long id) {
 - miss가 한 번에 몰리면 저장소로 요청이 집중될 수 있음
 
 ```mermaid
+%%{init: {"theme": "base", "themeVariables": {"primaryTextColor": "#111827", "secondaryTextColor": "#111827", "tertiaryTextColor": "#111827", "actorTextColor": "#111827", "signalTextColor": "#111827", "labelTextColor": "#111827", "noteTextColor": "#111827", "noteBkgColor": "#ffffff", "noteBorderColor": "#374151", "sequenceNumberColor": "#111827"}}}%%
 sequenceDiagram
     autonumber
     box rgba(37, 99, 235, 0.40) 테스트/클라이언트
@@ -165,6 +174,7 @@ sequenceDiagram
     participant Store as InMemoryProductStore
     end
 
+    Note over Test,Store: 읽기 경로 1 - cache miss 후 저장소 조회와 캐시 적재
     Test->>Service: findById(1L)
     Service->>Cache: get(1L)
     Cache-->>Service: miss
@@ -173,18 +183,18 @@ sequenceDiagram
     Service->>Cache: put(1L, Product)
     Service-->>Test: Product
 
+    Note over Test,Store: 읽기 경로 2 - cache hit
     Test->>Service: findById(1L)
     Service->>Cache: get(1L)
     Cache-->>Service: hit Product
     Service-->>Test: Product
 
+    Note over Test,Store: 쓰기 경로 - 저장소 반영 후 캐시 제거
     Test->>Service: save(updated)
     Service->>Store: save(updated)
     Store-->>Service: saved
     Service->>Cache: evict(1L)
     Service-->>Test: saved
-
-    Note over Cache,Store: 쓰기 후 캐시를 비워 다음 읽기에서 저장소 값을 다시 적재
 ```
 
 ### 케이스 2. Read Through
@@ -227,11 +237,14 @@ public Optional<V> get(K key) {
 
 주의점:
 
+- 이 예제에서는 비즈니스 서비스 바깥의 캐시 접근 계층을 `ReadThroughCache`로 표현
+- 외부 Redis 자체가 DB loader를 아는 구조는 아님
 - 캐시 계층이 저장소 loader를 알아야 함
 - Cache Aside보다 구조가 한 단계 더 두꺼움
 - 쓰기 정책은 별도로 선택해야 함
 
 ```mermaid
+%%{init: {"theme": "base", "themeVariables": {"primaryTextColor": "#111827", "secondaryTextColor": "#111827", "tertiaryTextColor": "#111827", "actorTextColor": "#111827", "signalTextColor": "#111827", "labelTextColor": "#111827", "noteTextColor": "#111827", "noteBkgColor": "#ffffff", "noteBorderColor": "#374151", "sequenceNumberColor": "#111827"}}}%%
 sequenceDiagram
     autonumber
     box rgba(37, 99, 235, 0.40) 테스트/클라이언트
@@ -248,6 +261,7 @@ sequenceDiagram
     participant Store as InMemoryProductStore
     end
 
+    Note over Test,Store: 읽기 경로 - ReadThroughCache가 miss 처리와 loader 호출 담당
     Test->>Service: findById(1L)
     Service->>Products: get(1L)
     Products->>Cache: get(1L)
@@ -258,17 +272,16 @@ sequenceDiagram
     Products-->>Service: Product
     Service-->>Test: Product
 
+    Note over Test,Store: 쓰기 경로 - 서비스가 저장소에 반영하고 캐시 래퍼로 무효화
     Test->>Service: save(updated)
     Service->>Store: save(updated)
     Store-->>Service: saved
     Service->>Products: evict(1L)
     Products->>Cache: evict(1L)
     Service-->>Test: saved
-
-    Note over Products,Store: 쓰기는 서비스가 저장소에 반영하고 캐시를 무효화
 ```
 
-## 그룹 2. 쓰기 반영 전략
+## 2. 쓰기 반영 전략
 
 ### 케이스 3. Write Through
 
@@ -309,6 +322,7 @@ public Product save(Product product) {
 - 거의 읽히지 않는 데이터도 캐시에 들어갈 수 있음
 
 ```mermaid
+%%{init: {"theme": "base", "themeVariables": {"primaryTextColor": "#111827", "secondaryTextColor": "#111827", "tertiaryTextColor": "#111827", "actorTextColor": "#111827", "signalTextColor": "#111827", "labelTextColor": "#111827", "noteTextColor": "#111827", "noteBkgColor": "#ffffff", "noteBorderColor": "#374151", "sequenceNumberColor": "#111827"}}}%%
 sequenceDiagram
     autonumber
     box rgba(37, 99, 235, 0.40) 테스트/클라이언트
@@ -324,12 +338,14 @@ sequenceDiagram
     participant Store as InMemoryProductStore
     end
 
+    Note over Test,Store: 쓰기 경로 - 저장소와 캐시를 함께 갱신
     Test->>Service: save(Product)
     Service->>Store: save(Product)
     Store-->>Service: saved
     Service->>Cache: put(id, saved)
     Service-->>Test: saved
 
+    Note over Test,Store: 읽기 경로 - 쓰기 때 채운 캐시에서 hit
     Test->>Service: findById(id)
     Service->>Cache: get(id)
     Cache-->>Service: hit saved
@@ -372,10 +388,12 @@ public Product save(Product product) {
 주의점:
 
 - 쓰기 직후 첫 읽기는 저장소를 거침
-- 기존 캐시 값 존재 시 stale data 방지를 위해 무효화 필요
+- 기존 캐시 값 존재 시 저장소보다 오래된 값 반환 가능
+- 그래서 쓰기 후 캐시 무효화 필요
 - 첫 읽기 요청자가 캐시 재적재 비용을 부담
 
 ```mermaid
+%%{init: {"theme": "base", "themeVariables": {"primaryTextColor": "#111827", "secondaryTextColor": "#111827", "tertiaryTextColor": "#111827", "actorTextColor": "#111827", "signalTextColor": "#111827", "labelTextColor": "#111827", "noteTextColor": "#111827", "noteBkgColor": "#ffffff", "noteBorderColor": "#374151", "sequenceNumberColor": "#111827"}}}%%
 sequenceDiagram
     autonumber
     box rgba(37, 99, 235, 0.40) 테스트/클라이언트
@@ -391,18 +409,26 @@ sequenceDiagram
     participant Store as InMemoryProductStore
     end
 
+    Note over Test,Store: 쓰기 경로 - 저장소만 갱신하고 캐시는 제거
     Test->>Service: save(Product)
     Service->>Store: save(Product)
     Store-->>Service: saved
     Service->>Cache: evict(id)
     Service-->>Test: saved
 
+    Note over Test,Store: 읽기 경로 1 - cache miss 후 저장소 조회와 캐시 적재
     Test->>Service: findById(id)
     Service->>Cache: get(id)
     Cache-->>Service: miss
     Service->>Store: findById(id)
     Store-->>Service: Product
     Service->>Cache: put(id, Product)
+    Service-->>Test: Product
+
+    Note over Test,Store: 읽기 경로 2 - 이후 조회는 cache hit
+    Test->>Service: findById(id)
+    Service->>Cache: get(id)
+    Cache-->>Service: hit Product
     Service-->>Test: Product
 ```
 
@@ -448,13 +474,10 @@ public void flush() {
 - 조회는 캐시 중심으로 처리하고, 저장소는 나중에 따라와도 되는 데이터일 때
 
 주의점:
-
-- 이 예제의 `pendingWrites`는 메모리 Map이므로 학습용으로만 사용
-- 실제 서비스에서는 durable queue, WAL, outbox, retry, idempotency 필요
-- flush 전 프로세스 종료 시 데이터 유실 가능
 - 저장소와 캐시 사이의 일시적 불일치
 
 ```mermaid
+%%{init: {"theme": "base", "themeVariables": {"primaryTextColor": "#111827", "secondaryTextColor": "#111827", "tertiaryTextColor": "#111827", "actorTextColor": "#111827", "signalTextColor": "#111827", "labelTextColor": "#111827", "noteTextColor": "#111827", "noteBkgColor": "#ffffff", "noteBorderColor": "#374151", "sequenceNumberColor": "#111827"}}}%%
 sequenceDiagram
     autonumber
     box rgba(37, 99, 235, 0.40) 테스트/클라이언트
@@ -473,17 +496,20 @@ sequenceDiagram
     participant Store as InMemoryProductStore
     end
 
+    Note over Test,Store: 쓰기 경로 - 캐시와 pendingWrites에 먼저 반영
     Test->>Service: save(updated)
     Service->>Cache: put(id, updated)
     Service->>Queue: put(id, updated)
     Service-->>Test: updated
     Note over Store: 아직 저장소에는 이전 값이 남아 있음
 
+    Note over Test,Store: 읽기 경로 - 저장소를 거치지 않고 캐시 최신 값 반환
     Test->>Service: findById(id)
     Service->>Cache: get(id)
     Cache-->>Service: hit updated
     Service-->>Test: updated
 
+    Note over Test,Store: flush 경로 - 지연된 쓰기를 저장소에 반영
     Test->>Service: flush()
     Service->>Queue: values()
     Queue-->>Service: pending products

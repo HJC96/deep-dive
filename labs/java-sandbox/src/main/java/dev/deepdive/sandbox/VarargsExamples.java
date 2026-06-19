@@ -45,7 +45,7 @@ final class VarargsExamples {
         }
 
         static KeywordGroup safe(String... keywords) {
-            return new텟 KeywordGroup(Arrays.copyOf(keywords, keywords.length));
+            return new KeywordGroup(Arrays.copyOf(keywords, keywords.length));
         }
 
         String first() {
