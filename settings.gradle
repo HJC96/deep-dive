@@ -8,6 +8,3 @@ project(':java-sandbox').projectDir = file('labs/java-sandbox')
 
 include 'cache-patterns'
 project(':cache-patterns').projectDir = file('labs/cache-patterns')
-
-include 'spring-cache'
-project(':spring-cache').projectDir = file('labs/spring-cache')
