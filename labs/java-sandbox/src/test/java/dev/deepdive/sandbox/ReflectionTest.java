@@ -14,6 +14,41 @@ import org.junit.jupiter.api.Test;
 class ReflectionTest {
 
     // -------------------------------------------------------------------------
+    // 객체 생성 방식 비교
+    // -------------------------------------------------------------------------
+
+    @Test
+    void 컴파일_타임에_타입을_알고_있으면_new로_객체를_생성한다() {
+        Person person = new Person("홍길동", 30);
+
+        assertThat(person).isExactlyInstanceOf(Person.class);
+        assertThat(person.name).isEqualTo("홍길동");
+        assertThat(person.greet()).isEqualTo("안녕하세요, 홍길동입니다.");
+    }
+
+    @Test
+    void 컴파일_타임에_Class를_알고_있으면_reflection으로_타입_안전하게_객체를_생성할_수_있다() throws Exception {
+        Class<Person> clazz = Person.class;
+        Constructor<Person> constructor = clazz.getDeclaredConstructor(String.class, int.class);
+
+        Person person = constructor.newInstance("홍길동", 30);
+
+        assertThat(person).isExactlyInstanceOf(Person.class);
+        assertThat(person.name).isEqualTo("홍길동");
+    }
+
+    @Test
+    void 런타임에_문자열로_Class를_찾아_reflection으로_객체를_생성할_수_있다() throws Exception {
+        Class<?> clazz = Class.forName("dev.deepdive.sandbox.Person");
+        Constructor<?> constructor = clazz.getDeclaredConstructor(String.class, int.class);
+
+        Object person = constructor.newInstance("홍길동", 30);
+
+        assertThat(person).isInstanceOf(Person.class);
+        assertThat(((Person) person).name).isEqualTo("홍길동");
+    }
+
+    // -------------------------------------------------------------------------
     // 문자열로 클래스 동적 로드
     // -------------------------------------------------------------------------
 
@@ -23,17 +58,6 @@ class ReflectionTest {
 
         assertThat(clazz).isEqualTo(Person.class);
         assertThat(clazz.getSimpleName()).isEqualTo("Person");
-    }
-
-    @Test
-    void 동적으로_로드한_클래스로_인스턴스를_만들_수_있다() throws Exception {
-        Class<?> clazz = Class.forName("dev.deepdive.sandbox.Person");
-        Constructor<?> constructor = clazz.getDeclaredConstructor(String.class, int.class);
-
-        Object person = constructor.newInstance("홍길동", 30);
-
-        assertThat(person).isInstanceOf(Person.class);
-        assertThat(((Person) person).name).isEqualTo("홍길동");
     }
 
     @Test
