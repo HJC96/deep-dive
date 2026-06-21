@@ -5,6 +5,15 @@ plugins {
 group = 'dev.deepdive'
 version = '0.1.0-SNAPSHOT'
 
+ext {
+    dependencyVersions = [
+            springBoot    : '3.4.1',
+            testcontainers: '2.0.5',
+            junitJupiter  : '5.11.4',
+            assertj       : '3.26.3'
+    ]
+}
+
 java {
     toolchain {
         languageVersion = JavaLanguageVersion.of(21)
