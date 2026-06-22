@@ -1,0 +1,9 @@
+spring:
+  application:
+    name: spring-cache
+  cache:
+    type: caffeine
+    cache-names:
+      - catalogItems
+    caffeine:
+      spec: maximumSize=1000,expireAfterWrite=5m
