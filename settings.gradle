@@ -11,3 +11,6 @@ project(':cache-patterns').projectDir = file('labs/cache-patterns')
 
 include 'spring-cache'
 project(':spring-cache').projectDir = file('labs/spring-cache')
+
+include 'seat-reservation'
+project(':seat-reservation').projectDir = file('labs/seat-reservation')
