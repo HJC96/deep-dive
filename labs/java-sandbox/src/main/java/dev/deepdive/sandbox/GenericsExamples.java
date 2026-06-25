@@ -82,4 +82,37 @@ final class GenericsExamples {
 
         // int n = first.intValue(); // 컴파일 에러: Object에는 intValue()가 없다.
     }
+
+    static Object firstFromUnknownList(List<?> values) {
+        // List<?>는 "원소 타입을 정확히 모르는 리스트"라는 뜻이다.
+        // List<String>, List<Integer>, List<Object> 등 어떤 타입의 리스트든 받을 수 있다.
+        //
+        // 다만 실제 원소 타입을 모르기 때문에 꺼낸 값은 Object까지만 보장된다.
+        Object first = values.getFirst();
+
+        // values.add("java"); // 컴파일 에러
+        // 실제 타입이 List<Integer>일 수도 있으므로 String을 넣으면 안전하지 않다.
+        return first;
+    }
+
+    static void addExamplesToObjectList(List<Object> values) {
+        // List<Object>는 "Object를 담는 리스트"다.
+        // String, Integer도 Object의 하위 타입이므로 이 리스트에는 함께 넣을 수 있다.
+        values.add("java");
+        values.add(100);
+        values.add(true);
+    }
+
+    // ResponseEntity<?> 와 같은 자리. "어떤 타입의 Box든" 받는다.
+    // 그래서 bodyOfAnyBox(Box<String>), bodyOfAnyBox(Box<Integer>) 모두 호출된다.
+    // 다만 실제 원소 타입을 모르므로 꺼낸 값은 Object까지만 보장된다.
+    static Object bodyOfAnyBox(Box<?> box) {
+        return box.value();
+    }
+
+    // ResponseEntity<Object> 와 같은 자리. "정확히 Box<Object>만" 받는다.
+    // bodyOfObjectBox(Box<String>) 은 컴파일 에러 — Box<String>은 Box<Object>가 아니다.
+    static Object bodyOfObjectBox(Box<Object> box) {
+        return box.value();
+    }
 }

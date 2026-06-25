@@ -115,4 +115,60 @@ class GenericsExamplesTest {
         assertThat(GenericsExamples.describeFirst(numbers)).isEqualTo("42");
         assertThat(GenericsExamples.describeFirst(objects)).isEqualTo("7");
     }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // <?> 와 <Object> 의 차이 (ResponseEntity<?> vs ResponseEntity<Object> 가 헷갈릴 때)
+    //
+    // 한 줄 요약:
+    //   <?>      = "아무 타입 박스나 가리킬 수 있다. 단, 값은 못 넣는다."   (받기 자유, 쓰기 불가)
+    //   <Object> = "정확히 Object 박스만 가리킨다. 대신 아무거나 넣는다."   (받기 빡빡, 쓰기 자유)
+    // 둘은 거의 정반대다.
+    // ──────────────────────────────────────────────────────────────────────────
+
+    @Test
+    void 물음표는_어떤_타입의_박스든_가리키지만_Object는_정확히_Object박스만_가리킨다() {
+        Box<String> stringBox = new Box<>("java");
+
+        // (1) <?> : Box<String> 을 그대로 가리킬 수 있다.
+        //     → ResponseEntity<?> r = someResponseEntity_String;  과 똑같은 상황
+        Box<?> anyBox = stringBox;
+        assertThat(anyBox.value()).isEqualTo("java");
+
+        // (2) <Object> : Box<String> 은 Box<Object> 가 "아니라서" 가리킬 수 없다.
+        // Box<Object> objectBox = stringBox; // ← 컴파일 에러
+        //     제네릭은 무공변(invariant)이라, 원소 타입이 다르면 상속 관계가 없다.
+        //     (가변 컨테이너였다면 String 박스에 Integer 를 넣어 깨뜨릴 수 있어서 막는 것 —
+        //      아래 '물음표는 값을 못 넣고' 테스트의 List 예시가 그 위험을 보여준다.)
+        //     → ResponseEntity<Object> r = someResponseEntity_String;  도 같은 이유로 에러.
+        //
+        // 이게 핵심: ResponseEntity<?> 는 어떤 body 타입의 ResponseEntity 든 받지만,
+        //          ResponseEntity<Object> 는 정확히 ResponseEntity<Object> 만 받는다.
+    }
+
+    @Test
+    void 메서드_인자도_물음표는_다_받고_Object는_Object박스만_받는다() {
+        Box<String> stringBox = new Box<>("java");
+        Box<Object> objectBox = new Box<>("spring");
+
+        // <?> 파라미터: String 박스도 Object 박스도 다 받는다
+        assertThat(GenericsExamples.bodyOfAnyBox(stringBox)).isEqualTo("java");
+        assertThat(GenericsExamples.bodyOfAnyBox(objectBox)).isEqualTo("spring");
+
+        // <Object> 파라미터: 정확히 Box<Object> 만 받는다
+        assertThat(GenericsExamples.bodyOfObjectBox(objectBox)).isEqualTo("spring");
+        // GenericsExamples.bodyOfObjectBox(stringBox); // ← 컴파일 에러: Box<String> 은 Box<Object> 가 아니다
+    }
+
+    @Test
+    void 대신_물음표는_값을_못_넣고_Object는_아무_값이나_넣을_수_있다() {
+        // 받기 자유의 대가: <?> 는 실제 원소 타입을 모르므로 값을 넣지 못한다.
+        // (firstFromUnknownList 안에서 values.add(...) 는 컴파일 에러였다 — 읽기만 가능)
+        List<String> names = List.of("java", "spring");
+        assertThat(GenericsExamples.firstFromUnknownList(names)).isEqualTo("java");
+
+        // 받기 빡빡의 보상: <Object> 는 정확히 Object 리스트라 String/Integer/boolean 아무거나 넣는다.
+        List<Object> objects = new ArrayList<>();
+        GenericsExamples.addExamplesToObjectList(objects);
+        assertThat(objects).containsExactly("java", 100, true);
+    }
 }
