@@ -8,3 +8,4 @@
 - `java-sandbox`: Java 실험실
 - `cache-patterns`: 캐시 패턴 실험실
 - `spring-cache`: Spring Cache 로컬 인메모리 캐시 실험실
+- `spring-boot-actuator`: Spring Boot Actuator 관찰 실험실

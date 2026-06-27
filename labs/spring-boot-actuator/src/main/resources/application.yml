@@ -1,0 +1,26 @@
+spring:
+  application:
+    name: spring-boot-actuator
+
+server:
+  port: 18080
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include:
+          - health
+          - info
+          - metrics
+  endpoint:
+    health:
+      show-details: always
+  info:
+    env:
+      enabled: true
+
+info:
+  app:
+    name: spring-boot-actuator
+    description: Spring Boot Actuator learning skeleton
