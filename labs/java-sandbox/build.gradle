@@ -1,5 +1,6 @@
 plugins {
     id 'java'
+    id 'me.champeau.jmh' version '0.7.2'
 }
 
 java {
@@ -13,9 +14,14 @@ repositories {
 }
 
 dependencies {
+    implementation 'org.bouncycastle:bcprov-jdk18on:1.78.1'
+
     testImplementation "org.junit.jupiter:junit-jupiter:${rootProject.ext.dependencyVersions.junitJupiter}"
     testImplementation "org.assertj:assertj-core:${rootProject.ext.dependencyVersions.assertj}"
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
+    jmh 'org.openjdk.jmh:jmh-core:1.37'
+    jmhAnnotationProcessor 'org.openjdk.jmh:jmh-generator-annprocess:1.37'
 }
 
 test {
@@ -24,4 +30,22 @@ test {
     testLogging {
         showStandardStreams = true
     }
+}
+
+jmh {
+    if (project.hasProperty('jmhIncludes')) {
+        includes = [project.property('jmhIncludes').toString()]
+    }
+
+    // 예: -PjmhProfilers=gc 또는 -PjmhProfilers=gc,stack 으로 JMH 프로파일러를 붙인다.
+    if (project.hasProperty('jmhProfilers')) {
+        profilers = project.property('jmhProfilers').toString().split(',') as List
+    }
+
+    warmupIterations = 3
+    iterations = 5
+    fork = 1
+    timeOnIteration = '1s'
+    warmup = '1s'
+    resultFormat = 'TEXT'
 }
