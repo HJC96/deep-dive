@@ -1,0 +1,544 @@
+{
+  "info": {
+    "_postman_id": "7b2c95c4-7d35-45c9-9f6d-actuatorlab001",
+    "name": "deep-dive spring-boot-actuator",
+    "description": "Spring Boot Actuator 실습 전체 요청 모음. README를 읽으며 폴더 순서대로 실행한다.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "appUrl",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "actuatorUrl",
+      "value": "http://localhost:9090",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "0. Basic Actuator",
+      "description": "기본 Actuator endpoint 확인.",
+      "item": [
+        {
+          "name": "Actuator Links",
+          "request": {
+            "method": "GET",
+            "url": "{{actuatorUrl}}/actuator"
+          }
+        },
+        {
+          "name": "Health",
+          "request": {
+            "method": "GET",
+            "url": "{{actuatorUrl}}/actuator/health"
+          }
+        },
+        {
+          "name": "Info",
+          "request": {
+            "method": "GET",
+            "url": "{{actuatorUrl}}/actuator/info"
+          }
+        },
+        {
+          "name": "Metrics Names",
+          "request": {
+            "method": "GET",
+            "url": "{{actuatorUrl}}/actuator/metrics"
+          }
+        }
+      ]
+    },
+    {
+      "name": "1. Health",
+      "description": "파트너 시스템 상태와 custom health 확인.",
+      "item": [
+        {
+          "name": "Partner System Status",
+          "request": {
+            "method": "GET",
+            "url": "{{appUrl}}/partners/system"
+          }
+        },
+        {
+          "name": "Partner Health",
+          "request": {
+            "method": "GET",
+            "url": "{{actuatorUrl}}/actuator/health/partnerSystem"
+          }
+        },
+        {
+          "name": "Partner System Down",
+          "request": {
+            "method": "POST",
+            "url": "{{appUrl}}/partners/system/down"
+          }
+        },
+        {
+          "name": "Partner Health After Down",
+          "request": {
+            "method": "GET",
+            "url": "{{actuatorUrl}}/actuator/health/partnerSystem"
+          }
+        },
+        {
+          "name": "Partner System Up",
+          "request": {
+            "method": "POST",
+            "url": "{{appUrl}}/partners/system/up"
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Info",
+      "description": "기본 info와 custom release 정보 확인.",
+      "item": [
+        {
+          "name": "Info With Release",
+          "request": {
+            "method": "GET",
+            "url": "{{actuatorUrl}}/actuator/info"
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Metrics Basic",
+      "description": "JVM, CPU, process 기본 메트릭 확인.",
+      "item": [
+        {
+          "name": "Metrics Names",
+          "request": {
+            "method": "GET",
+            "url": "{{actuatorUrl}}/actuator/metrics"
+          }
+        },
+        {
+          "name": "JVM Memory Used",
+          "request": {
+            "method": "GET",
+            "url": "{{actuatorUrl}}/actuator/metrics/jvm.memory.used"
+          }
+        },
+        {
+          "name": "JVM GC Pause",
+          "request": {
+            "method": "GET",
+            "url": "{{actuatorUrl}}/actuator/metrics/jvm.gc.pause"
+          }
+        },
+        {
+          "name": "JVM Threads Live",
+          "request": {
+            "method": "GET",
+            "url": "{{actuatorUrl}}/actuator/metrics/jvm.threads.live"
+          }
+        },
+        {
+          "name": "System CPU Usage",
+          "request": {
+            "method": "GET",
+            "url": "{{actuatorUrl}}/actuator/metrics/system.cpu.usage"
+          }
+        },
+        {
+          "name": "Process CPU Usage",
+          "request": {
+            "method": "GET",
+            "url": "{{actuatorUrl}}/actuator/metrics/process.cpu.usage"
+          }
+        },
+        {
+          "name": "Process Uptime",
+          "request": {
+            "method": "GET",
+            "url": "{{actuatorUrl}}/actuator/metrics/process.uptime"
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Counter and Tags",
+      "description": "알림 발송 API로 Counter와 tag 필터 확인.",
+      "item": [
+        {
+          "name": "Send Generic Notification",
+          "request": {
+            "method": "POST",
+            "url": "{{appUrl}}/notifications/send"
+          }
+        },
+        {
+          "name": "Send Email Notification",
+          "request": {
+            "method": "POST",
+            "url": "{{appUrl}}/notifications/email"
+          }
+        },
+        {
+          "name": "Send SMS Notification",
+          "request": {
+            "method": "POST",
+            "url": "{{appUrl}}/notifications/sms"
+          }
+        },
+        {
+          "name": "Notification Sent Counter",
+          "request": {
+            "method": "GET",
+            "url": "{{actuatorUrl}}/actuator/metrics/app.notification.sent"
+          }
+        },
+        {
+          "name": "Notification Sent Counter - Email",
+          "request": {
+            "method": "GET",
+            "url": "{{actuatorUrl}}/actuator/metrics/app.notification.sent?tag=channel:email"
+          }
+        },
+        {
+          "name": "Notification Sent Counter - SMS",
+          "request": {
+            "method": "GET",
+            "url": "{{actuatorUrl}}/actuator/metrics/app.notification.sent?tag=channel:sms"
+          }
+        },
+        {
+          "name": "Notification Sent Counter - Email KR",
+          "request": {
+            "method": "GET",
+            "url": "{{actuatorUrl}}/actuator/metrics/app.notification.sent?tag=channel:email&tag=region:kr"
+          }
+        },
+        {
+          "name": "Notification Requested Counted",
+          "request": {
+            "method": "GET",
+            "url": "{{actuatorUrl}}/actuator/metrics/app.notification.requested"
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Common Tags",
+      "description": "공통 metric tag 확인.",
+      "item": [
+        {
+          "name": "HTTP Server Requests With Common Tags",
+          "request": {
+            "method": "GET",
+            "url": "{{actuatorUrl}}/actuator/metrics/http.server.requests"
+          }
+        },
+        {
+          "name": "Notification Sent With Common Tags",
+          "request": {
+            "method": "GET",
+            "url": "{{actuatorUrl}}/actuator/metrics/app.notification.sent"
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Gauge",
+      "description": "대기 알림 수 Gauge 확인.",
+      "item": [
+        {
+          "name": "Enqueue Pending Notification",
+          "request": {
+            "method": "POST",
+            "url": "{{appUrl}}/notifications/pending"
+          }
+        },
+        {
+          "name": "Enqueue Retry Pending Notification",
+          "request": {
+            "method": "POST",
+            "url": "{{appUrl}}/notifications/pending?message=retry"
+          }
+        },
+        {
+          "name": "Pending Notification Gauge",
+          "request": {
+            "method": "GET",
+            "url": "{{actuatorUrl}}/actuator/metrics/app.notification.pending.size"
+          }
+        },
+        {
+          "name": "Dequeue Pending Notification",
+          "request": {
+            "method": "DELETE",
+            "url": "{{appUrl}}/notifications/pending"
+          }
+        },
+        {
+          "name": "Pending Notification Gauge After Dequeue",
+          "request": {
+            "method": "GET",
+            "url": "{{actuatorUrl}}/actuator/metrics/app.notification.pending.size"
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Timer.record",
+      "description": "파일 변환 작업 Timer.record 확인.",
+      "item": [
+        {
+          "name": "Convert File",
+          "request": {
+            "method": "POST",
+            "url": "{{appUrl}}/files/convert"
+          }
+        },
+        {
+          "name": "Convert CSV To PDF",
+          "request": {
+            "method": "POST",
+            "url": "{{appUrl}}/files/convert?fileName=monthly-report.csv&format=pdf"
+          }
+        },
+        {
+          "name": "File Conversion Timer",
+          "request": {
+            "method": "GET",
+            "url": "{{actuatorUrl}}/actuator/metrics/app.file.conversion.time"
+          }
+        },
+        {
+          "name": "HTTP Requests For File API",
+          "request": {
+            "method": "GET",
+            "url": "{{actuatorUrl}}/actuator/metrics/http.server.requests?tag=uri:/files/convert"
+          }
+        }
+      ]
+    },
+    {
+      "name": "8. Timer.Sample",
+      "description": "문서 검증 결과별 Timer.Sample 확인.",
+      "item": [
+        {
+          "name": "Validate Document Success",
+          "request": {
+            "method": "POST",
+            "url": "{{appUrl}}/documents/validate?valid=true"
+          }
+        },
+        {
+          "name": "Validate Document Fail",
+          "request": {
+            "method": "POST",
+            "url": "{{appUrl}}/documents/validate?valid=false"
+          }
+        },
+        {
+          "name": "Document Validation Timer",
+          "request": {
+            "method": "GET",
+            "url": "{{actuatorUrl}}/actuator/metrics/app.document.validation.time"
+          }
+        },
+        {
+          "name": "Document Validation Timer - Fail",
+          "request": {
+            "method": "GET",
+            "url": "{{actuatorUrl}}/actuator/metrics/app.document.validation.time?tag=result:fail"
+          }
+        },
+        {
+          "name": "Document Validation Timer - Success",
+          "request": {
+            "method": "GET",
+            "url": "{{actuatorUrl}}/actuator/metrics/app.document.validation.time?tag=result:success"
+          }
+        }
+      ]
+    },
+    {
+      "name": "9. @Timed",
+      "description": "리포트 생성 메서드의 @Timed 확인.",
+      "item": [
+        {
+          "name": "Generate Report",
+          "request": {
+            "method": "POST",
+            "url": "{{appUrl}}/reports/generate"
+          }
+        },
+        {
+          "name": "Generate Weekly Report",
+          "request": {
+            "method": "POST",
+            "url": "{{appUrl}}/reports/generate?reportType=weekly-sales"
+          }
+        },
+        {
+          "name": "Report Generation Timer",
+          "request": {
+            "method": "GET",
+            "url": "{{actuatorUrl}}/actuator/metrics/app.report.generation.time"
+          }
+        },
+        {
+          "name": "HTTP Requests For Report API",
+          "request": {
+            "method": "GET",
+            "url": "{{actuatorUrl}}/actuator/metrics/http.server.requests?tag=uri:/reports/generate"
+          }
+        }
+      ]
+    },
+    {
+      "name": "10. Percentile",
+      "description": "콘텐츠 검색 응답 시간 percentile 확인.",
+      "item": [
+        {
+          "name": "Search Content - Actuator",
+          "request": {
+            "method": "GET",
+            "url": "{{appUrl}}/contents/search?keyword=actuator"
+          }
+        },
+        {
+          "name": "Search Content - Observability",
+          "request": {
+            "method": "GET",
+            "url": "{{appUrl}}/contents/search?keyword=observability"
+          }
+        },
+        {
+          "name": "Content Search Timer",
+          "request": {
+            "method": "GET",
+            "url": "{{actuatorUrl}}/actuator/metrics/app.content.search.time"
+          }
+        },
+        {
+          "name": "Content Search Percentile",
+          "request": {
+            "method": "GET",
+            "url": "{{actuatorUrl}}/actuator/metrics/app.content.search.time.percentile"
+          }
+        },
+        {
+          "name": "Content Search Percentile - p95",
+          "request": {
+            "method": "GET",
+            "url": "{{actuatorUrl}}/actuator/metrics/app.content.search.time.percentile?tag=phi:0.95"
+          }
+        },
+        {
+          "name": "Content Search Percentile - p99",
+          "request": {
+            "method": "GET",
+            "url": "{{actuatorUrl}}/actuator/metrics/app.content.search.time.percentile?tag=phi:0.99"
+          }
+        }
+      ]
+    },
+    {
+      "name": "11. HTTP Metrics",
+      "description": "앞 섹션의 앱 API를 호출한 뒤 http.server.requests를 확인한다.",
+      "item": [
+        {
+          "name": "HTTP Server Requests",
+          "request": {
+            "method": "GET",
+            "url": "{{actuatorUrl}}/actuator/metrics/http.server.requests"
+          }
+        },
+        {
+          "name": "HTTP Server Requests - GET",
+          "request": {
+            "method": "GET",
+            "url": "{{actuatorUrl}}/actuator/metrics/http.server.requests?tag=method:GET"
+          }
+        },
+        {
+          "name": "HTTP Server Requests - POST",
+          "request": {
+            "method": "GET",
+            "url": "{{actuatorUrl}}/actuator/metrics/http.server.requests?tag=method:POST"
+          }
+        },
+        {
+          "name": "HTTP Server Requests - 200",
+          "request": {
+            "method": "GET",
+            "url": "{{actuatorUrl}}/actuator/metrics/http.server.requests?tag=status:200"
+          }
+        },
+        {
+          "name": "HTTP Server Requests - 404",
+          "request": {
+            "method": "GET",
+            "url": "{{actuatorUrl}}/actuator/metrics/http.server.requests?tag=status:404"
+          }
+        },
+        {
+          "name": "HTTP Server Requests - File API",
+          "request": {
+            "method": "GET",
+            "url": "{{actuatorUrl}}/actuator/metrics/http.server.requests?tag=uri:/files/convert"
+          }
+        },
+        {
+          "name": "HTTP Server Requests - Report API",
+          "request": {
+            "method": "GET",
+            "url": "{{actuatorUrl}}/actuator/metrics/http.server.requests?tag=uri:/reports/generate"
+          }
+        }
+      ]
+    },
+    {
+      "name": "12. Custom Endpoint",
+      "description": "custom actuator endpoint 확인.",
+      "item": [
+        {
+          "name": "Set Dark Mode Feature",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"enabled\": true}"
+            },
+            "url": "{{actuatorUrl}}/actuator/features/dark-mode"
+          }
+        },
+        {
+          "name": "Feature Toggles",
+          "request": {
+            "method": "GET",
+            "url": "{{actuatorUrl}}/actuator/features"
+          }
+        },
+        {
+          "name": "Dark Mode Feature",
+          "request": {
+            "method": "GET",
+            "url": "{{actuatorUrl}}/actuator/features/dark-mode"
+          }
+        },
+        {
+          "name": "Remove Dark Mode Feature",
+          "request": {
+            "method": "DELETE",
+            "url": "{{actuatorUrl}}/actuator/features/dark-mode"
+          }
+        }
+      ]
+    }
+  ]
+}

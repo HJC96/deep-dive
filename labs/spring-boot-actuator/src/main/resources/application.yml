@@ -1,11 +1,13 @@
 spring:
+  output:
+    ansi:
+      enabled: always
   application:
     name: spring-boot-actuator
 
-server:
-  port: 18080
-
 management:
+  server:
+    port: 9090
   endpoints:
     web:
       exposure:
@@ -13,14 +15,25 @@ management:
           - health
           - info
           - metrics
+          - features
   endpoint:
     health:
       show-details: always
+      show-components: always
   info:
     env:
       enabled: true
+    git:
+      mode: simple
+  metrics:
+    tags:
+      application: actuator-lab
+      environment: local
+      region: kr
 
 info:
   app:
     name: spring-boot-actuator
-    description: Spring Boot Actuator learning skeleton
+    version: 0.1.0-SNAPSHOT
+    description: Spring Boot Actuator learning lab
+  team: backend-lab

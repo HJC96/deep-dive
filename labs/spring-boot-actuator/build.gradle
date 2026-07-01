@@ -3,10 +3,17 @@ plugins {
     id 'application'
 }
 
+group = rootProject.group
+version = rootProject.version
+
 java {
     toolchain {
         languageVersion = JavaLanguageVersion.of(21)
     }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.compilerArgs += '-parameters'
 }
 
 application {
@@ -22,9 +29,76 @@ dependencies {
 
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    implementation 'org.springframework.boot:spring-boot-starter-aop'
 
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+def generatedResourcesDir = layout.buildDirectory.dir('generated/resources/actuator-info')
+
+tasks.register('generateBuildInfo') {
+    def outputFile = generatedResourcesDir.map { it.file('META-INF/build-info.properties') }
+    inputs.property('buildArtifact', 'spring-boot-actuator')
+    inputs.property('buildGroup', project.group.toString())
+    inputs.property('buildName', 'deep-dive :: spring-boot-actuator')
+    inputs.property('buildVersion', project.version.toString())
+    outputs.file(outputFile)
+
+    doLast {
+        def file = outputFile.get().asFile
+        file.parentFile.mkdirs()
+        file.text = """\
+build.artifact=spring-boot-actuator
+build.group=${project.group}
+build.name=deep-dive :: spring-boot-actuator
+build.version=${project.version}
+build.time=${new Date().format("yyyy-MM-dd'T'HH:mm:ssXXX")}
+"""
+    }
+}
+
+tasks.register('generateGitProperties') {
+    def outputFile = generatedResourcesDir.map { it.file('git.properties') }
+    inputs.property('headCommit', gitOutput(['git', 'rev-parse', 'HEAD']))
+    outputs.file(outputFile)
+
+    doLast {
+        def branch = gitOutput(['git', 'rev-parse', '--abbrev-ref', 'HEAD'])
+        def commitId = gitOutput(['git', 'rev-parse', 'HEAD'])
+        def commitIdAbbrev = gitOutput(['git', 'rev-parse', '--short', 'HEAD'])
+        def commitTime = gitOutput(['git', 'show', '-s', '--format=%cI', 'HEAD'])
+
+        def file = outputFile.get().asFile
+        file.parentFile.mkdirs()
+        file.text = """\
+git.branch=${branch}
+git.commit.id=${commitId}
+git.commit.id.abbrev=${commitIdAbbrev}
+git.commit.time=${commitTime}
+"""
+    }
+}
+
+def gitOutput(List<String> command) {
+    def process = new ProcessBuilder(command)
+            .directory(rootProject.projectDir)
+            .redirectErrorStream(true)
+            .start()
+    process.waitFor()
+    return process.inputStream.text.trim()
+}
+
+sourceSets {
+    main {
+        resources {
+            srcDir generatedResourcesDir
+        }
+    }
+}
+
+processResources {
+    dependsOn tasks.named('generateBuildInfo'), tasks.named('generateGitProperties')
 }
 
 test {
