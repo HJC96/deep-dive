@@ -2,9 +2,28 @@ spring:
   output:
     ansi:
       enabled: always
+  datasource:
+    url: ${JPA_LAB_DB_URL:jdbc:mysql://localhost:3306/deepdive?createDatabaseIfNotExist=true&serverTimezone=UTC}
+    username: ${JPA_LAB_DB_USER:root}
+    password: ${JPA_LAB_DB_PASSWORD:root}
   jpa:
     open-in-view: false
+    hibernate:
+      ddl-auto: update
     show-sql: true
     properties:
       hibernate:
         format_sql: true
+
+# Prometheus 스크레이프 대상으로 /actuator/prometheus 를 연다.
+# 인터셉터가 기록한 jpa_queries_per_request, jpa_queries_by_type 가 여기 노출된다.
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, metrics, prometheus
+  metrics:
+    distribution:
+      # http.server.requests 의 지연시간 P50/P95 도 함께 발행한다.
+      percentiles:
+        http.server.requests: 0.5, 0.95
