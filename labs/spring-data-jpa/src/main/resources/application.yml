@@ -10,10 +10,16 @@ spring:
     open-in-view: false
     hibernate:
       ddl-auto: update
-    show-sql: true
+    show-sql: false
     properties:
       hibernate:
         format_sql: true
+        highlight_sql: true
+
+logging:
+  level:
+    org.hibernate.SQL: debug
+    org.hibernate.orm.jdbc.bind: trace
 
 # Prometheus 스크레이프 대상으로 /actuator/prometheus 를 연다.
 # 인터셉터가 기록한 jpa_queries_per_request, jpa_queries_by_type 가 여기 노출된다.

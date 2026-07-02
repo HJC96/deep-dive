@@ -40,6 +40,7 @@ class OptimisticLockTest extends MySQLContainerTest {
         Long id = productService.create("키보드", 10);
 
         // 최신 스냅샷(version 0)을 읽는다. 위 충돌 테스트와 달리 그 사이 아무도 건드리지 않는다.
+        // getById가 끝나면, 트랜잭션이 종료되기 때문에 fresh가 detached 상태가 된다.
         Product fresh = productService.getById(id);
         assertThat(fresh.version()).isEqualTo(0L);
 

@@ -2,6 +2,7 @@ package dev.deepdive.jpa.service;
 
 import dev.deepdive.jpa.core.Product;
 import dev.deepdive.jpa.repository.ProductRepository;
+import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,6 +29,11 @@ public class ProductService {
     @Transactional(readOnly = true)
     public Product getById(Long id) {
         return productRepository.findById(id).orElseThrow();
+    }
+
+    @Transactional(readOnly = true)
+    public List<Product> findAll() {
+        return productRepository.findAll();
     }
 
     @Transactional
