@@ -127,13 +127,167 @@ sequenceDiagram
 - 메일 내용 생성
 - 실행 스레드: 테스트 스레드
 
+## CompletableFuture 병렬 작업으로 시간 줄이기
+
+위 예제가 하나의 메일 후처리 작업을 어떤 실행 주체에 맡기는지 비교했다면, 이 예제는 서로 의존하지 않는 작업 3개를 순차 처리했을 때와 병렬 처리했을 때의 실행 시간 차이를 본다.
+
+주문 확인 메일을 만들기 전에 결제 확인, 재고 확인, 배송 예정일 계산 작업을 수행한다.
+실제 HTTP 호출 대신 `Thread.sleep(...)`으로 각 작업의 대기 시간을 흉내 낸다.
+after 병렬 작업도 위에서 사용한 `javaExecutorService`를 그대로 재사용한다. 예제에서는 독립 작업 3개를 동시에 실행할 수 있도록 fixed thread pool 크기를 3으로 둔다.
+
+- 결제 확인: 250ms
+- 재고 확인: 200ms
+- 배송 예정일 계산: 220ms
+
+테스트 흐름:
+
+1. before 테스트에서 순차 작업 시간을 측정한다.
+2. after 테스트에서 병렬 작업 시간을 측정한다.
+3. 두 테스트 모두 같은 메일 본문을 반환하는지 확인한다.
+4. before/after 시간 조건으로 병렬 작업 후 시간이 줄었는지 확인한다.
+
+### Before: 순차 작업
+
+```mermaid
+%%{init: {"theme": "base", "themeVariables": {"primaryTextColor": "#111827", "secondaryTextColor": "#111827", "tertiaryTextColor": "#111827", "actorTextColor": "#111827", "signalTextColor": "#111827", "labelTextColor": "#111827", "noteTextColor": "#111827", "noteBkgColor": "#ffffff", "noteBorderColor": "#374151", "sequenceNumberColor": "#111827"}}}%%
+sequenceDiagram
+    autonumber
+    participant Test as 테스트
+    participant Service as AsyncWorkService
+    participant Payment as 결제 확인 작업
+    participant Inventory as 재고 확인 작업
+    participant Delivery as 배송 예정일 계산 작업
+    participant Sender as OrderConfirmationEmailSender
+
+    Test->>Service: prepareOrderConfirmationEmailSequentially(order)
+    Service->>Payment: confirmPayment(order)
+    Payment-->>Service: 결제 승인
+    Service->>Inventory: checkInventory(order)
+    Inventory-->>Service: 재고 확보
+    Service->>Delivery: estimateDelivery(order)
+    Delivery-->>Service: 2일 후 도착
+    Service->>Sender: sendWithPreparation(...)
+    Sender-->>Service: EmailReceipt
+    Service-->>Test: EmailReceipt
+```
+
+```java
+prepareOrderConfirmationEmailSequentially(order)
+```
+
+결과:
+
+- 세 작업을 차례대로 처리
+- 전체 시간은 세 작업 시간의 합에 가까움
+- before는 테스트에서 600ms 이상으로 관찰
+
+### After: 병렬 작업
+
+```mermaid
+%%{init: {"theme": "base", "themeVariables": {"primaryTextColor": "#111827", "secondaryTextColor": "#111827", "tertiaryTextColor": "#111827", "actorTextColor": "#111827", "signalTextColor": "#111827", "labelTextColor": "#111827", "noteTextColor": "#111827", "noteBkgColor": "#ffffff", "noteBorderColor": "#374151", "sequenceNumberColor": "#111827"}}}%%
+sequenceDiagram
+    autonumber
+    participant Test as 테스트
+    participant Service as AsyncWorkService
+    participant Executor as javaExecutorService
+    participant WorkerA as java-executor 스레드 A
+    participant WorkerB as java-executor 스레드 B
+    participant WorkerC as java-executor 스레드 C
+    participant Payment as 결제 확인 작업
+    participant Inventory as 재고 확인 작업
+    participant Delivery as 배송 예정일 계산 작업
+    participant Sender as OrderConfirmationEmailSender
+
+    Test->>Service: prepareOrderConfirmationEmailInParallel(order)
+    Service->>Executor: supplyAsync(confirmPayment)
+    Service->>Executor: supplyAsync(checkInventory)
+    Service->>Executor: supplyAsync(estimateDelivery)
+    Executor->>WorkerA: 결제 확인 작업 실행
+    Executor->>WorkerB: 재고 확인 작업 실행
+    Executor->>WorkerC: 배송 예정일 계산 작업 실행
+    WorkerA->>Payment: confirmPayment(order)
+    WorkerB->>Inventory: checkInventory(order)
+    WorkerC->>Delivery: estimateDelivery(order)
+    Payment-->>WorkerA: 결제 승인
+    Inventory-->>WorkerB: 재고 확보
+    Delivery-->>WorkerC: 2일 후 도착
+    WorkerA-->>Service: CompletableFuture 완료
+    WorkerB-->>Service: CompletableFuture 완료
+    WorkerC-->>Service: CompletableFuture 완료
+    Service->>Service: join()으로 결과 수집
+    Service->>Sender: sendWithPreparation(...)
+    Sender-->>Service: EmailReceipt
+    Service-->>Test: EmailReceipt
+```
+
+```java
+prepareOrderConfirmationEmailInParallel(order)
+```
+
+결과:
+
+- 세 작업을 먼저 동시에 시작
+- `EmailReceipt`를 만들 때 `join()`으로 결과 수집
+- 전체 시간은 가장 느린 작업 시간에 가까움
+- after는 테스트에서 500ms 미만으로 관찰
+- before/after 테스트의 시간 조건으로 개선 효과를 확인
+
+## @Async 병렬 작업으로 시간 줄이기
+
+같은 before/after 실험을 `@Async`로도 구현할 수 있다.
+
+차이는 작업 제출 방식이다. Java `ExecutorService` 예제는 `CompletableFuture.supplyAsync(..., javaExecutorService)`를 직접 호출하고, `@Async` 예제는 `@Async("springAsyncExecutor")`가 붙은 별도 빈 메서드를 호출한다.
+
+`@Async`는 Spring 프록시를 거쳐야 하므로 결제/재고/배송 작업은 `OrderPreparationAsyncService`에 둔다. `springAsyncExecutor`도 독립 작업 3개가 동시에 실행될 수 있도록 fixed thread pool 크기를 3으로 둔다.
+
+테스트 흐름:
+
+1. before 테스트는 `@Async` 작업을 호출하자마자 `join()`한다.
+2. after 테스트는 `@Async` 작업 3개를 먼저 시작한 뒤 마지막에 `join()`한다.
+3. 두 테스트 모두 같은 메일 본문을 반환하는지 확인한다.
+4. before/after 시간 조건으로 병렬 작업 후 시간이 줄었는지 확인한다.
+
+### Before: @Async 작업을 바로 기다림
+
+```java
+String paymentStatus = orderPreparationAsyncService.confirmPayment(order).join();
+String inventoryStatus = orderPreparationAsyncService.checkInventory(order).join();
+String deliveryEstimate = orderPreparationAsyncService.estimateDelivery(order).join();
+```
+
+결과:
+
+- 작업을 `@Async`로 제출하더라도 바로 `join()`하면 다음 작업을 시작하지 못함
+- 전체 시간은 세 작업 시간의 합에 가까움
+- before는 테스트에서 600ms 이상으로 관찰
+
+### After: @Async 작업을 먼저 시작
+
+```java
+CompletableFuture<String> paymentStatus = orderPreparationAsyncService.confirmPayment(order);
+CompletableFuture<String> inventoryStatus = orderPreparationAsyncService.checkInventory(order);
+CompletableFuture<String> deliveryEstimate = orderPreparationAsyncService.estimateDelivery(order);
+
+paymentStatus.join();
+inventoryStatus.join();
+deliveryEstimate.join();
+```
+
+결과:
+
+- 세 작업을 먼저 동시에 시작
+- 메일을 만들 때 `join()`으로 결과 수집
+- 전체 시간은 가장 느린 작업 시간에 가까움
+- after는 테스트에서 500ms 미만으로 관찰
+
 ## 시작점
 
 - `SpringLabApplication`: `@EnableAsync`가 켜진 Spring Boot 애플리케이션
 - `ExecutorConfig`: `ThreadPoolTaskExecutor`와 Java `ExecutorService` 설정
 - `OrderConfirmationEmailSender`: 주문 확인 메일 내용 생성
-- `AsyncWorkService`: 같은 메일 후처리를 두 실행 방식으로 위임
-- `AsyncVsExecutorServiceTest`: 결과 메일과 실행 스레드 비교
+- `OrderPreparationAsyncService`: `@Async`로 결제/재고/배송 작업 실행
+- `AsyncWorkService`: 주문 확인 메일 후처리를 `@Async`, `ExecutorService`, `CompletableFuture` 방식으로 비교하고, 결제/재고/배송 API 지연을 시뮬레이션
+- `AsyncVsExecutorServiceTest`: 결과 메일, 실행 스레드, Java ExecutorService와 `@Async`의 before/after 실행 시간 비교
 
 ## 실행
 

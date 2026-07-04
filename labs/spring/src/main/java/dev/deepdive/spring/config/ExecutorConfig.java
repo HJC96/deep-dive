@@ -12,8 +12,8 @@ public class ExecutorConfig {
     @Bean
     public ThreadPoolTaskExecutor springAsyncExecutor() {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
-        executor.setCorePoolSize(2);
-        executor.setMaxPoolSize(2);
+        executor.setCorePoolSize(3);
+        executor.setMaxPoolSize(3);
         executor.setQueueCapacity(10);
         executor.setThreadNamePrefix("spring-async-");
         executor.initialize();
@@ -22,6 +22,6 @@ public class ExecutorConfig {
 
     @Bean(destroyMethod = "shutdown")
     public ExecutorService javaExecutorService() {
-        return Executors.newFixedThreadPool(2, Thread.ofPlatform().name("java-executor-", 1).factory());
+        return Executors.newFixedThreadPool(3, Thread.ofPlatform().name("java-executor-", 1).factory());
     }
 }
