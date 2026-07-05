@@ -12,6 +12,9 @@ project(':cache-patterns').projectDir = file('labs/cache-patterns')
 include 'spring-cache'
 project(':spring-cache').projectDir = file('labs/spring-cache')
 
+include 'spring-test-infra'
+project(':spring-test-infra').projectDir = file('labs/spring-test-infra')
+
 include 'spring'
 project(':spring').projectDir = file('labs/spring')
 

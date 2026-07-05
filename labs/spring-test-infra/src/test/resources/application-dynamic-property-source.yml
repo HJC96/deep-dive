@@ -1,0 +1,5 @@
+spring:
+  datasource:
+    url: jdbc:mysql://localhost:1/this_datasource_should_not_be_used
+    username: wrong-user
+    password: wrong-password
