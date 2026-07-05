@@ -4,9 +4,20 @@ spring:
       enabled: always
   application:
     name: spring-cache
-  cache:
-    type: caffeine
-    cache-names:
-      - catalogItems
-    caffeine:
-      spec: maximumSize=1000,expireAfterWrite=5m
+  datasource:
+    url: jdbc:mysql://localhost:3306/deepdive_cache?createDatabaseIfNotExist=true&serverTimezone=UTC
+    username: root
+    password: ""
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        format_sql: true
+        jdbc:
+          time_zone: UTC
+
+logging:
+  level:
+    org.hibernate.SQL: debug
+    org.hibernate.orm.jdbc.bind: trace

@@ -1,10 +1,9 @@
 package dev.deepdive.springcache;
 
+import dev.deepdive.springcache.support.MySQLContainerTest;
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.context.SpringBootTest;
 
-@SpringBootTest
-class SpringCacheApplicationTest {
+class SpringCacheApplicationTest extends MySQLContainerTest {
 
     @Test
     void contextLoads() {
