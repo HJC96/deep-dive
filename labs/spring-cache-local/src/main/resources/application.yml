@@ -3,7 +3,7 @@ spring:
     ansi:
       enabled: always
   application:
-    name: spring-cache
+    name: spring-cache-local
   datasource:
     url: jdbc:mysql://localhost:3306/deepdive_cache?createDatabaseIfNotExist=true&serverTimezone=UTC
     username: root

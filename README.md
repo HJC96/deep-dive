@@ -7,17 +7,26 @@
 - `coupon-issue` — 선착순 쿠폰 발급 동시성 문제. 락 없음 / synchronized / 원자적 UPDATE / 비관적 락 / 낙관적 락 / 네임드 락 비교
 - `java-sandbox` — 디자인 패턴, 리플렉션 등 자바 문법 실험용 공간
 - `cache-patterns` — Cache Aside / Read Through / Write Through / Write Around / Write Behind 캐시 패턴 비교
-- `spring-cache` — Spring Cache를 로컬 인메모리 캐시로 사용할 때의 동작 실험
+- `spring-cache-local` — Spring Cache를 로컬 인메모리 캐시로 사용할 때의 동작 실험
+- `spring-cache-redis` — Spring Cache를 Redis 기반 공용 캐시로 사용할 때의 동작 실험 예정
+- `spring-test-infra` — `@DynamicPropertySource`와 Testcontainers 기반 테스트 인프라 실험
 - `spring` — `@Async`와 Java `ExecutorService` 비교 등 Spring 핵심 기능 실험
+- `seat-reservation` — 좌석 예약 동시성, Redis 선점, Kafka 비동기 확정 실험
+- `spring-data-jpa` — 낙관적 락과 Hibernate SQL 관찰 실험
 - `spring-boot-actuator` — Actuator 기본 엔드포인트와 커스텀 헬스 체크 관찰
 
 ## 실행
 
 ```bash
-./gradlew test                # 전체 모듈
-./gradlew :coupon-issue:test  # 특정 모듈만
-./gradlew :cache-patterns:test # 캐시 패턴 모듈만
-./gradlew :spring-cache:test   # Spring Cache 모듈만
-./gradlew :spring:test         # Spring 핵심 기능 모듈만
-./gradlew :spring-boot-actuator:test # Actuator 모듈만
+./gradlew test                         # 전체 모듈
+./gradlew :coupon-issue:test           # 쿠폰 동시성 모듈만
+./gradlew :java-sandbox:test           # Java 실험 모듈만
+./gradlew :cache-patterns:test         # 캐시 패턴 모듈만
+./gradlew :spring-cache-local:test     # Spring Cache 로컬 캐시 모듈만
+./gradlew :spring-cache-redis:test     # Spring Cache Redis 모듈만
+./gradlew :spring-test-infra:test      # Spring 테스트 인프라 모듈만
+./gradlew :spring:test                 # Spring 핵심 기능 모듈만
+./gradlew :seat-reservation:test       # 좌석 예약 모듈만
+./gradlew :spring-data-jpa:test        # Spring Data JPA 모듈만
+./gradlew :spring-boot-actuator:test   # Actuator 모듈만
 ```

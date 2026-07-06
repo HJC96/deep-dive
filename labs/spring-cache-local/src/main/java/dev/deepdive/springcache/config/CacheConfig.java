@@ -14,6 +14,7 @@ public class CacheConfig {
                 "catalogItems",
                 "bookById",
                 "bookName",
+                "studyBooks",
                 "bookNameByTableVersion",
                 "bookSummary",
                 "bookSearchByRecordCondition",

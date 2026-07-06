@@ -12,9 +12,9 @@ import java.util.concurrent.ConcurrentMap;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.mock.mockito.SpyBean;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.concurrent.ConcurrentMapCacheManager;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 class BookLookupServiceCacheTest extends MySQLContainerTest {
 
@@ -24,7 +24,7 @@ class BookLookupServiceCacheTest extends MySQLContainerTest {
     @Autowired
     private CacheManager cacheManager;
 
-    @SpyBean
+    @MockitoSpyBean
     private BookRepository bookRepository;
 
     @BeforeEach
