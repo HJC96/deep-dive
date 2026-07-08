@@ -259,8 +259,14 @@ Postman 폴더: `0. Basic Actuator`
 ```mermaid
 sequenceDiagram
     autonumber
+
+    box rgba(22, 163, 74, 0.40) 요청
     participant Postman
+    end
+
+    box rgba(147, 51, 234, 0.35) 관측
     participant Actuator
+    end
 
     Postman->>Actuator: GET /actuator
     Actuator-->>Postman: 노출 endpoint links
@@ -332,11 +338,20 @@ Postman 폴더: `1. Health`
 ```mermaid
 sequenceDiagram
     autonumber
+
+    box rgba(22, 163, 74, 0.40) 요청
     participant Postman
+    end
+
+    box rgba(245, 158, 11, 0.40) 앱
     participant Controller as PartnerSystemController
     participant Simulator as PartnerSystemSimulator
     participant Health as PartnerSystemHealthIndicator
+    end
+
+    box rgba(147, 51, 234, 0.35) 관측
     participant Actuator
+    end
 
     Postman->>Controller: POST /partners/system/down
     Controller->>Simulator: markUnavailable()
@@ -484,10 +499,22 @@ Postman 폴더: `2. Info`
 ```mermaid
 sequenceDiagram
     autonumber
+
+    box rgba(22, 163, 74, 0.40) 요청
     participant Postman
-    participant Actuator
+    end
+
+    box rgba(245, 158, 11, 0.40) 앱
     participant Contributor as ReleaseInfoContributor
+    end
+
+    box rgba(219, 39, 119, 0.40) 저장소
     participant Resources as build-info and git.properties
+    end
+
+    box rgba(147, 51, 234, 0.35) 관측
+    participant Actuator
+    end
 
     Postman->>Actuator: GET /actuator/info
     Actuator->>Contributor: contribute(builder)
@@ -595,10 +622,16 @@ Postman 폴더: `3. Metrics Basic`
 ```mermaid
 sequenceDiagram
     autonumber
+
+    box rgba(22, 163, 74, 0.40) 요청
+    participant Postman
+    end
+
+    box rgba(147, 51, 234, 0.35) 관측
     participant Binder as JVM/System/Process Binders
     participant Registry as MeterRegistry
-    participant Postman
     participant Actuator
+    end
 
     Binder->>Registry: 기본 metric 등록
     Postman->>Actuator: GET /actuator/metrics
@@ -665,11 +698,20 @@ Postman 폴더: `4. Counter and Tags`
 ```mermaid
 sequenceDiagram
     autonumber
+
+    box rgba(22, 163, 74, 0.40) 요청
     participant Postman
+    end
+
+    box rgba(245, 158, 11, 0.40) 앱
     participant Controller as NotificationController
     participant Service as NotificationService
+    end
+
+    box rgba(147, 51, 234, 0.35) 관측
     participant Registry as MeterRegistry
     participant Actuator
+    end
 
     Postman->>Controller: POST /notifications/email
     Controller->>Service: send("email", ...)
@@ -837,11 +879,20 @@ Postman 폴더: `5. Common Tags`
 ```mermaid
 sequenceDiagram
     autonumber
+
+    box rgba(22, 163, 74, 0.40) 요청
+    participant Postman
+    end
+
+    box rgba(245, 158, 11, 0.40) 앱
     participant Spring
+    end
+
+    box rgba(147, 51, 234, 0.35) 관측
     participant Config as MetricsTagConfig
     participant Registry as MeterRegistry
-    participant Postman
     participant Actuator
+    end
 
     Spring->>Config: hostnameCommonTag()
     Config-->>Registry: hostname common tag 등록
@@ -928,11 +979,21 @@ Postman 폴더: `6. Gauge`
 ```mermaid
 sequenceDiagram
     autonumber
+
+    box rgba(22, 163, 74, 0.40) 요청
     participant Postman
+    end
+
+    box rgba(245, 158, 11, 0.40) 앱
     participant Controller as PendingNotificationController
     participant Manager as PendingNotificationManager
+    end
+
+    box rgba(147, 51, 234, 0.35) 관측
     participant Registry as MeterRegistry
     participant Actuator
+    end
+
     Postman->>Controller: POST /notifications/pending
     Controller->>Manager: enqueue(message)
     Manager-->>Postman: pendingSize
@@ -1040,11 +1101,21 @@ Postman 폴더: `7. Timer.record`
 ```mermaid
 sequenceDiagram
     autonumber
+
+    box rgba(22, 163, 74, 0.40) 요청
     participant Postman
+    end
+
+    box rgba(245, 158, 11, 0.40) 앱
     participant Controller as FileProcessingController
     participant Service as FileProcessingService
+    end
+
+    box rgba(147, 51, 234, 0.35) 관측
     participant Timer
     participant Actuator
+    end
+
     Postman->>Controller: POST /files/convert
     Controller->>Service: convertFile(fileName, format)
     Service->>Timer: record(lambda)
@@ -1151,11 +1222,21 @@ Postman 폴더: `8. Timer.Sample`
 ```mermaid
 sequenceDiagram
     autonumber
+
+    box rgba(22, 163, 74, 0.40) 요청
     participant Postman
+    end
+
+    box rgba(245, 158, 11, 0.40) 앱
     participant Controller as DocumentValidationController
     participant Service as DocumentValidationService
+    end
+
+    box rgba(147, 51, 234, 0.35) 관측
     participant Registry as MeterRegistry
     participant Actuator
+    end
+
     Postman->>Controller: POST /documents/validate?valid=false
     Controller->>Service: validate(documentType, valid)
     Service->>Registry: Timer.Sample start
@@ -1270,12 +1351,22 @@ Postman 폴더: `9. @Timed`
 ```mermaid
 sequenceDiagram
     autonumber
+
+    box rgba(22, 163, 74, 0.40) 요청
     participant Postman
+    end
+
+    box rgba(245, 158, 11, 0.40) 앱
     participant Controller as ReportController
     participant Aspect as TimedAspect
     participant Service as ReportService
+    end
+
+    box rgba(147, 51, 234, 0.35) 관측
     participant Registry as MeterRegistry
     participant Actuator
+    end
+
     Postman->>Controller: POST /reports/generate
     Controller->>Aspect: @Timed 메서드 진입
     Aspect->>Service: generate(reportType)
@@ -1378,12 +1469,22 @@ Postman 폴더: `10. Percentile`
 ```mermaid
 sequenceDiagram
     autonumber
+
+    box rgba(22, 163, 74, 0.40) 요청
     participant Postman
+    end
+
+    box rgba(245, 158, 11, 0.40) 앱
     participant Controller as ContentSearchController
     participant Aspect as TimedAspect
     participant Service as ContentSearchService
+    end
+
+    box rgba(147, 51, 234, 0.35) 관측
     participant Registry as MeterRegistry
     participant Actuator
+    end
+
     Postman->>Controller: GET /contents/search?keyword=observability
     Controller->>Aspect: @Timed(percentiles) 메서드 진입
     Aspect->>Service: search(keyword)
@@ -1500,11 +1601,21 @@ Postman 폴더: `11. HTTP Metrics`
 ```mermaid
 sequenceDiagram
     autonumber
+
+    box rgba(22, 163, 74, 0.40) 요청
     participant Postman
+    end
+
+    box rgba(245, 158, 11, 0.40) 앱
     participant MVC as Spring MVC
+    end
+
+    box rgba(147, 51, 234, 0.35) 관측
     participant ActuatorAuto as Actuator Auto Instrumentation
     participant Registry as MeterRegistry
     participant Actuator
+    end
+
     Postman->>MVC: GET/POST App API
     MVC->>ActuatorAuto: 요청 시작/종료 관찰
     ActuatorAuto->>Registry: http.server.requests 기록
@@ -1582,9 +1693,19 @@ Postman 폴더: `12. Custom Endpoint`
 ```mermaid
 sequenceDiagram
     autonumber
+
+    box rgba(22, 163, 74, 0.40) 요청
     participant Postman
+    end
+
+    box rgba(245, 158, 11, 0.40) 앱
     participant Endpoint as FeatureToggleEndpoint
+    end
+
+    box rgba(219, 39, 119, 0.40) 저장소
     participant Store as ConcurrentHashMap
+    end
+
     Postman->>Endpoint: POST /actuator/features/dark-mode
     Endpoint->>Store: put("dark-mode", true)
     Endpoint-->>Postman: enabled=true

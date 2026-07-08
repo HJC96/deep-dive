@@ -12,9 +12,27 @@ Java 언어 기능과 JVM 동작을 작은 코드로 관찰하는 샌드박스.
 ### 구조
 
 - `AesUtilBefore`: `encrypt()`마다 `Security.addProvider(new BouncyCastleProvider())` 호출.
-- `AesUtilAfter`: 클래스 초기화 때 `getProvider(...) == null`이면 1회만 등록.
+- `AesUtilAfter`: static 유틸이 아니라 `Provider`를 생성자 주입받는 암호화 객체. `encrypt()`에서는 Provider 등록 없이 암호화만 수행.
+- `CryptoProviderConfig`: Spring Context 초기화 때 `getProvider(...) == null`이면 BouncyCastle Provider를 1회만 등록하고, `AesUtilAfter` Bean에 주입.
 - `AesProviderRegistrationSingleThreadBenchmark` / `...EightThreadsBenchmark`: 단일/8스레드 벤치마크. `@Threads`만 다르고 메서드는 동일.
 - 벤치마크 메서드: `encrypt_withRepeatedProviderRegistration`, `encrypt_withProviderInitializedOnce`.
+
+### Spring으로 테스트하기 쉬운 형태
+
+기존 static 구조는 클래스 로딩 순간 JVM 전역 `Security` 상태를 바꿔서 테스트 간 상태 제어가 어렵다. 개선 후에는 Provider 등록 책임을 Spring 설정으로 분리하고, 암호화 객체는 생성자 주입만 받는 POJO로 둔다.
+
+```java
+try (AnnotationConfigApplicationContext context =
+             new AnnotationConfigApplicationContext(CryptoProviderConfig.class)) {
+    AesUtilAfter aesUtilAfter = context.getBean(AesUtilAfter.class);
+}
+```
+
+단위 테스트에서는 Spring Context 없이도 직접 만들 수 있다.
+
+```java
+AesUtilAfter aesUtilAfter = new AesUtilAfter(new BouncyCastleProvider());
+```
 
 ### 실행
 
@@ -33,12 +51,15 @@ Java 언어 기능과 JVM 동작을 작은 코드로 관찰하는 샌드박스.
 
 ```mermaid
 sequenceDiagram
+
+    box rgba(37, 99, 235, 0.40) 테스트 실행
     participant G as Gradle (jmh task)
     participant AP as JMH AnnotationProcessor
     participant F as Forked JVM (@Fork(1))
     participant S as @State CryptoInput
     participant B as Benchmark 메서드
     participant H as Blackhole
+    end
 
     G->>AP: @Benchmark 스캔 → 러너 코드 생성
     G->>F: 별도 JVM fork 기동
@@ -128,7 +149,7 @@ Benchmark                                        Mode  Cnt       Score       Err
 
 - **BLOCKED** = 다른 스레드가 쥔 락(모니터)이 풀리길 기다리며 **아무 일도 못 하는** 상태. 이게 51%면 절반의 시간을 놀고 있다는 뜻.
 - 그 BLOCKED의 거의 전부가 `BouncyCastleProvider.getService`에서 발생.
-- 원인: `Cipher.getInstance(..., "BC")` → BC의 `Provider.getService()` 호출인데, 이 메서드가 **`synchronized`**(한 번에 한 스레드만 진입). 8스레드가 **하나뿐인 Provider 객체**의 그 메서드에 동시에 들어가려다 줄을 섬(= 직렬화).
+- 원인: `Cipher.getInstance(..., provider)` → BC의 `Provider.getService()` 호출인데, 이 메서드가 **`synchronized`**(한 번에 한 스레드만 진입). 8스레드가 **하나뿐인 Provider 객체**의 그 메서드에 동시에 들어가려다 줄을 섬(= 직렬화).
 - **결론: once가 18코어를 두고도 확장 못 하는 이유는 "공유 Provider 객체의 synchronized getService에서 8스레드가 직렬화되기 때문"이다.** (측정으로 확정)
 - 참고: 이 경합은 처음 추측한 "JCE 내부 검증"이 아니라 **BouncyCastle `getService` 자체의 동기화**였다. 프로파일이 가설을 바로잡은 사례.
 
@@ -155,10 +176,13 @@ if (var5 == null) {                    // ② 캐시에 있으면 여기서 끝(
 
 ```mermaid
 sequenceDiagram
+
+    box rgba(251, 191, 36, 0.40) 인프라
     participant C as Cipher.getInstance(BC)
     participant M as serviceMap (락 없는 캐시)
     participant L as synchronized(this) 모니터
     participant S as super.getService
+    end
 
     Note over C: 한 호출에 이름 변형 여러 개 조회
     C->>M: get(Cipher.AES/CBC/PKCS7PADDING)
@@ -178,11 +202,17 @@ sequenceDiagram
 
 ```mermaid
 sequenceDiagram
+
+    box rgba(22, 163, 74, 0.40) 요청
     participant T1 as Thread-1
     participant T2 as Thread-2
     participant T3 as Thread-3
+    end
+
+    box rgba(251, 191, 36, 0.40) 인프라
     participant L as synchronized(this) — Provider 1개
     participant S as super.getService
+    end
 
     Note over T1,T3: 셋 다 같은 키 get(Cipher.AES/CBC) → 캐시 미스
 
@@ -216,7 +246,7 @@ sequenceDiagram
 
 - 단일 스레드에서도 약 1,526배 차이.
 - gc 프로파일이 정체를 못박음: repeated는 op당 **2.85MB** 할당(once 4KB의 707배). 매 호출 `new BouncyCastleProvider()`(수백 개 알고리즘 매핑을 채우는 무거운 생성자)가 비용의 본체.
-- once는 이 작업을 초기화 때 1회만. 암호화 본 연산(`init` + `doFinal`)은 둘이 동일.
+- once는 이 작업을 Spring Bean/JMH State 초기화 때 1회만. 암호화 본 연산(`init` + `doFinal`)은 둘이 동일.
 
 **2) 반전 — 빠른 once가 오히려 스레드 확장이 안 된다.**
 

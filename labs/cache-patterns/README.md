@@ -9,7 +9,6 @@
 3. Cache Stampede / Penetration / Avalanche
 
 ```mermaid
-%%{init: {"theme": "base", "themeVariables": {"primaryTextColor": "#111827", "secondaryTextColor": "#111827", "tertiaryTextColor": "#111827", "actorTextColor": "#111827", "signalTextColor": "#111827", "labelTextColor": "#111827", "noteTextColor": "#111827", "noteBkgColor": "#ffffff", "noteBorderColor": "#374151", "sequenceNumberColor": "#111827"}}}%%
 flowchart LR
     Start["기본 캐시 패턴"]
     Read["읽기 miss 처리<br/>Cache Aside / Read Through"]
@@ -28,6 +27,19 @@ flowchart LR
     Problems --> Stampede
     Problems --> Penetration
     Problems --> Avalanche
+
+    classDef blue fill:#DBEAFE,stroke:#2563EB,color:#111827
+    classDef green fill:#DCFCE7,stroke:#16A34A,color:#111827
+    classDef orange fill:#FEF3C7,stroke:#F59E0B,color:#111827
+    classDef pink fill:#FCE7F3,stroke:#DB2777,color:#111827
+    classDef yellow fill:#FEF9C3,stroke:#F59E0B,color:#111827
+    classDef purple fill:#F3E8FF,stroke:#9333EA,color:#111827
+    class Start,Penetration blue
+    class Read,Avalanche green
+    class Write orange
+    class Race pink
+    class Problems yellow
+    class Stampede purple
 ```
 
 ## 비교 대상군
@@ -160,13 +172,21 @@ public Optional<Product> findById(long id) {
 - miss가 한 번에 몰리면 저장소로 요청 집중
 
 ```mermaid
-%%{init: {"theme": "base", "themeVariables": {"primaryTextColor": "#111827", "secondaryTextColor": "#111827", "tertiaryTextColor": "#111827", "actorTextColor": "#111827", "signalTextColor": "#111827", "labelTextColor": "#111827", "noteTextColor": "#111827", "noteBkgColor": "#ffffff", "noteBorderColor": "#374151", "sequenceNumberColor": "#111827"}}}%%
 sequenceDiagram
     autonumber
+
+    box rgba(37, 99, 235, 0.40) 테스트 실행
     participant Test as 테스트
+    end
+
+    box rgba(245, 158, 11, 0.40) 앱
     participant Service as CacheAsideProductService
+    end
+
+    box rgba(219, 39, 119, 0.40) 저장소
     participant Cache as InMemoryCache
     participant Store as InMemoryProductStore
+    end
 
     Note over Test,Store: 읽기 경로 1 - cache miss 후 저장소 조회와 캐시 적재
     Test->>Service: findById(1L)
@@ -236,14 +256,22 @@ public Optional<V> get(K key) {
 - Redis만 단독으로 두면 Read Through가 자동으로 생기지 않음
 
 ```mermaid
-%%{init: {"theme": "base", "themeVariables": {"primaryTextColor": "#111827", "secondaryTextColor": "#111827", "tertiaryTextColor": "#111827", "actorTextColor": "#111827", "signalTextColor": "#111827", "labelTextColor": "#111827", "noteTextColor": "#111827", "noteBkgColor": "#ffffff", "noteBorderColor": "#374151", "sequenceNumberColor": "#111827"}}}%%
 sequenceDiagram
     autonumber
+
+    box rgba(37, 99, 235, 0.40) 테스트 실행
     participant Test as 테스트
+    end
+
+    box rgba(245, 158, 11, 0.40) 앱
     participant Service as ReadThroughProductService
+    end
+
+    box rgba(219, 39, 119, 0.40) 저장소
     participant Products as ReadThroughCache
     participant Cache as InMemoryCache
     participant Store as InMemoryProductStore
+    end
 
     Note over Test,Store: 읽기 경로 - ReadThroughCache가 miss 처리와 loader 호출 담당
     Test->>Service: findById(1L)
@@ -306,13 +334,21 @@ public Product save(Product product) {
 - 거의 읽히지 않는 데이터도 캐시에 들어갈 수 있음
 
 ```mermaid
-%%{init: {"theme": "base", "themeVariables": {"primaryTextColor": "#111827", "secondaryTextColor": "#111827", "tertiaryTextColor": "#111827", "actorTextColor": "#111827", "signalTextColor": "#111827", "labelTextColor": "#111827", "noteTextColor": "#111827", "noteBkgColor": "#ffffff", "noteBorderColor": "#374151", "sequenceNumberColor": "#111827"}}}%%
 sequenceDiagram
     autonumber
+
+    box rgba(37, 99, 235, 0.40) 테스트 실행
     participant Test as 테스트
+    end
+
+    box rgba(245, 158, 11, 0.40) 앱
     participant Service as WriteThroughProductService
+    end
+
+    box rgba(219, 39, 119, 0.40) 저장소
     participant Cache as InMemoryCache
     participant Store as InMemoryProductStore
+    end
 
     Note over Test,Store: 쓰기 경로 - 저장소와 캐시를 함께 갱신
     Test->>Service: save(Product)
@@ -367,13 +403,21 @@ public Product save(Product product) {
 - 첫 읽기 요청자가 캐시 재적재 비용 부담
 
 ```mermaid
-%%{init: {"theme": "base", "themeVariables": {"primaryTextColor": "#111827", "secondaryTextColor": "#111827", "tertiaryTextColor": "#111827", "actorTextColor": "#111827", "signalTextColor": "#111827", "labelTextColor": "#111827", "noteTextColor": "#111827", "noteBkgColor": "#ffffff", "noteBorderColor": "#374151", "sequenceNumberColor": "#111827"}}}%%
 sequenceDiagram
     autonumber
+
+    box rgba(37, 99, 235, 0.40) 테스트 실행
     participant Test as 테스트
+    end
+
+    box rgba(245, 158, 11, 0.40) 앱
     participant Service as WriteAroundProductService
+    end
+
+    box rgba(219, 39, 119, 0.40) 저장소
     participant Cache as InMemoryCache
     participant Store as InMemoryProductStore
+    end
 
     Note over Test,Store: 쓰기 경로 - 저장소만 갱신하고 캐시는 제거
     Test->>Service: save(Product)
@@ -446,14 +490,22 @@ public void flush() {
 - 실무에서는 영속 큐, retry, idempotency, 실패 보상 흐름 필요
 
 ```mermaid
-%%{init: {"theme": "base", "themeVariables": {"primaryTextColor": "#111827", "secondaryTextColor": "#111827", "tertiaryTextColor": "#111827", "actorTextColor": "#111827", "signalTextColor": "#111827", "labelTextColor": "#111827", "noteTextColor": "#111827", "noteBkgColor": "#ffffff", "noteBorderColor": "#374151", "sequenceNumberColor": "#111827"}}}%%
 sequenceDiagram
     autonumber
+
+    box rgba(37, 99, 235, 0.40) 테스트 실행
     participant Test as 테스트
+    end
+
+    box rgba(245, 158, 11, 0.40) 앱
     participant Service as WriteBehindProductService
-    participant Cache as InMemoryCache
     participant Queue as pendingWrites
+    end
+
+    box rgba(219, 39, 119, 0.40) 저장소
+    participant Cache as InMemoryCache
     participant Store as InMemoryProductStore
+    end
 
     Note over Test,Store: 쓰기 경로 - 캐시와 pendingWrites에 먼저 반영
     Test->>Service: save(updated)
@@ -491,13 +543,18 @@ Cache Aside에서 읽기와 쓰기가 교차하면 저장소보다 오래된 값
 5. 캐시에는 v1, 저장소에는 v2
 
 ```mermaid
-%%{init: {"theme": "base", "themeVariables": {"primaryTextColor": "#111827", "secondaryTextColor": "#111827", "tertiaryTextColor": "#111827", "actorTextColor": "#111827", "signalTextColor": "#111827", "labelTextColor": "#111827", "noteTextColor": "#111827", "noteBkgColor": "#ffffff", "noteBorderColor": "#374151", "sequenceNumberColor": "#111827"}}}%%
 sequenceDiagram
     autonumber
+
+    box rgba(22, 163, 74, 0.40) 요청
     participant ReadA as 읽기 A
     participant WriteB as 쓰기 B
+    end
+
+    box rgba(219, 39, 119, 0.40) 저장소
     participant Cache as Cache
     participant Store as Store
+    end
 
     Note over ReadA,Store: 읽기 경로 시작 - 아직 캐시에 쓰기 전
     ReadA->>Cache: get(1L)
@@ -544,15 +601,20 @@ sequenceDiagram
 - `RefreshAheadCache`: 만료 직전에 미리 갱신해서 완전 만료로 생기는 miss를 줄임
 
 ```mermaid
-%%{init: {"theme": "base", "themeVariables": {"primaryTextColor": "#111827", "secondaryTextColor": "#111827", "tertiaryTextColor": "#111827", "actorTextColor": "#111827", "signalTextColor": "#111827", "labelTextColor": "#111827", "noteTextColor": "#111827", "noteBkgColor": "#ffffff", "noteBorderColor": "#374151", "sequenceNumberColor": "#111827"}}}%%
 sequenceDiagram
     autonumber
+
+    box rgba(22, 163, 74, 0.40) 요청
     participant T1 as 요청 1
     participant T2 as 요청 2
     participant Tn as 요청 N
+    end
+
+    box rgba(219, 39, 119, 0.40) 저장소
     participant Cache as Cache
     participant SingleFlight as SingleFlightCache
     participant Store as Store
+    end
 
     Note over T1,Store: 보호 없음 - 모든 요청이 miss 후 저장소 조회
     T1->>Cache: get(key)
@@ -598,13 +660,21 @@ sequenceDiagram
 - Bloom filter: 확실히 없는 키는 저장소 조회 전 차단
 
 ```mermaid
-%%{init: {"theme": "base", "themeVariables": {"primaryTextColor": "#111827", "secondaryTextColor": "#111827", "tertiaryTextColor": "#111827", "actorTextColor": "#111827", "signalTextColor": "#111827", "labelTextColor": "#111827", "noteTextColor": "#111827", "noteBkgColor": "#ffffff", "noteBorderColor": "#374151", "sequenceNumberColor": "#111827"}}}%%
 sequenceDiagram
     autonumber
+
+    box rgba(22, 163, 74, 0.40) 요청
     participant Client as Client
-    participant Cache as Cache
+    end
+
+    box rgba(245, 158, 11, 0.40) 앱
     participant Filter as BloomFilter
+    end
+
+    box rgba(219, 39, 119, 0.40) 저장소
+    participant Cache as Cache
     participant Store as Store
+    end
 
     Note over Client,Store: 보호 없음 - 없는 키는 캐시에 안 남고 매번 저장소 조회
     Client->>Cache: get(99L)
@@ -654,7 +724,6 @@ sequenceDiagram
 - 만료 시각 분산
 
 ```mermaid
-%%{init: {"theme": "base", "themeVariables": {"primaryTextColor": "#111827", "secondaryTextColor": "#111827", "tertiaryTextColor": "#111827", "actorTextColor": "#111827", "signalTextColor": "#111827", "labelTextColor": "#111827", "noteTextColor": "#111827", "noteBkgColor": "#ffffff", "noteBorderColor": "#374151", "sequenceNumberColor": "#111827"}}}%%
 flowchart LR
     Fixed["고정 TTL<br/>모든 key expireAt=1000"]
     Burst["t=1000<br/>한 번에 만료"]
@@ -666,6 +735,19 @@ flowchart LR
 
     Fixed --> Burst --> StoreBurst
     Jitter --> Spread --> StoreSpread
+
+    classDef blue fill:#DBEAFE,stroke:#2563EB,color:#111827
+    classDef green fill:#DCFCE7,stroke:#16A34A,color:#111827
+    classDef orange fill:#FEF3C7,stroke:#F59E0B,color:#111827
+    classDef pink fill:#FCE7F3,stroke:#DB2777,color:#111827
+    classDef yellow fill:#FEF9C3,stroke:#F59E0B,color:#111827
+    classDef purple fill:#F3E8FF,stroke:#9333EA,color:#111827
+    class Fixed blue
+    class Burst green
+    class StoreBurst orange
+    class Jitter pink
+    class Spread yellow
+    class StoreSpread purple
 ```
 
 테스트 포인트:
