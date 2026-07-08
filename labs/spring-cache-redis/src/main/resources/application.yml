@@ -1,0 +1,21 @@
+spring:
+  output:
+    ansi:
+      enabled: always
+  application:
+    name: spring-cache-redis
+  cache:
+    type: redis
+    redis:
+      time-to-live: 10m
+      cache-null-values: false
+      use-key-prefix: true
+      key-prefix: "deep-dive:spring-cache-redis::"
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
+logging:
+  level:
+    org.springframework.cache: debug

@@ -1,5 +1,6 @@
 plugins {
     id 'java'
+    id 'org.springframework.boot' version '3.4.1'
 }
 
 java {
@@ -26,4 +27,8 @@ dependencies {
 
 test {
     useJUnitPlatform()
+
+    testLogging {
+        showStandardStreams = true
+    }
 }
