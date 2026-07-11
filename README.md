@@ -4,11 +4,11 @@
 
 ## 모듈
 
-- `coupon-issue` — 선착순 쿠폰 발급 동시성 문제. 락 없음 / synchronized / 원자적 UPDATE / 비관적 락 / 낙관적 락 / 네임드 락 비교
-- `java-sandbox` — 디자인 패턴, 리플렉션 등 자바 문법 실험용 공간
+- `coupon-issue` — 선착순 쿠폰 발급 동시성 문제. 락 없음 / synchronized / 원자적 UPDATE / 비관적 락 / 낙관적 락 / 네임드 락 / Redis 분산락 / Redis 원자적 차감(Lua) / Redisson 비교
+- `java-sandbox` — AES 암호화 시 BouncyCastle Provider 등록 비용을 JMH로 측정하는 실험용 공간
 - `cache-patterns` — Cache Aside / Read Through / Write Through / Write Around / Write Behind 캐시 패턴 비교
 - `spring-cache-local` — Spring Cache를 로컬 인메모리 캐시로 사용할 때의 동작 실험
-- `spring-cache-redis` — Spring Cache를 Redis 기반 공용 캐시로 사용할 때의 동작 실험 예정
+- `spring-cache-redis` — Spring Cache를 Redis 기반 공용 캐시로 사용할 때의 동작 실험. Cache Aside/Null Caching/TTL Jitter/Hot Key 방어를 `RedisTemplate`으로 직접 구현
 - `spring-test-infra` — `@DynamicPropertySource`와 Testcontainers 기반 테스트 인프라 실험
 - `spring` — `@Async`와 Java `ExecutorService` 비교 등 Spring 핵심 기능 실험
 - `seat-reservation` — 좌석 예약 동시성, Redis 선점, Kafka 비동기 확정 실험

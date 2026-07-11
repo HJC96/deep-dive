@@ -13,7 +13,7 @@
 1. 동시성 제어 없음 → 같은 좌석이 여러 명에게 배정됨
 2. Redis 선점(SADD) → 두 불변식(이중 배정·1인 1좌석)을 보장 (동시성 해결)
 3. Redis + Kafka → DB 확정을 요청 경로에서 분리 (결합·내구성 문제 해결)
-4. 버스트 부하 비교 & 실패 처리 → DB가 병목일 때 Kafka가 몰린 요청을 받아 내고, 확정이 실패해도 FailedEvent로 남겨 배치가 재처리
+4. 버스트 부하 비교 & 실패 처리 → DB가 병목일 때 Kafka가 몰린 요청을 받아 내고, 확정이 실패해도 FailedEvent로 남긴다 (재처리 배치는 향후 구현)
 
 ## 공통 환경
 
@@ -385,7 +385,7 @@ Kafka 경유 - 요청 반환까지 21ms, 실패 0건 / DB 전부 확정까지 37
 - **Kafka 경유**: 
   - **요청 경로**: Redis 선점 + publish만 하고 즉시 반환 → 실패 0건
   - **확정 경로**: 몰린 쓰기는 토픽이 받아 두고, Consumer가 DB 속도에 맞춰 천천히 소진 → 결국 100건 전부 확정
-  - **실패 처리**: Consumer의 DB 확정이 실패해도 FailedEvent로 기록 → 배치가 나중에 재처리 → 최종적으로 모든 선점이 확정됨
+  - **실패 처리**: Consumer의 DB 확정이 실패하면 FailedEvent로 기록해 유실은 막는다 (재처리 배치는 향후 구현). 이 부하 테스트에서는 Consumer가 결국 모든 메시지를 처리해 100건 전부 확정됨
 
 테스트 단언문:
 
@@ -482,7 +482,7 @@ sequenceDiagram
         alt DB 확정 성공
             Consumer->>DB: INSERT ✓
         else DB 확정 실패
-            Consumer->>FailedDB: FailedEvent 저장 (배치가 나중에 재처리)
+            Consumer->>FailedDB: FailedEvent 저장 (재처리 배치는 향후 구현)
         end
     end
 
@@ -492,7 +492,7 @@ sequenceDiagram
 
 ### 실패 처리 메커니즘
 
-**Consumer의 try-catch:** Redis 선점은 됐는데 DB 확정이 실패하면, FailedEvent로 기록해 배치가 나중에 처리하도록 함.
+**Consumer의 try-catch:** Redis 선점은 됐는데 DB 확정이 실패하면, FailedEvent로 기록해 유실만 막음. 재처리 배치는 아직 없음(아래 코드는 향후 구현 예정안).
 
 ```java
 @KafkaListener(topics = "seat-reservation", groupId = "seat-reservation-confirm")

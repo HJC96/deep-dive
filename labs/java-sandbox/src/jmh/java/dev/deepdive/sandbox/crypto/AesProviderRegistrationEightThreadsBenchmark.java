@@ -1,7 +1,10 @@
 package dev.deepdive.sandbox.crypto;
 
 import java.nio.charset.StandardCharsets;
+import java.security.Provider;
+import java.security.Security;
 import java.util.concurrent.TimeUnit;
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
@@ -9,6 +12,7 @@ import org.openjdk.jmh.annotations.Measurement;
 import org.openjdk.jmh.annotations.Mode;
 import org.openjdk.jmh.annotations.OutputTimeUnit;
 import org.openjdk.jmh.annotations.Scope;
+import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.Threads;
 import org.openjdk.jmh.annotations.Warmup;
@@ -64,7 +68,7 @@ public class AesProviderRegistrationEightThreadsBenchmark {
      *  Cipher.getInstance가 부르는 synchronized getService 경합으로 확장이 거의 안 된다(×1.4). */
     @Benchmark
     public void encrypt_withProviderInitializedOnce(CryptoInput input, Blackhole blackhole) throws Exception {
-        blackhole.consume(AesUtilAfter.encrypt(input.plainText, input.key, input.iv));
+        blackhole.consume(input.aesUtilAfter.encrypt(input.plainText, input.key, input.iv));
     }
 
     /**
@@ -81,5 +85,16 @@ public class AesProviderRegistrationEightThreadsBenchmark {
                 BouncyCastle provider registration benchmark plain text.
                 The AES algorithm, key, iv, and payload are identical for both paths.
                 """.getBytes(StandardCharsets.UTF_8);
+        AesUtilAfter aesUtilAfter;
+
+        @Setup
+        public void setUp() {
+            Provider provider = Security.getProvider(BouncyCastleProvider.PROVIDER_NAME);
+            if (provider == null) {
+                provider = new BouncyCastleProvider();
+                Security.addProvider(provider);
+            }
+            aesUtilAfter = new AesUtilAfter(provider);
+        }
     }
 }

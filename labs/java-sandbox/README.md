@@ -13,22 +13,23 @@ Java 언어 기능과 JVM 동작을 작은 코드로 관찰하는 샌드박스.
 
 - `AesUtilBefore`: `encrypt()`마다 `Security.addProvider(new BouncyCastleProvider())` 호출.
 - `AesUtilAfter`: static 유틸이 아니라 `Provider`를 생성자 주입받는 암호화 객체. `encrypt()`에서는 Provider 등록 없이 암호화만 수행.
-- `CryptoProviderConfig`: Spring Context 초기화 때 `getProvider(...) == null`이면 BouncyCastle Provider를 1회만 등록하고, `AesUtilAfter` Bean에 주입.
 - `AesProviderRegistrationSingleThreadBenchmark` / `...EightThreadsBenchmark`: 단일/8스레드 벤치마크. `@Threads`만 다르고 메서드는 동일.
 - 벤치마크 메서드: `encrypt_withRepeatedProviderRegistration`, `encrypt_withProviderInitializedOnce`.
 
-### Spring으로 테스트하기 쉬운 형태
+### 생성자 주입으로 테스트하기 쉬운 형태
 
-기존 static 구조는 클래스 로딩 순간 JVM 전역 `Security` 상태를 바꿔서 테스트 간 상태 제어가 어렵다. 개선 후에는 Provider 등록 책임을 Spring 설정으로 분리하고, 암호화 객체는 생성자 주입만 받는 POJO로 둔다.
+기존 static 구조는 클래스 로딩 순간 JVM 전역 `Security` 상태를 바꿔서 테스트 간 상태 제어가 어렵다. 개선 후에는 Provider 등록과 암호화 로직을 분리하고, 암호화 객체(`AesUtilAfter`)는 생성자로 `Provider`만 주입받는 POJO로 둔다.
 
 ```java
-try (AnnotationConfigApplicationContext context =
-             new AnnotationConfigApplicationContext(CryptoProviderConfig.class)) {
-    AesUtilAfter aesUtilAfter = context.getBean(AesUtilAfter.class);
+Provider provider = Security.getProvider(BouncyCastleProvider.PROVIDER_NAME);
+if (provider == null) {
+    provider = new BouncyCastleProvider();
+    Security.addProvider(provider);
 }
+AesUtilAfter aesUtilAfter = new AesUtilAfter(provider);
 ```
 
-단위 테스트에서는 Spring Context 없이도 직접 만들 수 있다.
+단위 테스트에서는 이 등록 절차 없이도 직접 만들 수 있다.
 
 ```java
 AesUtilAfter aesUtilAfter = new AesUtilAfter(new BouncyCastleProvider());
@@ -246,7 +247,7 @@ sequenceDiagram
 
 - 단일 스레드에서도 약 1,526배 차이.
 - gc 프로파일이 정체를 못박음: repeated는 op당 **2.85MB** 할당(once 4KB의 707배). 매 호출 `new BouncyCastleProvider()`(수백 개 알고리즘 매핑을 채우는 무거운 생성자)가 비용의 본체.
-- once는 이 작업을 Spring Bean/JMH State 초기화 때 1회만. 암호화 본 연산(`init` + `doFinal`)은 둘이 동일.
+- once는 이 작업을 JMH State 초기화 때 1회만. 암호화 본 연산(`init` + `doFinal`)은 둘이 동일.
 
 **2) 반전 — 빠른 once가 오히려 스레드 확장이 안 된다.**
 

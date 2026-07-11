@@ -3,6 +3,7 @@ package dev.deepdive.sandbox.crypto;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.nio.charset.StandardCharsets;
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.junit.jupiter.api.Test;
 
 class AesUtilComparisonTest {
@@ -14,7 +15,9 @@ class AesUtilComparisonTest {
         byte[] plainText = "same aes input for provider registration comparison".getBytes(StandardCharsets.UTF_8);
 
         byte[] before = AesUtilBefore.encrypt(plainText, key, iv);
-        byte[] after = AesUtilAfter.encrypt(plainText, key, iv);
+        AesUtilAfter aesUtilAfter = new AesUtilAfter(new BouncyCastleProvider());
+
+        byte[] after = aesUtilAfter.encrypt(plainText, key, iv);
 
         assertThat(after).isEqualTo(before);
     }
