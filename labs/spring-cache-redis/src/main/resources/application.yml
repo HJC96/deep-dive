@@ -4,6 +4,17 @@ spring:
       enabled: always
   application:
     name: spring-cache-redis
+  datasource:
+    url: jdbc:mysql://localhost:3306/deepdive_cache_redis?createDatabaseIfNotExist=true&serverTimezone=UTC
+    username: root
+    password: ""
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
   cache:
     type: redis
     redis:
