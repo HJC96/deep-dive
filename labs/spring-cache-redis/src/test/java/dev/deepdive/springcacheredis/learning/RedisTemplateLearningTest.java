@@ -43,7 +43,15 @@ class RedisTemplateLearningTest extends RedisAndMySqlContainerTest {
 
         assertThat(redisTemplateLearningService.find("learning:verification-code"))
                 .isEqualTo("123456");
-        assertThat(redisTemplate.getExpire("learning:verification-code", TimeUnit.SECONDS))
+
+        // getExpire()는 value가 아니라 key가 자동 삭제되기까지 남은 TTL을 조회한다.
+        // TimeUnit.SECONDS를 전달했으므로 결과는 초 단위이며, 실행 시간이 지나 60보다 작을 수 있다.
+        Long remainingTtlSeconds = redisTemplate.getExpire(
+                "learning:verification-code",
+                TimeUnit.SECONDS
+        );
+
+        assertThat(remainingTtlSeconds)
                 .isBetween(1L, 60L);
     }
 
