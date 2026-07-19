@@ -2,3 +2,11 @@ spring:
   output:
     ansi:
       enabled: always
+
+payment:
+  retry:
+    max-attempts: 3
+    initial-delay: 50
+    max-delay: 500
+    multiplier: 2.0
+    random: true
