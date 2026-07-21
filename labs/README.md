@@ -14,3 +14,4 @@
 - `seat-reservation`: 좌석 예약 동시성 실험실
 - `spring-data-jpa`: Spring Data JPA 실험실
 - `spring-boot-actuator`: Spring Boot Actuator 관찰 실험실
+- `distributed-transaction-monolith`: 단일 DB 트랜잭션으로 좌석 예약 정합성을 보장하는 Monolithic 실험실
