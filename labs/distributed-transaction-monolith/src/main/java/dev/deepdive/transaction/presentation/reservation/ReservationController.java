@@ -1,9 +1,9 @@
 package dev.deepdive.transaction.presentation.reservation;
 
-import dev.deepdive.transaction.application.reservation.ReservationResult;
 import dev.deepdive.transaction.application.reservation.ReservationService;
-import dev.deepdive.transaction.presentation.reservation.dto.CreateReservationRequest;
-import dev.deepdive.transaction.presentation.reservation.dto.ReservationResponse;
+import dev.deepdive.transaction.application.reservation.dto.result.ReservationResult;
+import dev.deepdive.transaction.presentation.reservation.dto.request.CreateReservationRequest;
+import dev.deepdive.transaction.presentation.reservation.dto.response.ReservationResponse;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import org.springframework.validation.annotation.Validated;

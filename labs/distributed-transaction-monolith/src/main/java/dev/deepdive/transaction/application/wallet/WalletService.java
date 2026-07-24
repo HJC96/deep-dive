@@ -2,8 +2,8 @@ package dev.deepdive.transaction.application.wallet;
 
 import dev.deepdive.transaction.domain.wallet.Wallet;
 import dev.deepdive.transaction.domain.wallet.WalletLedger;
-import dev.deepdive.transaction.infrastructure.persistence.wallet.WalletLedgerRepository;
-import dev.deepdive.transaction.infrastructure.persistence.wallet.WalletRepository;
+import dev.deepdive.transaction.infrastructure.repository.wallet.WalletLedgerRepository;
+import dev.deepdive.transaction.infrastructure.repository.wallet.WalletRepository;
 import org.springframework.stereotype.Service;
 
 @Service

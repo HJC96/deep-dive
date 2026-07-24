@@ -15,3 +15,4 @@
 - `spring-data-jpa`: Spring Data JPA 실험실
 - `spring-boot-actuator`: Spring Boot Actuator 관찰 실험실
 - `distributed-transaction-monolith`: 단일 DB 트랜잭션으로 좌석 예약 정합성을 보장하는 Monolithic 실험실
+- `distributed-transaction-msa`: 서비스별 DB와 로컬 트랜잭션으로 부분 커밋을 재현하는 MSA 실험실

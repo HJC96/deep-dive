@@ -1,0 +1,14 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: seat-service
+  datasource:
+    url: ${SEAT_DB_URL:jdbc:mysql://localhost:3306/seat_db}
+    username: ${SEAT_DB_USERNAME:root}
+    password: ${SEAT_DB_PASSWORD:root}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false

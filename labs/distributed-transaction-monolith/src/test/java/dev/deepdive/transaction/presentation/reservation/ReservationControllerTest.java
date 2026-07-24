@@ -8,8 +8,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import dev.deepdive.transaction.application.reservation.ReservationNotFoundException;
-import dev.deepdive.transaction.application.reservation.ReservationResult;
 import dev.deepdive.transaction.application.reservation.ReservationService;
+import dev.deepdive.transaction.application.reservation.dto.result.ReservationResult;
 import dev.deepdive.transaction.domain.reservation.ReservationStatus;
 import dev.deepdive.transaction.domain.seat.NotEnoughSeatsException;
 import org.junit.jupiter.api.BeforeEach;

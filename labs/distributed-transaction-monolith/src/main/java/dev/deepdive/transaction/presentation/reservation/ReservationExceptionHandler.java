@@ -5,7 +5,7 @@ import dev.deepdive.transaction.application.seat.WorkshopNotFoundException;
 import dev.deepdive.transaction.application.wallet.WalletNotFoundException;
 import dev.deepdive.transaction.domain.seat.NotEnoughSeatsException;
 import dev.deepdive.transaction.domain.wallet.NotEnoughCreditException;
-import dev.deepdive.transaction.presentation.reservation.dto.ErrorResponse;
+import dev.deepdive.transaction.presentation.reservation.dto.response.ErrorResponse;
 import jakarta.validation.ConstraintViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

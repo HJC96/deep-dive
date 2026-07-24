@@ -32,3 +32,12 @@ project(':spring-boot-actuator').projectDir = file('labs/spring-boot-actuator')
 
 include 'distributed-transaction-monolith'
 project(':distributed-transaction-monolith').projectDir = file('labs/distributed-transaction-monolith')
+
+include 'distributed-transaction-msa-reservation-service'
+project(':distributed-transaction-msa-reservation-service').projectDir = file('labs/distributed-transaction-msa/reservation-service')
+
+include 'distributed-transaction-msa-seat-service'
+project(':distributed-transaction-msa-seat-service').projectDir = file('labs/distributed-transaction-msa/seat-service')
+
+include 'distributed-transaction-msa-wallet-service'
+project(':distributed-transaction-msa-wallet-service').projectDir = file('labs/distributed-transaction-msa/wallet-service')

@@ -1,7 +1,7 @@
 package dev.deepdive.transaction.application.seat;
 
 import dev.deepdive.transaction.domain.seat.WorkshopSeat;
-import dev.deepdive.transaction.infrastructure.persistence.seat.WorkshopSeatRepository;
+import dev.deepdive.transaction.infrastructure.repository.seat.WorkshopSeatRepository;
 import org.springframework.stereotype.Service;
 
 @Service

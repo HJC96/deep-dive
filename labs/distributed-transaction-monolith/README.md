@@ -20,7 +20,21 @@
 2. 예약 실행  → reservationId로 좌석과 크레딧 처리
 ```
 
-같은 예약을 다시 실행하는지 `reservationId`만으로 판단할 수 있다. 이후 MSA로 분리해도 이 값을 Seat·Wallet 서비스에 전달하는 `requestId`로 그대로 사용할 수 있다.
+같은 예약을 다시 실행하는지 `reservationId`만으로 판단할 수 있다. 모놀리스에는 별도의 `requestId` 필드가 없고, `reservationId`가 요청 식별자 역할까지 맡는다.
+
+- 예약 실행 대상을 찾고 잠그는 ID
+- 같은 예약의 재실행 여부를 판단하는 ID
+- 지갑 원장 키를 만드는 ID
+
+```mermaid
+flowchart LR
+    Create["예약 생성"] -->|"서버가 발급"| Id["별도 requestId 없음<br/>reservationId = 1이 요청 식별자 역할"]
+    Id -->|"place(1)"| Reservation["Reservation 1 조회·잠금"]
+    Id -->|"원장 키 생성"| LedgerKey["reservation:1:debit"]
+    LedgerKey --> Ledger["WalletLedger.ledgerKey"]
+```
+
+이후 MSA로 분리하면 같은 값을 Seat·Wallet Service에 전달하는 명시적인 `requestId`로 사용한다.
 
 두 API 호출을 사용하지만 2PC는 아니다. 예약 생성과 예약 실행이 각각 독립적인 로컬 트랜잭션이고, 실행 트랜잭션 안에서 사용하는 데이터베이스는 하나다.
 
@@ -59,7 +73,7 @@ sequenceDiagram
     Controller->>Service: create(command)
     Note over Service,DB: BEGIN
     Service->>DB: Reservation INSERT
-    DB-->>Service: reservationId
+    DB-->>Service: reservationId = 1
     Note over Service,DB: COMMIT
     Service-->>Client: reservationId + CREATED
 ```
@@ -82,20 +96,44 @@ sequenceDiagram
     participant Wallet as WalletService
     participant DB as MySQL
 
-    Client->>Service: place(reservationId)
-    Service->>Transaction: place(reservationId)
+    Client->>Service: place(reservationId = 1)
+    Service->>Transaction: place(reservationId = 1)
     Note over Transaction,DB: BEGIN
-    Transaction->>DB: Reservation SELECT FOR UPDATE
+    Transaction->>DB: Reservation 1 SELECT FOR UPDATE
     DB-->>Transaction: CREATED
     Transaction->>Seat: 좌석 2개 예약
     Seat->>DB: reservedCount 증가
-    Transaction->>Wallet: 60,000 크레딧 차감
+    Transaction->>Wallet: debit(60,000, ledgerKey = reservation:1:debit)
     Wallet->>DB: balance 차감
-    Wallet->>DB: WalletLedger 저장
+    Wallet->>DB: WalletLedger INSERT (ledgerKey)
     Transaction->>DB: Reservation CONFIRMED 변경
     Note over Transaction,DB: COMMIT
     Transaction-->>Client: CONFIRMED
 ```
+
+핵심은 좌석 예약, 크레딧 차감, 예약 확정이 하나의 `@Transactional` 메서드 안에서 실행된다는 점이다.
+
+```java
+@Transactional
+public ReservationResult place(long reservationId) {
+    Reservation reservation = repository.findByIdForUpdate(reservationId)
+            .orElseThrow(() -> new ReservationNotFoundException(reservationId));
+    if (reservation.getStatus() == ReservationStatus.CONFIRMED) {
+        return ReservationResult.from(reservation);
+    }
+
+    long amount = seatService.reserve(
+            reservation.getWorkshopId(), reservation.getSeatCount());
+
+    String ledgerKey = "reservation:" + reservationId + ":debit";
+    walletService.debit(reservation.getUserId(), amount, ledgerKey);
+
+    reservation.confirm(amount);
+    return ReservationResult.from(reservation);
+}
+```
+
+`reservationId`는 예약 조회와 중복 실행 판단에 사용되고, `reservation:{reservationId}:debit` 형태의 원장 키로도 이어진다. 이 메서드 중간에서 예외가 발생하면 네 데이터의 변경이 함께 롤백된다.
 
 좌석 10개, 좌석당 30,000 크레딧인 워크숍에서 2개를 예약하면:
 
@@ -105,12 +143,6 @@ sequenceDiagram
 | `Wallet.balance` | 100,000 | 40,000 |
 | `Reservation.status` | `CREATED` | `CONFIRMED` |
 | `WalletLedger` | 0건 | 1건 |
-
-원장 키도 서버가 발급한 예약 ID를 사용한다.
-
-```text
-reservation:{reservationId}:debit
-```
 
 ## 실행 중 실패하면
 
@@ -125,10 +157,10 @@ sequenceDiagram
     participant DB as MySQL
 
     Note over Transaction,DB: BEGIN
-    Transaction->>DB: Reservation SELECT FOR UPDATE
+    Transaction->>DB: Reservation 1 SELECT FOR UPDATE
     Transaction->>Seat: 좌석 예약
     Seat->>DB: reservedCount 증가
-    Transaction->>Wallet: 크레딧 차감
+    Transaction->>Wallet: debit(60,000, ledgerKey = reservation:1:debit)
     Wallet-->>Transaction: NotEnoughCreditException
     Note over Transaction,DB: ROLLBACK
     Note over DB: Reservation은 CREATED 유지
@@ -140,6 +172,12 @@ sequenceDiagram
 ## 같은 예약을 다시 실행하면
 
 `ReservationTransaction`은 예약 row를 `SELECT FOR UPDATE`로 조회한다.
+
+```java
+@Lock(LockModeType.PESSIMISTIC_WRITE)
+@Query("select reservation from Reservation reservation where reservation.id = :reservationId")
+Optional<Reservation> findByIdForUpdate(@Param("reservationId") long reservationId);
+```
 
 - 상태가 `CREATED`면 좌석과 크레딧 처리
 - 상태가 `CONFIRMED`면 기존 결과 반환
@@ -154,10 +192,10 @@ sequenceDiagram
     participant Transaction as ReservationTransaction
     participant DB as MySQL
 
-    A->>Transaction: place(1)
+    A->>Transaction: place(reservationId = 1)
     Transaction->>DB: SELECT FOR UPDATE reservation 1
     DB-->>Transaction: CREATED + row lock
-    B->>Transaction: place(1)
+    B->>Transaction: place(reservationId = 1)
     Transaction->>DB: SELECT FOR UPDATE reservation 1
     Note over B,DB: A의 트랜잭션 종료까지 대기
     Transaction->>DB: A) 좌석·지갑 처리 후 CONFIRMED
@@ -188,13 +226,12 @@ sequenceDiagram
 
 ## 다음 문제
 
-같은 `reservationId`의 중복 실행은 막았지만, 서로 다른 예약이 같은 워크숍을 동시에 변경하는 문제는 남아 있다.
+예약·좌석·지갑을 서로 다른 서비스와 데이터베이스로 분리하면 이 로컬 트랜잭션을 그대로 사용할 수 없다.
 
 ```text
-예약 1: 남은 좌석 2개 확인
-예약 2: 남은 좌석 2개 확인
-예약 1: 2개 예약 성공
-예약 2: 2개 예약 성공
+Reservation Service → reservation_db
+Seat Service        → seat_db
+Wallet Service      → wallet_db
 ```
 
-두 요청은 서로 다른 Reservation row를 잠그므로 현재 락으로는 막을 수 없다. 다음 단계에서 이 상황을 재현한 뒤 WorkshopSeat row의 비관적 락과 낙관적 락을 비교한다.
+좌석 예약이 커밋된 뒤 크레딧 차감이 실패해도 Reservation Service의 롤백으로 `seat_db`를 되돌릴 수 없다. 다음 단계인 `distributed-transaction-msa`에서 세 서비스를 실제 HTTP로 연결하고 이 부분 커밋을 재현한다.

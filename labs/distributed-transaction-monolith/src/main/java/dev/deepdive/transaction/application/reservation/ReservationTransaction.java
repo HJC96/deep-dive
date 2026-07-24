@@ -1,10 +1,11 @@
 package dev.deepdive.transaction.application.reservation;
 
+import dev.deepdive.transaction.application.reservation.dto.result.ReservationResult;
 import dev.deepdive.transaction.application.seat.SeatService;
 import dev.deepdive.transaction.application.wallet.WalletService;
 import dev.deepdive.transaction.domain.reservation.Reservation;
 import dev.deepdive.transaction.domain.reservation.ReservationStatus;
-import dev.deepdive.transaction.infrastructure.persistence.reservation.ReservationRepository;
+import dev.deepdive.transaction.infrastructure.repository.reservation.ReservationRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
