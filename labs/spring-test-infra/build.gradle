@@ -22,6 +22,7 @@ dependencies {
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation "org.testcontainers:testcontainers-junit-jupiter:${rootProject.ext.dependencyVersions.testcontainers}"
     testImplementation "org.testcontainers:testcontainers-mysql:${rootProject.ext.dependencyVersions.testcontainers}"
+    testImplementation 'com.tngtech.archunit:archunit-junit5:1.4.1'
     testRuntimeOnly 'com.mysql:mysql-connector-j'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }

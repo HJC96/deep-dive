@@ -9,7 +9,7 @@
 - `cache-patterns` — Cache Aside / Read Through / Write Through / Write Around / Write Behind 캐시 패턴 비교
 - `spring-cache-local` — Spring Cache를 로컬 인메모리 캐시로 사용할 때의 동작 실험
 - `spring-cache-redis` — Spring Cache를 Redis 기반 공용 캐시로 사용할 때의 동작 실험. Cache Aside/Null Caching/TTL Jitter/Hot Key 방어를 `RedisTemplate`으로 직접 구현
-- `spring-test-infra` — `@DynamicPropertySource`와 Testcontainers 기반 테스트 인프라 실험
+- `spring-test-infra` — `@DynamicPropertySource`와 Testcontainers 기반 테스트 인프라 실험, ArchUnit 아키텍처 검증
 - `spring` — `@Async`와 Java `ExecutorService` 비교 등 Spring 핵심 기능 실험
 - `seat-reservation` — 좌석 예약 동시성, Redis 선점, Kafka 비동기 확정 실험
 - `distributed-transaction-monolith` — 좌석·지갑·예약을 하나의 로컬 트랜잭션으로 처리하는 Monolithic 기준선

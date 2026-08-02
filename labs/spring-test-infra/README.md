@@ -139,6 +139,84 @@ sequenceDiagram
 
 수동 방식에서 생명주기가 흩어진다는 말은 컨테이너 선언, 시작, 종료, Spring 프로퍼티 등록 책임이 각각 다른 위치로 나뉜다는 뜻이다.
 
+## ArchUnit
+
+패키지 의존 방향과 코딩 컨벤션을 컴파일된 클래스 기준으로 검증하는 테스트 라이브러리.
+
+| 항목 | 내용 |
+| --- | --- |
+| 대상 | `.class` 파일 |
+| 임포트 | `ClassFileImporter` |
+| 규칙 | `ArchRule` (직접 정의 또는 `GeneralCodingRules` 같은 사전 정의 규칙) |
+| 검증 | `rule.check(classes)` |
+| 위반 시 | `check()` 호출 시점에 `AssertionError` 발생 |
+
+## 케이스 3. 계층형 아키텍처 검증
+
+`archunit.example` 패키지에 Controller-Service-Repository 3계층 예제를 만들고, 계층 사이 접근 방향을 규칙으로 고정한다.
+
+```java
+ArchRule rule = layeredArchitecture()
+        .consideringAllDependencies()
+        .layer("Controller").definedBy(BASE_PACKAGE + ".controller..")
+        .layer("Service").definedBy(BASE_PACKAGE + ".service..")
+        .layer("Repository").definedBy(BASE_PACKAGE + ".repository..")
+        .whereLayer("Controller").mayNotBeAccessedByAnyLayer()
+        .whereLayer("Service").mayOnlyBeAccessedByLayers("Controller")
+        .whereLayer("Repository").mayOnlyBeAccessedByLayers("Service");
+
+assertThatCode(() -> rule.check(classes)).doesNotThrowAnyException();
+```
+
+```mermaid
+flowchart LR
+    Controller["Controller"] --> Service["Service"]
+    Service --> Repository["Repository"]
+
+    classDef blue fill:#DBEAFE,stroke:#2563EB,color:#111827
+    classDef orange fill:#FEF3C7,stroke:#F59E0B,color:#111827
+    classDef pink fill:#FCE7F3,stroke:#DB2777,color:#111827
+    class Controller blue
+    class Service orange
+    class Repository pink
+```
+
+확인 포인트:
+
+- `SampleController` → `SampleService` → `SampleRepository` 방향만 허용된다.
+- Repository가 Controller를 직접 호출하는 코드가 생기면 `check()`가 `AssertionError`를 던진다.
+- 세 계층 모두 생성자 주입만 사용하므로 규칙 검증이 통과한다.
+- 계층에 속하지 않은 패키지(`legacy`)는 이 검증 대상에서 제외한다. `mayOnlyBeAccessedByLayers`는 정의되지 않은 패키지의 접근도 위반으로 잡기 때문이다.
+
+## 케이스 4. 필드 주입 금지 규칙 검증
+
+ArchUnit이 미리 정의한 `GeneralCodingRules.NO_CLASSES_SHOULD_USE_FIELD_INJECTION`으로 필드 주입을 잡아낸다. `legacy` 패키지의 `LegacyNotificationService`는 일부러 `@Autowired` 필드 주입을 사용한다.
+
+```java
+@Service
+public class LegacyNotificationService {
+
+    @Autowired
+    private SampleRepository sampleRepository;
+}
+```
+
+```java
+assertThatThrownBy(() -> NO_CLASSES_SHOULD_USE_FIELD_INJECTION.check(classes))
+        .isInstanceOf(AssertionError.class);
+```
+
+확인 포인트:
+
+- `controller` / `service` / `repository` 패키지만 검사하면 통과한다. 전부 생성자 주입이다.
+- `legacy` 패키지만 검사하면 실패한다. `LegacyNotificationService`의 필드 주입이 걸린다.
+
+이유:
+
+- 필드 주입은 생성자 없이도 객체가 만들어져서 필수 의존성이 코드로 드러나지 않는다.
+- 테스트에서 목 객체를 넣으려면 리플렉션이 필요하다.
+- 순환 의존이 생겨도 생성 시점에는 드러나지 않는다.
+
 ## 실행
 
 ```bash
@@ -155,4 +233,7 @@ Docker가 떠 있어야 한다.
 | `ContainerAnnotationLifecycleTest` | `@Container` 유무에 따른 자동 시작 비교 |
 | `ManualContainerLifecycleTest` | 수동 `start()` / `stop()` 생명주기 검증 |
 | `application-dynamic-property-source.yml` | 일부러 틀린 정적 datasource |
+| `LayeredArchitectureTest` | Controller-Service-Repository 계층 의존 방향 검증 |
+| `CodingRuleTest` | 필드 주입 금지 규칙 검증과 위반 탐지 |
+| `LegacyNotificationService` | 일부러 필드 주입을 사용한 위반 예시 |
 | `SpringTestInfraApplication` | 테스트 컨텍스트 시작점 |
