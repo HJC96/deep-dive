@@ -279,3 +279,5 @@ assertThat(walletLedgerRepository.count()).isZero();
 - 세 서비스가 최종 상태에 도달했는지 추적하는 상태 모델 없음
 
 이 기준선 다음에 2PC와 TCC를 적용하면, 각 방식이 부분 커밋과 재시도를 어떻게 다루는지 같은 실패 시나리오로 비교할 수 있다.
+
+2PC는 `distributed-transaction-2pc`에서 이어진다. 같은 실패 시나리오에서 좌석이 남지 않는 대신, 참여자가 락을 쥔 채 코디네이터를 기다리는 문제가 생긴다.

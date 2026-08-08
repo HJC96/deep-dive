@@ -14,6 +14,7 @@
 - `seat-reservation` — 좌석 예약 동시성, Redis 선점, Kafka 비동기 확정 실험
 - `distributed-transaction-monolith` — 좌석·지갑·예약을 하나의 로컬 트랜잭션으로 처리하는 Monolithic 기준선
 - `distributed-transaction-msa` — Reservation·Seat·Wallet을 분리하고 서비스별 로컬 트랜잭션의 부분 커밋을 재현하는 MSA 기준선
+- `distributed-transaction-2pc` — MySQL `XA` SQL로 prepare·commit 두 단계를 직접 실행해 부분 커밋을 없애고, 대신 생기는 블로킹과 in-doubt를 재현
 - `spring-data-jpa` — 낙관적 락과 Hibernate SQL 관찰 실험
 - `spring-boot-actuator` — Actuator 기본 엔드포인트와 커스텀 헬스 체크 관찰
 
@@ -31,4 +32,5 @@
 ./gradlew :seat-reservation:test       # 좌석 예약 모듈만
 ./gradlew :spring-data-jpa:test        # Spring Data JPA 모듈만
 ./gradlew :spring-boot-actuator:test   # Actuator 모듈만
+./gradlew :distributed-transaction-2pc:test  # 2PC 모듈만
 ```
