@@ -44,3 +44,6 @@ project(':distributed-transaction-msa-wallet-service').projectDir = file('labs/d
 
 include 'distributed-transaction-2pc'
 project(':distributed-transaction-2pc').projectDir = file('labs/distributed-transaction-2pc')
+
+include 'distributed-transaction-tcc'
+project(':distributed-transaction-tcc').projectDir = file('labs/distributed-transaction-tcc')

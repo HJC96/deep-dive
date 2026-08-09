@@ -17,3 +17,4 @@
 - `distributed-transaction-monolith`: 단일 DB 트랜잭션으로 좌석 예약 정합성을 보장하는 Monolithic 실험실
 - `distributed-transaction-msa`: 서비스별 DB와 로컬 트랜잭션으로 부분 커밋을 재현하는 MSA 실험실
 - `distributed-transaction-2pc`: MySQL `XA` SQL로 2단계 커밋을 직접 실행하는 실험실
+- `distributed-transaction-tcc`: Try·Confirm·Cancel로 락 없이 정합성을 맞추는 실험실
