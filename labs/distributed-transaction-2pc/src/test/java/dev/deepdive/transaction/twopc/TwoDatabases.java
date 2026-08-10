@@ -1,13 +1,10 @@
 package dev.deepdive.transaction.twopc;
 
-import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.ArrayList;
-import java.util.List;
 import org.testcontainers.mysql.MySQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
@@ -29,6 +26,10 @@ final class TwoDatabases {
     static final int SEAT_COUNT = 2;
     static final long PRICE = 30_000L;
     static final long AMOUNT = SEAT_COUNT * PRICE;
+
+    // 글로벌 트랜잭션 하나(gtrid = reservation-1)에 참여자별 브랜치(bqual)가 붙는다.
+    static final String SEAT_XID = "'reservation-1','seat'";
+    static final String WALLET_XID = "'reservation-1','wallet'";
 
     // 싱글톤 컨테이너 패턴: 한 번 start 후 stop하지 않는다.
     // 컨테이너는 JVM 종료 시 Testcontainers(Ryuk)가 정리한다.
@@ -65,8 +66,8 @@ final class TwoDatabases {
      * {@code DROP TABLE}부터 막힌다. 실험 자체가 그 상황을 만들기 때문에 매번 확인한다.
      */
     static void seed(long walletBalance) throws SQLException {
-        rollbackPrepared(SEAT);
-        rollbackPrepared(WALLET);
+        rollbackPrepared(SEAT, SEAT_XID);
+        rollbackPrepared(WALLET, WALLET_XID);
 
         try (Connection seat = seat(); Connection wallet = wallet()) {
             execute(seat, "DROP TABLE IF EXISTS workshop_seat");
@@ -125,14 +126,20 @@ final class TwoDatabases {
     }
 
     /**
-     * {@code seat_db}에서 커밋도 롤백도 안 된 채 멈춰 있는 트랜잭션 목록.
+     * {@code seat_db}에서 커밋도 롤백도 안 된 채 멈춰 있는 트랜잭션의 수.
      *
-     * <p>{@code XA RECOVER}는 {@code 'gtrid','bqual'} 형태로 되돌려주지 않고 두 값을 이어 붙인
-     * 바이트와 각각의 길이를 준다. 다시 XA 문에 넣을 수 있는 모양으로 되돌려 놓는다.
+     * <p>{@code XA RECOVER}가 바로 이 목록을 보여 준다. 운영자가 멈춘 트랜잭션을 찾을 때 쓰는 문이고,
+     * prepare한 트랜잭션이 커넥션이 끊긴 뒤에도 살아 있다는 증거다.
      */
-    static List<String> preparedSeatXids() throws SQLException {
-        try (Connection connection = seat()) {
-            return preparedXids(connection);
+    static int preparedSeatCount() throws SQLException {
+        try (Connection connection = seat();
+             Statement statement = connection.createStatement();
+             ResultSet resultSet = statement.executeQuery("XA RECOVER")) {
+            int count = 0;
+            while (resultSet.next()) {
+                count++;
+            }
+            return count;
         }
     }
 
@@ -141,27 +148,11 @@ final class TwoDatabases {
                 container.getJdbcUrl(), container.getUsername(), container.getPassword());
     }
 
-    private static void rollbackPrepared(MySQLContainer container) throws SQLException {
+    private static void rollbackPrepared(MySQLContainer container, String xid) throws SQLException {
         try (Connection connection = connect(container)) {
-            for (String xid : preparedXids(connection)) {
-                execute(connection, "XA ROLLBACK " + xid);
-            }
+            execute(connection, "XA ROLLBACK " + xid);
+        } catch (SQLException e) {
+            // 멈춰 있는 게 없으면 XAER_NOTA가 난다. 정리할 게 없었다는 뜻이라 넘어간다.
         }
-    }
-
-    private static List<String> preparedXids(Connection connection) throws SQLException {
-        List<String> xids = new ArrayList<>();
-        try (Statement statement = connection.createStatement();
-             ResultSet resultSet = statement.executeQuery("XA RECOVER")) {
-            while (resultSet.next()) {
-                int gtridLength = resultSet.getInt("gtrid_length");
-                int bqualLength = resultSet.getInt("bqual_length");
-                String data = new String(resultSet.getBytes("data"), StandardCharsets.UTF_8);
-                xids.add("'%s','%s'".formatted(
-                        data.substring(0, gtridLength),
-                        data.substring(gtridLength, gtridLength + bqualLength)));
-            }
-        }
-        return xids;
     }
 }

@@ -38,8 +38,8 @@ sequenceDiagram
     participant W as wallet_db
 
     Note over T,W: 앞 테스트가 prepared 트랜잭션을 일부러 남겨 뒀을 수 있다
-    T->>S: XA RECOVER → 남은 gtrid/bqual마다 XA ROLLBACK
-    T->>W: XA RECOVER → 남은 gtrid/bqual마다 XA ROLLBACK
+    T->>S: XA ROLLBACK 'reservation-1','seat' (없으면 무시)
+    T->>W: XA ROLLBACK 'reservation-1','wallet' (없으면 무시)
     Note over T,W: 이제 락이 없으니 테이블을 다시 만들 수 있다
     T->>S: DROP/CREATE workshop_seat, 시드 2건 INSERT
     T->>S: DROP/CREATE seat_reservation_history

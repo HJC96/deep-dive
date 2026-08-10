@@ -4,6 +4,7 @@ import static dev.deepdive.transaction.twopc.TwoDatabases.AMOUNT;
 import static dev.deepdive.transaction.twopc.TwoDatabases.OTHER_WORKSHOP_ID;
 import static dev.deepdive.transaction.twopc.TwoDatabases.REQUEST_ID;
 import static dev.deepdive.transaction.twopc.TwoDatabases.SEAT_COUNT;
+import static dev.deepdive.transaction.twopc.TwoDatabases.SEAT_XID;
 import static dev.deepdive.transaction.twopc.TwoDatabases.WORKSHOP_ID;
 import static dev.deepdive.transaction.twopc.TwoDatabases.execute;
 import static dev.deepdive.transaction.twopc.TwoDatabases.executeUpdate;
@@ -25,8 +26,6 @@ import org.junit.jupiter.api.Test;
  * <p>막히는 것만 보면 "테이블 전체가 잠긴다"고 오해하기 쉬워서, 안 막히는 경우도 같이 확인한다.
  */
 class PreparedLockTest {
-
-    private static final String SEAT_XID = "'reservation-1','seat'";
 
     // 기본값 50초를 기다리지 않으려고 줄인다. 막히는 쪽 세션에만 건다.
     private static final int LOCK_WAIT_SECONDS = 3;

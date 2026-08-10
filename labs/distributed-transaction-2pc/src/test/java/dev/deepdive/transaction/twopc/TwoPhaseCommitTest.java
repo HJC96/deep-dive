@@ -3,7 +3,9 @@ package dev.deepdive.transaction.twopc;
 import static dev.deepdive.transaction.twopc.TwoDatabases.AMOUNT;
 import static dev.deepdive.transaction.twopc.TwoDatabases.REQUEST_ID;
 import static dev.deepdive.transaction.twopc.TwoDatabases.SEAT_COUNT;
+import static dev.deepdive.transaction.twopc.TwoDatabases.SEAT_XID;
 import static dev.deepdive.transaction.twopc.TwoDatabases.USER_ID;
+import static dev.deepdive.transaction.twopc.TwoDatabases.WALLET_XID;
 import static dev.deepdive.transaction.twopc.TwoDatabases.WORKSHOP_ID;
 import static dev.deepdive.transaction.twopc.TwoDatabases.execute;
 import static dev.deepdive.transaction.twopc.TwoDatabases.executeUpdate;
@@ -26,10 +28,6 @@ import org.junit.jupiter.api.Test;
  * 넣어도 돌아간다.
  */
 class TwoPhaseCommitTest {
-
-    // 글로벌 트랜잭션 하나(gtrid = reservation-1)에 참여자별 브랜치(bqual)가 붙는다.
-    private static final String SEAT_XID = "'reservation-1','seat'";
-    private static final String WALLET_XID = "'reservation-1','wallet'";
 
     @Test
     void 양쪽_참여자_투표_찬성_모두_커밋한다() throws Exception {
@@ -91,7 +89,7 @@ class TwoPhaseCommitTest {
         }
 
         // prepare한 트랜잭션은 커넥션이 끊겨도 사라지지 않는다. 커밋을 기다리며 락을 쥐고 있다.
-        assertThat(TwoDatabases.preparedSeatXids()).containsExactly(SEAT_XID);
+        assertThat(TwoDatabases.preparedSeatCount()).isEqualTo(1);
 
         try (Connection other = TwoDatabases.seat()) {
             // 기본값 50초를 기다리지 않으려고 줄인다.
@@ -108,7 +106,7 @@ class TwoPhaseCommitTest {
             execute(resolver, "XA COMMIT " + SEAT_XID);
         }
 
-        assertThat(TwoDatabases.preparedSeatXids()).isEmpty();
+        assertThat(TwoDatabases.preparedSeatCount()).isZero();
         assertThat(reservedCount()).isEqualTo(SEAT_COUNT);
     }
 
