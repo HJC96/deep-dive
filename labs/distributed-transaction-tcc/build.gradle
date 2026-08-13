@@ -2,25 +2,35 @@ plugins {
     id 'java'
 }
 
+group = rootProject.group
+version = rootProject.version
+
 java {
     toolchain {
         languageVersion = JavaLanguageVersion.of(21)
     }
 }
 
+// Spring Data가 @Param 없이도 파라미터 이름을 읽게 한다.
+tasks.withType(JavaCompile).configureEach {
+    options.compilerArgs += '-parameters'
+}
+
 repositories {
     mavenCentral()
 }
 
-// Spring 애플리케이션이 아니다. XA를 SQL로 직접 다루는 테스트만 있는 모듈이라
-// BOM은 JUnit·AssertJ 버전을 맞추는 용도로만 쓴다.
+// 좌석과 지갑이 서로 다른 MySQL에 있어 DataSource·EntityManagerFactory·TransactionManager를
+// 두 벌 만든다. XA는 쓰지 않으므로 분산 트랜잭션 관련 의존성은 없다.
 dependencies {
-    testImplementation platform("org.springframework.boot:spring-boot-dependencies:${rootProject.ext.dependencyVersions.springBoot}")
+    implementation platform("org.springframework.boot:spring-boot-dependencies:${rootProject.ext.dependencyVersions.springBoot}")
+
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    runtimeOnly 'com.mysql:mysql-connector-j'
 
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation "org.testcontainers:testcontainers-junit-jupiter:${rootProject.ext.dependencyVersions.testcontainers}"
     testImplementation "org.testcontainers:testcontainers-mysql:${rootProject.ext.dependencyVersions.testcontainers}"
-    testRuntimeOnly 'com.mysql:mysql-connector-j'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
