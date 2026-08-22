@@ -1,4 +1,5 @@
 # deep-dive
+![test](https://github.com/HJC96/deep-dive/actions/workflows/test.yml/badge.svg)                                                                                                                              
 
 공부하다 직접 돌려보고 싶은 내용을 정리하는 실험실. 주제 하나당 `labs/` 아래 모듈 하나.
 
