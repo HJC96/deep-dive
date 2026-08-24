@@ -18,3 +18,4 @@
 - `distributed-transaction-msa`: 서비스별 DB와 로컬 트랜잭션으로 부분 커밋을 재현하는 MSA 실험실
 - `distributed-transaction-2pc`: MySQL `XA` SQL로 2단계 커밋을 직접 실행하는 실험실
 - `distributed-transaction-tcc`: Try·Confirm·Cancel로 락 없이 정합성을 맞추는 실험실
+- `payment-system`: 장애·메시지 유실·동시성에도 돈이 맞아떨어지는 결제 시스템 실험실

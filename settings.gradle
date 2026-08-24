@@ -47,3 +47,12 @@ project(':distributed-transaction-2pc').projectDir = file('labs/distributed-tran
 
 include 'distributed-transaction-tcc'
 project(':distributed-transaction-tcc').projectDir = file('labs/distributed-transaction-tcc')
+
+include 'payment-system-payment-service'
+project(':payment-system-payment-service').projectDir = file('labs/payment-system/payment-service')
+
+include 'payment-system-wallet-service'
+project(':payment-system-wallet-service').projectDir = file('labs/payment-system/wallet-service')
+
+include 'payment-system-ledger-service'
+project(':payment-system-ledger-service').projectDir = file('labs/payment-system/ledger-service')

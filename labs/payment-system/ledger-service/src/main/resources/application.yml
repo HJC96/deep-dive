@@ -1,0 +1,21 @@
+server:
+  port: 8092
+
+spring:
+  application:
+    name: ledger-service
+  datasource:
+    url: ${LEDGER_DB_URL:jdbc:mysql://localhost:3306/ledger_db}
+    username: ${LEDGER_DB_USERNAME:root}
+    password: ${LEDGER_DB_PASSWORD:root}
+  jpa:
+    hibernate:
+      # 장부 테이블은 트리거까지 포함해 스키마를 직접 관리한다. Hibernate가 손대지 않게 둔다.
+      ddl-auto: none
+    open-in-view: false
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: ledger-service
+      auto-offset-reset: earliest
+      enable-auto-commit: false

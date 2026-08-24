@@ -17,6 +17,7 @@
 - `distributed-transaction-msa` — Reservation·Seat·Wallet을 분리하고 서비스별 로컬 트랜잭션의 부분 커밋을 재현하는 MSA 기준선
 - `distributed-transaction-2pc` — MySQL `XA` SQL로 prepare·commit 두 단계를 직접 실행해 부분 커밋을 없애고, 대신 생기는 블로킹과 in-doubt를 재현
 - `distributed-transaction-tcc` — Try로 자원을 잡고 바로 커밋한 뒤 Confirm·Cancel로 마무리. 락을 안 쥐는 대신 멱등성·빈 취소·매달림을 직접 처리
+- `payment-system` — Payment·Wallet·Ledger를 Kafka로 잇는 결제 시스템. 아웃박스·DLQ·Bulkhead·낙관적 락·복식부기 불변 장부·대사(reconciliation)로 장애와 유실을 견디게 만든다
 - `spring-data-jpa` — 낙관적 락과 Hibernate SQL 관찰 실험
 - `spring-boot-actuator` — Actuator 기본 엔드포인트와 커스텀 헬스 체크 관찰
 
@@ -36,4 +37,7 @@
 ./gradlew :spring-boot-actuator:test   # Actuator 모듈만
 ./gradlew :distributed-transaction-2pc:test  # 2PC 모듈만
 ./gradlew :distributed-transaction-tcc:test  # TCC 모듈만
+./gradlew :payment-system-payment-service:test  # 결제 처리 모듈만
+./gradlew :payment-system-wallet-service:test   # 정산 모듈만
+./gradlew :payment-system-ledger-service:test   # 장부 모듈만
 ```

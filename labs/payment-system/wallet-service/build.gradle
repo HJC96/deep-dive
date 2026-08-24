@@ -1,0 +1,53 @@
+plugins {
+    id 'java'
+    id 'application'
+}
+
+group = rootProject.group
+version = rootProject.version
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+// Spring Data가 @Param 없이도 파라미터 이름을 읽게 한다.
+tasks.withType(JavaCompile).configureEach {
+    options.compilerArgs += '-parameters'
+}
+
+repositories {
+    mavenCentral()
+}
+
+application {
+    mainClass = 'dev.deepdive.paymentsystem.wallet.WalletServiceApplication'
+}
+
+// 결제 완료 이벤트를 소비해 잔액을 정산한다.
+// 같은 지갑에 동시 갱신이 몰릴 때 Lost Update를 낙관적 락으로 막는 것이 이 서비스의 주제다.
+dependencies {
+    implementation platform("org.springframework.boot:spring-boot-dependencies:${rootProject.ext.dependencyVersions.springBoot}")
+
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    implementation 'org.springframework.kafka:spring-kafka'
+    runtimeOnly 'com.mysql:mysql-connector-j'
+
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.kafka:spring-kafka-test'
+    testImplementation "org.testcontainers:testcontainers-junit-jupiter:${rootProject.ext.dependencyVersions.testcontainers}"
+    testImplementation "org.testcontainers:testcontainers-mysql:${rootProject.ext.dependencyVersions.testcontainers}"
+    testImplementation "org.testcontainers:testcontainers-kafka:${rootProject.ext.dependencyVersions.testcontainers}"
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+test {
+    useJUnitPlatform()
+
+    testLogging {
+        showStandardStreams = true
+    }
+}

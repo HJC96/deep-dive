@@ -1,0 +1,53 @@
+plugins {
+    id 'java'
+    id 'application'
+}
+
+group = rootProject.group
+version = rootProject.version
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+// Spring Data가 @Param 없이도 파라미터 이름을 읽게 한다.
+tasks.withType(JavaCompile).configureEach {
+    options.compilerArgs += '-parameters'
+}
+
+repositories {
+    mavenCentral()
+}
+
+application {
+    mainClass = 'dev.deepdive.paymentsystem.payment.PaymentServiceApplication'
+}
+
+// 결제 요청을 받아 PSP를 호출하고, 결과를 Kafka로 흘려보낸다.
+// 아웃박스 테이블을 같은 로컬 트랜잭션에 쓰기 때문에 JPA와 Kafka가 함께 필요하다.
+dependencies {
+    implementation platform("org.springframework.boot:spring-boot-dependencies:${rootProject.ext.dependencyVersions.springBoot}")
+
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    implementation 'org.springframework.kafka:spring-kafka'
+    runtimeOnly 'com.mysql:mysql-connector-j'
+
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.kafka:spring-kafka-test'
+    testImplementation "org.testcontainers:testcontainers-junit-jupiter:${rootProject.ext.dependencyVersions.testcontainers}"
+    testImplementation "org.testcontainers:testcontainers-mysql:${rootProject.ext.dependencyVersions.testcontainers}"
+    testImplementation "org.testcontainers:testcontainers-kafka:${rootProject.ext.dependencyVersions.testcontainers}"
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+test {
+    useJUnitPlatform()
+
+    testLogging {
+        showStandardStreams = true
+    }
+}
