@@ -4,19 +4,13 @@ server:
 spring:
   application:
     name: payment-service
-  datasource:
-    url: ${PAYMENT_DB_URL:jdbc:mysql://localhost:3306/payment_db}
+  r2dbc:
+    url: ${PAYMENT_DB_URL:r2dbc:mysql://localhost:3306/payment_db}
     username: ${PAYMENT_DB_USERNAME:root}
     password: ${PAYMENT_DB_PASSWORD:root}
-  jpa:
-    hibernate:
-      ddl-auto: update
-    open-in-view: false
-  kafka:
-    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
-    producer:
-      # 아웃박스 릴레이가 최소 한 번은 반드시 보내야 하므로 전체 ISR 확인과 재시도를 켠다.
-      acks: all
-      retries: 3
-      properties:
-        enable.idempotence: true
+
+# Toss가 공식 문서/샘플에서 제공하는 공개 테스트 키. 실제 운영 키는 환경변수로 주입한다.
+PSP:
+  toss:
+    url: ${TOSS_BASE_URL:https://api.tosspayments.com}
+    secretKey: ${TOSS_SECRET_KEY:test_gsk_docs_OaPz8L5KdmQXkzRz3y47BMw6}
