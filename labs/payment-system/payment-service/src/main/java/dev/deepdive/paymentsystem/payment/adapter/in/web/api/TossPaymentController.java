@@ -3,7 +3,9 @@ package dev.deepdive.paymentsystem.payment.adapter.in.web.api;
 import dev.deepdive.paymentsystem.common.WebAdapter;
 import dev.deepdive.paymentsystem.payment.adapter.in.web.request.TossPaymentConfirmRequest;
 import dev.deepdive.paymentsystem.payment.adapter.in.web.response.ApiResponse;
-import dev.deepdive.paymentsystem.payment.adapter.out.web.toss.executor.TossPaymentExecutor;
+import dev.deepdive.paymentsystem.payment.application.port.in.PaymentConfirmCommand;
+import dev.deepdive.paymentsystem.payment.application.port.in.PaymentConfirmUseCase;
+import dev.deepdive.paymentsystem.payment.domain.PaymentConfirmationResult;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -17,18 +19,21 @@ import reactor.core.publisher.Mono;
 @RestController
 public class TossPaymentController {
 
-    private final TossPaymentExecutor tossPaymentExecutor;
+    private final PaymentConfirmUseCase paymentConfirmUseCase;
 
-    public TossPaymentController(TossPaymentExecutor tossPaymentExecutor) {
-        this.tossPaymentExecutor = tossPaymentExecutor;
+    public TossPaymentController(PaymentConfirmUseCase paymentConfirmUseCase) {
+        this.paymentConfirmUseCase = paymentConfirmUseCase;
     }
 
     @PostMapping("/confirm")
-    public Mono<ResponseEntity<ApiResponse<String>>> confirm(@RequestBody TossPaymentConfirmRequest request) {
-        return tossPaymentExecutor.execute(
+    public Mono<ResponseEntity<ApiResponse<PaymentConfirmationResult>>> confirm(@RequestBody TossPaymentConfirmRequest request) {
+        PaymentConfirmCommand command = new PaymentConfirmCommand(
                 request.paymentKey(),
                 request.orderId(),
-                String.valueOf(request.amount())
-        ).map(it -> ResponseEntity.ok().body(ApiResponse.with(HttpStatus.OK, "", it)));
+                Long.parseLong(request.amount())
+        );
+
+        return paymentConfirmUseCase.confirm(command)
+                .map(it -> ResponseEntity.ok().body(ApiResponse.with(HttpStatus.OK, "", it)));
     }
 }

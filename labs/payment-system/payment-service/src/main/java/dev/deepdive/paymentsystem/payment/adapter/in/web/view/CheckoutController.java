@@ -20,7 +20,7 @@ public class CheckoutController {
         this.checkoutUseCase = checkoutUseCase;
     }
 
-    @GetMapping("/checkout")
+    @GetMapping("/")
     public Mono<String> checkoutPage(CheckoutRequest request, Model model) {
         CheckoutCommand command = new CheckoutCommand(
                 request.cartId(),

@@ -1,12 +1,15 @@
 package dev.deepdive.paymentsystem.payment.test;
 
 import dev.deepdive.paymentsystem.payment.domain.PaymentEvent;
+import dev.deepdive.paymentsystem.payment.domain.PaymentMethod;
 import dev.deepdive.paymentsystem.payment.domain.PaymentOrder;
 import dev.deepdive.paymentsystem.payment.domain.PaymentStatus;
+import dev.deepdive.paymentsystem.payment.domain.PaymentType;
 import org.springframework.r2dbc.core.DatabaseClient;
 import org.springframework.transaction.reactive.TransactionalOperator;
 import reactor.core.publisher.Mono;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
@@ -48,9 +51,14 @@ public class R2DBCPaymentDatabaseHelper implements PaymentDatabaseHelper {
 
         Map<String, Object> first = rows.get(0);
         return new PaymentEvent(
+                ((Number) first.get("id")).longValue(),
                 ((Number) first.get("buyer_id")).longValue(),
                 (String) first.get("order_name"),
                 (String) first.get("order_id"),
+                (String) first.get("payment_key"),
+                first.get("type") == null ? null : PaymentType.valueOf((String) first.get("type")),
+                first.get("method") == null ? null : PaymentMethod.valueOf((String) first.get("method")),
+                (LocalDateTime) first.get("approved_at"),
                 paymentOrders
         );
     }
@@ -71,7 +79,8 @@ public class R2DBCPaymentDatabaseHelper implements PaymentDatabaseHelper {
     }
 
     private static final String SELECT_PAYMENT_QUERY = """
-            SELECT pe.order_id, pe.order_name, pe.buyer_id,
+            SELECT pe.id, pe.order_id, pe.order_name, pe.buyer_id, pe.payment_key,
+                   pe.type, pe.method, pe.approved_at,
                    po.seller_id, po.product_id, po.amount, po.payment_order_status
             FROM payment_events pe
             INNER JOIN payment_orders po ON pe.order_id = po.order_id

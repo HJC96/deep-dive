@@ -8,6 +8,17 @@ spring:
     url: ${PAYMENT_DB_URL:r2dbc:mysql://localhost:3306/payment_db}
     username: ${PAYMENT_DB_USERNAME:root}
     password: ${PAYMENT_DB_PASSWORD:root}
+  thymeleaf:
+    cache: false
+
+# 원본 강의 설정을 따라 승인 플로우 디버깅용으로 열어둔다.
+logging:
+  level:
+    org:
+      springframework:
+        web: DEBUG
+        r2dbc: DEBUG
+        transaction: DEBUG
 
 # Toss가 공식 문서/샘플에서 제공하는 공개 테스트 키. 실제 운영 키는 환경변수로 주입한다.
 PSP:
