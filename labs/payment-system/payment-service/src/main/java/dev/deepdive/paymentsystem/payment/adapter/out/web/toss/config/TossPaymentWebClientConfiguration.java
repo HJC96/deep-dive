@@ -21,12 +21,12 @@ import java.util.concurrent.TimeUnit;
  * 앱 자체는 서블릿(Tomcat)으로 뜨고, WebClient 는 아웃바운드 HTTP 클라이언트로만 쓴다.
  */
 @Configuration
-public class TossWebClientConfiguration {
+public class TossPaymentWebClientConfiguration {
 
     private final String baseUrl;
     private final String secretKey;
 
-    public TossWebClientConfiguration(
+    public TossPaymentWebClientConfiguration(
             @Value("${PSP.toss.url}") String baseUrl,
             @Value("${PSP.toss.secretKey}") String secretKey
     ) {

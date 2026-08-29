@@ -3,6 +3,9 @@ package dev.deepdive.paymentsystem.payment.application.service;
 import dev.deepdive.paymentsystem.payment.application.port.in.CheckoutCommand;
 import dev.deepdive.paymentsystem.payment.application.port.in.CheckoutUseCase;
 import dev.deepdive.paymentsystem.payment.application.port.in.PaymentConfirmCommand;
+import dev.deepdive.paymentsystem.payment.adapter.out.persistent.exception.PaymentValidationException;
+import dev.deepdive.paymentsystem.payment.adapter.out.web.toss.exception.PSPConfirmationException;
+import dev.deepdive.paymentsystem.payment.adapter.out.web.toss.exception.TossPaymentError;
 import dev.deepdive.paymentsystem.payment.application.port.out.PaymentExecutorPort;
 import dev.deepdive.paymentsystem.payment.application.port.out.PaymentStatusUpdatePort;
 import dev.deepdive.paymentsystem.payment.application.port.out.PaymentValidationPort;
@@ -34,10 +37,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-// TODO: PaymentErrorHandler 구현 후 에러 처리 테스트 추가
-//  - should_handle_PSPConfirmationException
-//  - should_handle_PaymentValidationException
-//  - should_handle_PaymentAlreadyProcessedException
 @SpringBootTest
 @Import(PaymentTestConfiguration.class)
 @Tag("ExternalIntegration")
@@ -54,6 +53,9 @@ class PaymentConfirmServiceTest {
 
     @Autowired
     private PaymentDatabaseHelper paymentDatabaseHelper;
+
+    @Autowired
+    private PaymentErrorHandler paymentErrorHandler;
 
     private final PaymentExecutorPort mockPaymentExecutorPort = mock(PaymentExecutorPort.class);
 
@@ -72,7 +74,7 @@ class PaymentConfirmServiceTest {
                 UUID.randomUUID().toString(), orderId, checkoutResult.amount());
 
         PaymentConfirmService paymentConfirmService = new PaymentConfirmService(
-                paymentStatusUpdatePort, paymentValidationPort, mockPaymentExecutorPort);
+                paymentStatusUpdatePort, paymentValidationPort, mockPaymentExecutorPort, paymentErrorHandler);
 
         PaymentExtraDetails extraDetails = new PaymentExtraDetails(
                 PaymentType.NORMAL, PaymentMethod.EASY_PAY, LocalDateTime.now(),
@@ -104,7 +106,7 @@ class PaymentConfirmServiceTest {
                 UUID.randomUUID().toString(), orderId, checkoutResult.amount());
 
         PaymentConfirmService paymentConfirmService = new PaymentConfirmService(
-                paymentStatusUpdatePort, paymentValidationPort, mockPaymentExecutorPort);
+                paymentStatusUpdatePort, paymentValidationPort, mockPaymentExecutorPort, paymentErrorHandler);
 
         PaymentExtraDetails extraDetails = new PaymentExtraDetails(
                 PaymentType.NORMAL, PaymentMethod.EASY_PAY, LocalDateTime.now(),
@@ -120,5 +122,115 @@ class PaymentConfirmServiceTest {
 
         assertThat(result.status()).isEqualTo(PaymentStatus.FAILURE);
         assertThat(paymentEvent.isFailure()).isTrue();
+    }
+
+    @Test
+    void should_handle_PSPConfirmationException() {
+        String orderId = UUID.randomUUID().toString();
+        CheckoutResult checkoutResult = checkoutUseCase.checkout(
+                new CheckoutCommand(1L, 1L, List.of(1L, 2L, 3L), orderId)).block();
+
+        PaymentConfirmCommand command = new PaymentConfirmCommand(
+                UUID.randomUUID().toString(), orderId, checkoutResult.amount());
+
+        PaymentConfirmService paymentConfirmService = new PaymentConfirmService(
+                paymentStatusUpdatePort, paymentValidationPort, mockPaymentExecutorPort, paymentErrorHandler);
+
+        PSPConfirmationException pspConfirmationException = new PSPConfirmationException(
+                TossPaymentError.REJECT_ACCOUNT_PAYMENT.name(),
+                TossPaymentError.REJECT_ACCOUNT_PAYMENT.description(),
+                false, true, false, false);
+
+        when(mockPaymentExecutorPort.execute(command)).thenReturn(Mono.error(pspConfirmationException));
+
+        var result = paymentConfirmService.confirm(command).block();
+        PaymentEvent paymentEvent = paymentDatabaseHelper.getPayments(orderId);
+
+        assertThat(result.status()).isEqualTo(PaymentStatus.FAILURE);
+        assertThat(paymentEvent.isFailure()).isTrue();
+    }
+
+    @Test
+    void should_handle_PaymentValidationException() {
+        String orderId = UUID.randomUUID().toString();
+        CheckoutResult checkoutResult = checkoutUseCase.checkout(
+                new CheckoutCommand(1L, 1L, List.of(1L, 2L, 3L), orderId)).block();
+
+        PaymentConfirmCommand command = new PaymentConfirmCommand(
+                UUID.randomUUID().toString(), orderId, checkoutResult.amount());
+
+        PaymentValidationPort mockPaymentValidationPort = mock(PaymentValidationPort.class);
+
+        PaymentConfirmService paymentConfirmService = new PaymentConfirmService(
+                paymentStatusUpdatePort, mockPaymentValidationPort, mockPaymentExecutorPort, paymentErrorHandler);
+
+        PaymentValidationException paymentValidationException =
+                new PaymentValidationException("결제 유효성 검증에서 실패하였습니다.");
+
+        when(mockPaymentValidationPort.isValid(orderId, command.amount()))
+                .thenReturn(Mono.error(paymentValidationException));
+
+        var result = paymentConfirmService.confirm(command).block();
+        PaymentEvent paymentEvent = paymentDatabaseHelper.getPayments(orderId);
+
+        assertThat(result.status()).isEqualTo(PaymentStatus.FAILURE);
+        assertThat(paymentEvent.isFailure()).isTrue();
+    }
+
+    @Test
+    void should_handle_PaymentAlreadyProcessedException() {
+        String orderId = UUID.randomUUID().toString();
+        CheckoutResult checkoutResult = checkoutUseCase.checkout(
+                new CheckoutCommand(1L, 1L, List.of(1L, 2L, 3L), orderId)).block();
+
+        PaymentConfirmCommand command = new PaymentConfirmCommand(
+                UUID.randomUUID().toString(), orderId, checkoutResult.amount());
+
+        PaymentConfirmService paymentConfirmService = new PaymentConfirmService(
+                paymentStatusUpdatePort, paymentValidationPort, mockPaymentExecutorPort, paymentErrorHandler);
+
+        PaymentExtraDetails extraDetails = new PaymentExtraDetails(
+                PaymentType.NORMAL, PaymentMethod.EASY_PAY, LocalDateTime.now(),
+                "test_order_name", PSPConfirmationStatus.DONE, command.amount(), "{}");
+        PaymentExecutionResult executionResult = new PaymentExecutionResult(
+                command.paymentKey(), command.orderId(), extraDetails, null, true, false, false, false);
+
+        when(mockPaymentExecutorPort.execute(command)).thenReturn(Mono.just(executionResult));
+
+        paymentConfirmService.confirm(command).block();
+        var result = paymentConfirmService.confirm(command).block();
+
+        PaymentEvent paymentEvent = paymentDatabaseHelper.getPayments(orderId);
+
+        assertThat(result.status()).isEqualTo(PaymentStatus.SUCCESS);
+        assertThat(paymentEvent.paymentOrders())
+                .allMatch(it -> it.paymentStatus() == PaymentStatus.SUCCESS);
+    }
+
+    @Test
+    @Tag("ExternalIntegration")
+    void should_send_the_event_message_to_the_external_message_system_after_the_payment_confirmation_has_been_successful()
+            throws InterruptedException {
+        String orderId = UUID.randomUUID().toString();
+        CheckoutResult checkoutResult = checkoutUseCase.checkout(
+                new CheckoutCommand(1L, 1L, List.of(1L, 2L, 3L), orderId)).block();
+
+        PaymentConfirmCommand command = new PaymentConfirmCommand(
+                UUID.randomUUID().toString(), orderId, checkoutResult.amount());
+
+        PaymentConfirmService paymentConfirmService = new PaymentConfirmService(
+                paymentStatusUpdatePort, paymentValidationPort, mockPaymentExecutorPort, paymentErrorHandler);
+
+        PaymentExtraDetails extraDetails = new PaymentExtraDetails(
+                PaymentType.NORMAL, PaymentMethod.EASY_PAY, LocalDateTime.now(),
+                "test_order_name", PSPConfirmationStatus.DONE, command.amount(), "{}");
+        PaymentExecutionResult executionResult = new PaymentExecutionResult(
+                command.paymentKey(), command.orderId(), extraDetails, null, true, false, false, false);
+
+        when(mockPaymentExecutorPort.execute(command)).thenReturn(Mono.just(executionResult));
+
+        paymentConfirmService.confirm(command).block();
+
+        Thread.sleep(10000);
     }
 }

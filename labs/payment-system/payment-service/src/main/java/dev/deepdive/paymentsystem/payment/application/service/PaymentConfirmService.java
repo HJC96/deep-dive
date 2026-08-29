@@ -16,15 +16,18 @@ public class PaymentConfirmService implements PaymentConfirmUseCase {
     private final PaymentStatusUpdatePort paymentStatusUpdatePort;
     private final PaymentValidationPort paymentValidationPort;
     private final PaymentExecutorPort paymentExecutorPort;
+    private final PaymentErrorHandler paymentErrorHandler;
 
     public PaymentConfirmService(
             PaymentStatusUpdatePort paymentStatusUpdatePort,
             PaymentValidationPort paymentValidationPort,
-            PaymentExecutorPort paymentExecutorPort
+            PaymentExecutorPort paymentExecutorPort,
+            PaymentErrorHandler paymentErrorHandler
     ) {
         this.paymentStatusUpdatePort = paymentStatusUpdatePort;
         this.paymentValidationPort = paymentValidationPort;
         this.paymentExecutorPort = paymentExecutorPort;
+        this.paymentErrorHandler = paymentErrorHandler;
     }
 
     @Override
@@ -41,6 +44,7 @@ public class PaymentConfirmService implements PaymentConfirmUseCase {
                                 it.failure()
                         )
                 ).thenReturn(it))
-                .map(it -> new PaymentConfirmationResult(it.paymentStatus(), it.failure()));
+                .map(it -> new PaymentConfirmationResult(it.paymentStatus(), it.failure()))
+                .onErrorResume(error -> paymentErrorHandler.handlePaymentConfirmationError(error, command));
     }
 }
