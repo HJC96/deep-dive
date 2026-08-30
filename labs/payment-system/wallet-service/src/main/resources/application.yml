@@ -11,11 +11,46 @@ spring:
   jpa:
     hibernate:
       ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
     open-in-view: false
-  kafka:
-    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
-    consumer:
-      group-id: wallet-service
-      auto-offset-reset: earliest
-      # 정산을 커밋한 뒤에 오프셋을 넘겨야 재처리로 복구할 수 있다.
-      enable-auto-commit: false
+
+  cloud:
+    stream:
+      kafka:
+        binder:
+          # 원본은 Confluent Cloud(SASL_SSL). 여기서는 로컬 Kafka(PLAINTEXT)로 둔다.
+          brokers: ${KAFKA_BROKERS:localhost:9092}
+          required-acks: all
+          auto-create-topics: false
+          # 정산 저장과 지갑 이벤트 발행을 하나의 Kafka 트랜잭션으로 묶는다.
+          transaction:
+            transaction-id-prefix: wallet-
+            producer:
+              configuration:
+                transaction.timeout.ms: 30000
+        bindings:
+          consume-in-0:
+            consumer:
+              enable-dlq: true
+              dlq-name: payment_wallet_dlq
+
+      bindings:
+        consume-in-0:
+          destination: payment
+          group: wallet-service
+          consumer:
+            max-attempts: 5
+
+# 정산·트랜잭션·Kafka 흐름을 눈으로 보기 위해 열어둔다.
+logging:
+  level:
+    org:
+      springframework:
+        transaction: TRACE
+        kafka: TRACE
+      hibernate:
+        SQL: DEBUG
+        orm.jdbc.bind: TRACE
