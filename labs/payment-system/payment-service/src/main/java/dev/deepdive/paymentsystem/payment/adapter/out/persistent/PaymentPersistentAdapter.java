@@ -4,15 +4,18 @@ import dev.deepdive.paymentsystem.common.PersistentAdapter;
 import dev.deepdive.paymentsystem.payment.adapter.out.persistent.repository.PaymentRepository;
 import dev.deepdive.paymentsystem.payment.adapter.out.persistent.repository.PaymentStatusUpdateRepository;
 import dev.deepdive.paymentsystem.payment.adapter.out.persistent.repository.PaymentValidationRepository;
+import dev.deepdive.paymentsystem.payment.application.port.out.LoadPendingPaymentPort;
 import dev.deepdive.paymentsystem.payment.application.port.out.PaymentStatusUpdateCommand;
 import dev.deepdive.paymentsystem.payment.application.port.out.PaymentStatusUpdatePort;
 import dev.deepdive.paymentsystem.payment.application.port.out.PaymentValidationPort;
 import dev.deepdive.paymentsystem.payment.application.port.out.SavePaymentPort;
 import dev.deepdive.paymentsystem.payment.domain.PaymentEvent;
+import dev.deepdive.paymentsystem.payment.domain.PendingPaymentEvent;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 @PersistentAdapter
-public class PaymentPersistentAdapter implements SavePaymentPort, PaymentStatusUpdatePort, PaymentValidationPort {
+public class PaymentPersistentAdapter implements SavePaymentPort, PaymentStatusUpdatePort, PaymentValidationPort, LoadPendingPaymentPort {
 
     private final PaymentRepository paymentRepository;
     private final PaymentStatusUpdateRepository paymentStatusUpdateRepository;
@@ -46,5 +49,10 @@ public class PaymentPersistentAdapter implements SavePaymentPort, PaymentStatusU
     @Override
     public Mono<Boolean> isValid(String orderId, long amount) {
         return paymentValidationRepository.isValid(orderId, amount);
+    }
+
+    @Override
+    public Flux<PendingPaymentEvent> getPendingPayments() {
+        return paymentRepository.getPendingPayments();
     }
 }
