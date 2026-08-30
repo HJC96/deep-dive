@@ -10,12 +10,47 @@ spring:
     password: ${LEDGER_DB_PASSWORD:root}
   jpa:
     hibernate:
-      # 장부 테이블은 트리거까지 포함해 스키마를 직접 관리한다. Hibernate가 손대지 않게 둔다.
+      # 장부 테이블은 트리거까지 포함해 schema.sql로 직접 관리한다. Hibernate가 손대지 않게 둔다.
       ddl-auto: none
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
     open-in-view: false
-  kafka:
-    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
-    consumer:
-      group-id: ledger-service
-      auto-offset-reset: earliest
-      enable-auto-commit: false
+
+  cloud:
+    stream:
+      kafka:
+        binder:
+          # 원본은 Confluent Cloud(SASL_SSL). 여기서는 로컬 Kafka(PLAINTEXT)로 둔다.
+          brokers: ${KAFKA_BROKERS:localhost:9092}
+          required-acks: all
+          auto-create-topics: false
+          transaction:
+            transaction-id-prefix: ledger-
+            producer:
+              configuration:
+                transaction.timeout.ms: 30000
+        bindings:
+          consume-in-0:
+            consumer:
+              enable-dlq: true
+              dlq-name: payment_ledger_dlq
+
+      bindings:
+        consume-in-0:
+          destination: payment
+          group: ledger-service
+          consumer:
+            max-attempts: 5
+
+# 장부 기록·트랜잭션·Kafka 흐름을 눈으로 보기 위해 열어둔다.
+logging:
+  level:
+    org:
+      springframework:
+        transaction: TRACE
+        kafka: TRACE
+      hibernate:
+        SQL: DEBUG
+        orm.jdbc.bind: TRACE

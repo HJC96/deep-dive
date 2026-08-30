@@ -10,3 +10,6 @@ out/
 .vscode/
 hs_err_pid*
 replay_pid*
+
+# 위키 콘텐츠는 별도 볼트(~/Desktop/git/llm-wiki)에서 관리한다
+wiki/
