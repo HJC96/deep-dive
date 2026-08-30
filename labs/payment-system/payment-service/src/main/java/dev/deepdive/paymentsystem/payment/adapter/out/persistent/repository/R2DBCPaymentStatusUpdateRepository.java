@@ -2,6 +2,7 @@ package dev.deepdive.paymentsystem.payment.adapter.out.persistent.repository;
 
 import dev.deepdive.paymentsystem.payment.adapter.out.persistent.exception.PaymentAlreadyProcessedException;
 import dev.deepdive.paymentsystem.payment.application.port.out.PaymentStatusUpdateCommand;
+import dev.deepdive.paymentsystem.payment.domain.PaymentEventMessagePublisher;
 import dev.deepdive.paymentsystem.payment.domain.PaymentStatus;
 import org.springframework.r2dbc.core.DatabaseClient;
 import org.springframework.stereotype.Repository;
@@ -18,13 +19,19 @@ public class R2DBCPaymentStatusUpdateRepository implements PaymentStatusUpdateRe
 
     private final DatabaseClient databaseClient;
     private final TransactionalOperator transactionalOperator;
+    private final PaymentOutboxRepository paymentOutboxRepository;
+    private final PaymentEventMessagePublisher paymentEventMessagePublisher;
 
     public R2DBCPaymentStatusUpdateRepository(
             DatabaseClient databaseClient,
-            TransactionalOperator transactionalOperator
+            TransactionalOperator transactionalOperator,
+            PaymentOutboxRepository paymentOutboxRepository,
+            PaymentEventMessagePublisher paymentEventMessagePublisher
     ) {
         this.databaseClient = databaseClient;
         this.transactionalOperator = transactionalOperator;
+        this.paymentOutboxRepository = paymentOutboxRepository;
+        this.paymentEventMessagePublisher = paymentEventMessagePublisher;
     }
 
     @Override
@@ -113,6 +120,8 @@ public class R2DBCPaymentStatusUpdateRepository implements PaymentStatusUpdateRe
                 .flatMap(it -> insertPaymentHistory(it, command.status(), "PAYMENT_CONFIRMATION_DONE"))
                 .flatMap(it -> updatePaymentOrderStatus(command.orderId(), command.status()))
                 .flatMap(it -> updatePaymentEventExtraDetails(command))
+                .flatMap(it -> paymentOutboxRepository.insertOutbox(command))
+                .flatMap(paymentEventMessagePublisher::publishEvent)
                 .as(transactionalOperator::transactional)
                 .thenReturn(true);
     }

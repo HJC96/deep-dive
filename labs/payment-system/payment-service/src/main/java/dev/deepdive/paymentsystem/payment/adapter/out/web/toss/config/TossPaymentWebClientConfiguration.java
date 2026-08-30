@@ -18,7 +18,6 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * Toss Payments API 를 호출하는 {@link WebClient} 를 구성한다.
- * 앱 자체는 서블릿(Tomcat)으로 뜨고, WebClient 는 아웃바운드 HTTP 클라이언트로만 쓴다.
  */
 @Configuration
 public class TossPaymentWebClientConfiguration {

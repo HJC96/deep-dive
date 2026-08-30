@@ -52,3 +52,22 @@ CREATE TABLE IF NOT EXISTS payment_order_histories
     KEY idx_payment_order_histories_payment_order_id (payment_order_id)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4;
+
+-- 트랜잭셔널 아웃박스. 결제 승인 커밋과 같은 트랜잭션에서 이벤트를 이 테이블에 쓰고,
+-- 릴레이가 status = INIT/FAILURE 인 행을 읽어 Kafka로 발행한다.
+CREATE TABLE IF NOT EXISTS outboxes
+(
+    id              BIGINT       NOT NULL AUTO_INCREMENT,
+    idempotency_key VARCHAR(255) NOT NULL COMMENT '보통 orderId',
+    type            VARCHAR(50)  NOT NULL COMMENT 'PaymentEventMessageType (PAYMENT_CONFIRMATION_SUCCESS 등)',
+    partition_key   INT          NOT NULL DEFAULT 0,
+    payload         JSON         NOT NULL,
+    metadata        JSON         NOT NULL,
+    status          VARCHAR(20)  NOT NULL DEFAULT 'INIT' COMMENT 'INIT / SUCCESS / FAILURE',
+    created_at      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_outboxes_idempotency_key_type (idempotency_key, type),
+    KEY idx_outboxes_status_created_at (status, created_at)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4;

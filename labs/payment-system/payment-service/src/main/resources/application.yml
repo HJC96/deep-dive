@@ -11,6 +11,26 @@ spring:
   thymeleaf:
     cache: false
 
+  cloud:
+    stream:
+      # 아직 만든 스트림 빈은 send 뿐. wallet;ledger 는 핸들러 만든 뒤 추가한다.
+      function:
+        definition: send
+      bindings:
+        send-out-0:
+          destination: payment
+          group: payment-service
+      kafka:
+        binder:
+          # 원본은 Confluent Cloud(SASL_SSL). 여기서는 로컬 Kafka(PLAINTEXT).
+          brokers: ${KAFKA_BROKERS:localhost:9092}
+          required-acks: all
+          auto-create-topics: false
+        bindings:
+          send-out-0:
+            producer:
+              record-metadata-channel: payment-result
+
 # 원본 강의 설정을 따라 승인 플로우 디버깅용으로 열어둔다.
 logging:
   level:
@@ -25,3 +45,9 @@ PSP:
   toss:
     url: ${TOSS_BASE_URL:https://api.tosspayments.com}
     secretKey: ${TOSS_SECRET_KEY:test_gsk_docs_OaPz8L5KdmQXkzRz3y47BMw6}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: bindings
