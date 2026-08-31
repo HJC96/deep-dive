@@ -5,6 +5,8 @@ import dev.deepdive.paymentsystem.payment.adapter.out.persistent.repository.Paym
 import dev.deepdive.paymentsystem.payment.adapter.out.persistent.repository.PaymentRepository;
 import dev.deepdive.paymentsystem.payment.adapter.out.persistent.repository.PaymentStatusUpdateRepository;
 import dev.deepdive.paymentsystem.payment.adapter.out.persistent.repository.PaymentValidationRepository;
+import dev.deepdive.paymentsystem.payment.application.port.out.CompletePaymentPort;
+import dev.deepdive.paymentsystem.payment.application.port.out.LoadPaymentPort;
 import dev.deepdive.paymentsystem.payment.application.port.out.LoadPendingPaymentEventMessagePort;
 import dev.deepdive.paymentsystem.payment.application.port.out.LoadPendingPaymentPort;
 import dev.deepdive.paymentsystem.payment.application.port.out.PaymentStatusUpdateCommand;
@@ -23,7 +25,9 @@ public class PaymentPersistentAdapter implements
         PaymentStatusUpdatePort,
         PaymentValidationPort,
         LoadPendingPaymentPort,
-        LoadPendingPaymentEventMessagePort {
+        LoadPendingPaymentEventMessagePort,
+        LoadPaymentPort,
+        CompletePaymentPort {
 
     private final PaymentRepository paymentRepository;
     private final PaymentStatusUpdateRepository paymentStatusUpdateRepository;
@@ -70,5 +74,15 @@ public class PaymentPersistentAdapter implements
     @Override
     public Flux<PaymentEventMessage> getPendingPaymentEventMessage() {
         return paymentOutboxRepository.getPendingPaymentOutboxes();
+    }
+
+    @Override
+    public Mono<PaymentEvent> getPayment(String orderId) {
+        return paymentRepository.getPayment(orderId);
+    }
+
+    @Override
+    public Mono<Void> complete(PaymentEvent paymentEvent) {
+        return paymentRepository.complete(paymentEvent);
     }
 }

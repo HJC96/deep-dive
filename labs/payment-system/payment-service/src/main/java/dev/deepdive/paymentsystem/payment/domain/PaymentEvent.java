@@ -25,6 +25,18 @@ public class PaymentEvent {
             Long buyerId,
             String orderName,
             String orderId,
+            List<PaymentOrder> paymentOrders,
+            boolean isPaymentDone
+    ) {
+        this(id, buyerId, orderName, orderId, null, null, null, null, paymentOrders);
+        this.isPaymentDone = isPaymentDone;
+    }
+
+    public PaymentEvent(
+            Long id,
+            Long buyerId,
+            String orderName,
+            String orderId,
             String paymentKey,
             PaymentType paymentType,
             PaymentMethod paymentMethod,
@@ -40,6 +52,22 @@ public class PaymentEvent {
         this.paymentMethod = paymentMethod;
         this.approvedAt = approvedAt;
         this.paymentOrders = paymentOrders == null ? List.of() : paymentOrders;
+    }
+
+    public PaymentEvent(
+            Long id,
+            Long buyerId,
+            String orderName,
+            String orderId,
+            String paymentKey,
+            PaymentType paymentType,
+            PaymentMethod paymentMethod,
+            LocalDateTime approvedAt,
+            List<PaymentOrder> paymentOrders,
+            boolean isPaymentDone
+    ) {
+        this(id, buyerId, orderName, orderId, paymentKey, paymentType, paymentMethod, approvedAt, paymentOrders);
+        this.isPaymentDone = isPaymentDone;
     }
 
     public long totalAmount() {
@@ -60,6 +88,32 @@ public class PaymentEvent {
 
     public boolean isUnknown() {
         return paymentOrders.stream().allMatch(it -> it.paymentStatus() == PaymentStatus.UNKNOWN);
+    }
+
+    public void confirmWalletUpdate() {
+        paymentOrders.forEach(PaymentOrder::confirmWalletUpdate);
+    }
+
+    public void confirmLedgerUpdate() {
+        paymentOrders.forEach(PaymentOrder::confirmLedgerUpdate);
+    }
+
+    public void completeIfDone() {
+        if (allPaymentOrdersDone()) {
+            isPaymentDone = true;
+        }
+    }
+
+    public boolean isLedgerUpdateDone() {
+        return paymentOrders.stream().allMatch(PaymentOrder::isLedgerUpdated);
+    }
+
+    public boolean isWalletUpdateDone() {
+        return paymentOrders.stream().allMatch(PaymentOrder::isWalletUpdated);
+    }
+
+    private boolean allPaymentOrdersDone() {
+        return paymentOrders.stream().allMatch(it -> it.isWalletUpdated() && it.isLedgerUpdated());
     }
 
     public Long id() {

@@ -9,6 +9,23 @@ CREATE TABLE IF NOT EXISTS accounts
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4;
 
+-- 복식부기 대상 계정. JpaAccountRepository 가 이름으로 조회한다(REVENUE=대변, ITEM_BUYER=차변).
+INSERT INTO accounts (id, name)
+VALUES (1, 'REVENUE'),
+       (2, 'ITEM_BUYER')
+ON DUPLICATE KEY UPDATE name = VALUES(name);
+
+-- 결제 서비스가 확정한 주문 금액. 장부 기입 시 읽기 전용으로 참조한다.
+CREATE TABLE IF NOT EXISTS payment_orders
+(
+    id       BIGINT         NOT NULL,
+    amount   DECIMAL(19, 2) NOT NULL,
+    order_id VARCHAR(255)   NOT NULL,
+    PRIMARY KEY (id),
+    KEY idx_payment_orders_order_id (order_id)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4;
+
 CREATE TABLE IF NOT EXISTS ledger_transactions
 (
     id              BIGINT       NOT NULL AUTO_INCREMENT,

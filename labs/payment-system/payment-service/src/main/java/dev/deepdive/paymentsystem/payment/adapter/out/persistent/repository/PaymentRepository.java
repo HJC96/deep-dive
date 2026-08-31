@@ -10,4 +10,8 @@ public interface PaymentRepository {
     Mono<Void> save(PaymentEvent paymentEvent);
 
     Flux<PendingPaymentEvent> getPendingPayments();
+
+    Mono<PaymentEvent> getPayment(String orderId);
+
+    Mono<Void> complete(PaymentEvent paymentEvent);
 }
