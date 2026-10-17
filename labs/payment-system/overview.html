@@ -751,7 +751,7 @@ if (paymentEvent.isWalletUpdateDone()) { return handleWalletUpdate(paymentEvent)
           </tbody>
         </table>
       </div>
-      <div class="callout warn"><strong>README 서술 중 사실과 다른 것.</strong>
+      <div class="callout good"><strong>README 서술 중 사실과 달랐던 것 (README 수정 완료).</strong> 아래 내용은 모듈 README를 실제 코드 기준으로 다시 쓰면서 바로잡았습니다.
         <ul class="plain">
           <li>"지금은 스캐폴딩만 있다" → 실제로는 승인부터 완료까지 구현되어 있습니다(git 로그에 checkout·confirm·재시도·복구·아웃박스·wallet·ledger·완료 기능 커밋이 있음).</li>
           <li>패키지 구조 <code>domain / application / presentation / infrastructure</code> → 실제로는 헥사고날 <code>adapter/in·out</code>, <code>application/port/in·out</code>, <code>service</code>, <code>domain</code>입니다.</li>

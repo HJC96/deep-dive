@@ -11,7 +11,6 @@ Spring Boot Actuator 운영 관찰 실험실.
 프로젝트 루트 기준.
 
 ```bash
-cd /Users/hanjichan/Desktop/git/deep-dive
 ./gradlew :spring-boot-actuator:run
 ```
 

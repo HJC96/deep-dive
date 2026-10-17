@@ -1,5 +1,7 @@
 # distributed-transaction-tcc
 
+*시퀀스 다이어그램과 면접 Q&A로 정리한 요약은 [`overview.html`](overview.html)을 내려받아 브라우저로 열면 볼 수 있다.*
+
 <mark>기다리지 않고 일단 커밋한 다음, 잘못되면 반대 방향 업무 작업으로 되돌린다.</mark>
 
 세 단계의 이름이 그대로 규약이다.
@@ -83,7 +85,7 @@ sequenceDiagram
     Note over C,W: 1단계 — Try
     C->>S: held_count += 2 / 로그 TRIED / COMMIT
     S-->>C: true
-    C->>W: UPDATE 0건 (잔액 부족) / 빈 커밋
+    C->>W: 지갑 조회 → 잔액 부족으로 freeze 거절 (저장·로그 없음)
     W-->>C: false
 
     Note over C,W: 2단계 — Cancel
@@ -181,7 +183,7 @@ XA를 지원하지 않는 참여자(외부 결제 API, 메시지 큐, NoSQL)도 
 | 영속성 계층 | Spring Data JPA. DataSource·EntityManagerFactory·TransactionManager를 좌석/지갑 두 벌로 나눠 둔다 | **단일 트랜잭션 매니저** — 한 매니저가 두 DB를 아우르면 커밋이 갈라지는 지점 자체가 사라져 실험이 성립하지 않는다 |
 | 자원 수량 변경 | 엔티티를 읽어 메서드를 부르고 저장. 정원·잔액 검사도 엔티티 안에 있다 | **벌크 UPDATE(`@Modifying`)의 WHERE에 검사를 넣기** — 동시 요청에는 더 강하지만 리포지토리가 SQL 덩어리가 된다. 이 실험실은 순차 실행이라 얻는 것보다 읽기 어려워지는 쪽이 컸다 |
 | 동시성 제어 | 없다. 요청 상태 판단은 로그 한 줄을 읽어서 한다 | **비관적 락·낙관적 락** — Confirm/Cancel 중복과 빈 취소는 순서 문제이지 동시성 문제가 아니라 락 없이도 재현된다. 동시 요청은 아래 "다루지 않은 것"으로 남겼다 |
-| 데이터베이스 | MySQL 8 (Testcontainers) | **H2** — 2PC와 나란히 비교하는 게 목적이라 바꿀 이유가 없었고 `TwoDatabases`류 인프라 패턴도 그대로 재사용된다 |
+| 데이터베이스 | MySQL 8 (Testcontainers) | **H2** — 2PC와 나란히 비교하는 게 목적이라 바꿀 이유가 없었고 `TwoDatabases`와 같은 싱글톤 컨테이너 패턴을 `TccJpaTest`에서 다시 구현했다 |
 
 ## 실무에서는 Seata가 이 역할을 대신한다
 

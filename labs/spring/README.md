@@ -272,7 +272,7 @@ prepareOrderConfirmationEmailInParallel(order)
 
 차이는 작업 제출 방식이다. Java `ExecutorService` 예제는 `CompletableFuture.supplyAsync(..., javaExecutorService)`를 직접 호출하고, `@Async` 예제는 `@Async("springAsyncExecutor")`가 붙은 별도 빈 메서드를 호출한다.
 
-`@Async`는 Spring 프록시를 거쳐야 하므로 결제/재고/배송 작업은 `OrderPreparationAsyncService`에 둔다. `springAsyncExecutor`도 독립 작업 3개가 동시에 실행될 수 있도록 fixed thread pool 크기를 3으로 둔다.
+`@Async`는 Spring 프록시를 거쳐야 하므로 결제/재고/배송 작업은 `OrderPreparationAsyncService`에 둔다. `springAsyncExecutor`도 독립 작업 3개가 동시에 실행될 수 있도록 `ThreadPoolTaskExecutor`의 core·max 크기를 3으로 두고, 대기 큐는 10으로 둔다.
 
 테스트 흐름:
 
@@ -314,14 +314,50 @@ deliveryEstimate.join();
 - 전체 시간은 가장 느린 작업 시간에 가까움
 - after는 테스트에서 500ms 미만으로 관찰
 
+## @Retryable로 재시도할 오류와 하지 않을 오류 나누기
+
+외부 결제 API 호출을 예로, 오류 종류마다 재시도와 복구(`@Recover`) 여부를 다르게 둔다. `SpringLabApplication`에 `@EnableRetry`가 켜져 있다.
+
+```java
+@Retryable(
+        retryFor = PaymentException.class,
+        noRetryFor = InvalidPaymentRequestException.class,
+        notRecoverable = UnknownPaymentStateException.class,
+        maxAttemptsExpression = "${payment.retry.max-attempts:3}",
+        backoff = @Backoff(
+                delayExpression = "${payment.retry.initial-delay:50}",
+                maxDelayExpression = "${payment.retry.max-delay:500}",
+                multiplierExpression = "${payment.retry.multiplier:2.0}",
+                randomExpression = "${payment.retry.random:true}"
+        )
+)
+public PaymentResult requestPayment(PaymentRequest request) { ... }
+```
+
+| 오류 | 재시도 | 끝난 뒤 | 이유 |
+| --- | --- | --- | --- |
+| `TemporaryPaymentException` | 최대 3회 시도 | `@Recover` → `reviewRequired` | 일시적 오류는 다시 시도하면 성공할 수 있다 |
+| `InvalidPaymentRequestException` | 안 함(`noRetryFor`) | `@Recover` → `rejected` | 요청 자체가 틀렸으니 다시 보내도 같다 |
+| `UnknownPaymentStateException` | 최대 3회 시도 | 복구 없이 예외 전파(`notRecoverable`) | 결제가 됐는지 모르는 상태를 "검토 필요"로 덮으면 안 된다. 호출한 쪽이 알아야 한다 |
+
+`RetryableTest`는 `initial-delay=10`, `multiplier=2.0`, `random=false`로 두고 대기 시간을 기록하는 `Sleeper`를 끼워, 실제로 기다리지 않고 재시도 흐름을 확인한다.
+
+- 첫 호출 성공: `RetryContext` 재시도 횟수 `0`, 대기 없음
+- 일시적 오류 두 번 뒤 성공: 재시도 횟수 `0, 1, 2`, 대기 `10ms, 20ms`
+- 일시적 오류 세 번: `reviewRequired` 반환
+- 잘못된 요청: 재시도 없이 `rejected` 반환
+- 상태를 알 수 없는 오류: 세 번 시도한 뒤 `UnknownPaymentStateException` 전파
+
 ## 시작점
 
-- `SpringLabApplication`: `@EnableAsync`가 켜진 Spring Boot 애플리케이션
+- `SpringLabApplication`: `@EnableAsync`와 `@EnableRetry`가 켜진 Spring Boot 애플리케이션
 - `ExecutorConfig`: `ThreadPoolTaskExecutor`와 Java `ExecutorService` 설정
 - `OrderConfirmationEmailSender`: 주문 확인 메일 내용 생성
 - `OrderPreparationAsyncService`: `@Async`로 결제/재고/배송 작업 실행
 - `AsyncWorkService`: 주문 확인 메일 후처리를 `@Async`, `ExecutorService`, `CompletableFuture` 방식으로 비교하고, 결제/재고/배송 API 지연을 시뮬레이션
 - `AsyncVsExecutorServiceTest`: 결과 메일, 실행 스레드, Java ExecutorService와 `@Async`의 before/after 실행 시간 비교
+- `PaymentRetryService`: `@Retryable`과 `@Recover`로 오류 종류별 재시도·복구 정책 적용
+- `RetryableTest`: 재시도 횟수, 백오프 대기 시간, 복구 결과 검증
 
 ## 실행
 

@@ -1,6 +1,6 @@
 # distributed-transaction-2pc
 
-*결론에는 형광펜을 칠했다. 근거와 주의점까지 3색으로 구분된 판은 `README.html`을 내려받아 브라우저로 열면 볼 수 있다.*
+*결론에는 형광펜을 칠했다. 시퀀스 다이어그램과 면접 Q&A로 정리한 요약은 [`overview.html`](overview.html)을 내려받아 브라우저로 열면 볼 수 있다.*
 
 `distributed-transaction-msa`에서 남은 문제는 부분 커밋이었다. 좌석은 이미 커밋됐는데 지갑이 실패하면, 예약도 결제도 없이 좌석만 잡힌 상태가 남는다. 각 서비스의 `@Transactional`이 자기 데이터베이스 하나만 관리하기 때문이다.
 
@@ -46,13 +46,13 @@ sequenceDiagram
     T->>W: DROP/CREATE wallet, 시드 1건 INSERT (잔액은 seed 파라미터)
 ```
 
-**이 순서를 바꾸면 `DROP TABLE`부터 막힌다.**<!--note--> `TwoPhaseCommitTest`의 코디네이터 죽음 시나리오와 `PreparedLockTest`는 일부러 커밋도 롤백도 안 한 채 prepared 트랜잭션을 남기고 끝난다. 다음 테스트의 `seed()`가 롤백을 먼저 하지 않으면, 그 행에 걸린 락 때문에 `DROP TABLE`이 타임아웃까지 기다리게 된다.
+**이 순서를 바꾸면 `DROP TABLE`부터 막힌다.**<!--note--> `PreparedLockTest`는 일부러 커밋도 롤백도 안 한 채 prepared 트랜잭션을 남기고 끝난다. (`TwoPhaseCommitTest`의 코디네이터 죽음 시나리오는 마지막에 새 커넥션으로 `XA COMMIT`을 보내 스스로 정리한다. 다만 중간에 단언이 실패하면 prepared가 남을 수 있다.) 다음 테스트의 `seed()`가 롤백을 먼저 하지 않으면, 그 행에 걸린 락 때문에 `DROP TABLE`이 타임아웃까지 기다리게 된다.
 
 `seed()`가 만드는 최종 상태:
 
 | 테이블 | 위치 | 시드 데이터 |
 | --- | --- | --- |
-| `workshop_seat` | seat_db | id=100(잔여 0), id=200(잔여 0) |
+| `workshop_seat` | seat_db | id=100(전체 10석, 예약 0), id=200(전체 10석, 예약 0) |
 | `seat_reservation_history` | seat_db | 없음 |
 | `wallet` | wallet_db | user_id=1, balance=`seed()` 인자 |
 

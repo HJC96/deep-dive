@@ -247,7 +247,7 @@ ul.plain{margin:6px 0;padding-left:20px}ul.plain li{margin:3px 0}
       <a class="card" href="payment-system/overview.html" style="display:block;text-decoration:none;color:inherit">
         <h3 style="margin-top:0">payment-system <span class="badge warn">진행 중</span></h3>
         <p>Payment(WebFlux·R2DBC) → Kafka → Wallet·Ledger(MVC·JPA). Toss PSP 승인과 에러 분류·재시도, 트랜잭셔널 아웃박스, 지갑 정산 낙관적 락, 복식부기 장부, 결제 완료 집계.</p>
-        <div class="callout warn" style="margin-bottom:0"><strong>주의</strong> 모듈 README는 아직 "스캐폴딩만 있다"고 적혀 있어 실제 코드와 다릅니다. 상세 페이지에서 계획과 실제 구현을 나눠 정리했습니다.</div>
+        <div class="callout warn" style="margin-bottom:0"><strong>주의</strong> README의 주제 중 DLQ 처리·Bulkhead·대사는 아직 구현되지 않았고, 복구 스케줄러가 실제로는 돌지 않는 등 알려진 문제가 있습니다. 상세 페이지에서 계획과 실제 구현을 나눠 정리했습니다.</div>
       </a>
     </section>
 
