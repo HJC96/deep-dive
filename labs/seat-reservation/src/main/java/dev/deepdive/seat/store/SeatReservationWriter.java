@@ -8,6 +8,8 @@ import java.util.Optional;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * DB에 예약을 확정한다. 좌석/사용자 단위로 멱등해 같은 좌석·사용자를 두 번 저장하지 않는다.
@@ -21,21 +23,27 @@ import org.springframework.stereotype.Component;
  * "이미 예약됨"으로 분류한다. 같은 사용자·같은 좌석이 이미 있으면(Kafka 중복 메시지 등) 멱등하게
  * {@code ACCEPTED}를 돌려준다.
  *
- * <p>{@code @Transactional}을 일부러 걸지 않는다. 바깥 트랜잭션 안에서 중복 키 예외를 잡으면
- * 그 트랜잭션이 rollback-only로 표시되어 커밋 시점에 다시 터지기 때문에, INSERT는
- * {@code repository.save()}의 자체 트랜잭션에서 끝나게 둔다.
+ * <p>메서드 전체에 {@code @Transactional}을 걸지 않는다. 바깥 트랜잭션 안에서 중복 키 예외를 잡으면
+ * 그 트랜잭션이 rollback-only로 표시되어 커밋 시점에 다시 터지기 때문이다. 대신 "느린 쓰기 + INSERT"만
+ * {@link TransactionTemplate}으로 묶어 커밋까지 끝내고, 중복 키 예외는 그 바깥에서 잡는다.
+ * 느린 쓰기를 트랜잭션 안에 두는 이유: 실제 느린 DB처럼 쓰는 동안 커넥션을 쥐고 있어야
+ * 버스트 부하에서 커넥션 풀 고갈을 재현할 수 있다.
  */
 @Component
 public class SeatReservationWriter {
 
     private final SeatReservationRepository seatReservationRepository;
+    private final TransactionTemplate transactionTemplate;
     private final long writeDelayMillis;
 
     public SeatReservationWriter(
             SeatReservationRepository seatReservationRepository,
+            PlatformTransactionManager transactionManager,
             @Value("${seat.db.write-delay-millis:0}") long writeDelayMillis
     ) {
         this.seatReservationRepository = Objects.requireNonNull(seatReservationRepository, "좌석 예약 저장소는 필수입니다.");
+        this.transactionTemplate = new TransactionTemplate(
+                Objects.requireNonNull(transactionManager, "트랜잭션 매니저는 필수입니다."));
         this.writeDelayMillis = writeDelayMillis;
     }
 
@@ -50,9 +58,12 @@ public class SeatReservationWriter {
             return existing.get();
         }
 
-        simulateSlowDb();
         try {
-            seatReservationRepository.save(new SeatReservation(seatNo, userId));
+            // 커넥션을 쥔 채로 느린 쓰기를 흉내 내고 INSERT까지 커밋한다(flush로 제약 위반을 이 안에서 드러낸다).
+            transactionTemplate.executeWithoutResult(status -> {
+                simulateSlowDb();
+                seatReservationRepository.saveAndFlush(new SeatReservation(seatNo, userId));
+            });
             return SeatReservationStatus.ACCEPTED;
         } catch (DataIntegrityViolationException e) {
             // 조회 이후 다른 쓰기가 먼저 들어와 유니크 제약에 걸린 경우 → 이미 예약됨으로 분류한다.
