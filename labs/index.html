@@ -1,0 +1,348 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>deep-dive 실험실 지도</title>
+<style>
+/* ===== 공통 스타일 (모든 모듈 overview.html에서 동일하게 유지) ===== */
+:root{
+  --bg:#f7f7f5;--surface:#ffffff;--surface-2:#f0efeb;--border:#e2e0da;
+  --text:#1d1d1b;--muted:#6b6a65;--accent:#2f5bd3;--accent-soft:#e6ecfb;
+  --good:#1f8a4c;--good-soft:#e3f4ea;--bad:#c2410c;--bad-soft:#fcebe1;
+  --warn:#a16207;--warn-soft:#fbf3dc;--code-bg:#f3f2ee;
+  --shadow:0 1px 2px rgba(0,0,0,.04),0 4px 16px rgba(0,0,0,.04);
+  --radius:12px;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --sans:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Pretendard","Noto Sans KR","Segoe UI",sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#141413;--surface:#1c1c1a;--surface-2:#252522;--border:#33322e;
+    --text:#ecebe6;--muted:#a09e96;--accent:#7c9cff;--accent-soft:#1f2a47;
+    --good:#4ccf85;--good-soft:#16301f;--bad:#ff8a5c;--bad-soft:#3a1f14;
+    --warn:#e8b84a;--warn-soft:#3a2f12;--code-bg:#22221f;
+    --shadow:none;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#141413;--surface:#1c1c1a;--surface-2:#252522;--border:#33322e;
+  --text:#ecebe6;--muted:#a09e96;--accent:#7c9cff;--accent-soft:#1f2a47;
+  --good:#4ccf85;--good-soft:#16301f;--bad:#ff8a5c;--bad-soft:#3a1f14;
+  --warn:#e8b84a;--warn-soft:#3a2f12;--code-bg:#22221f;
+  --shadow:none;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);line-height:1.65;font-size:15.5px;-webkit-font-smoothing:antialiased}
+a{color:var(--accent)}
+code,.mono{font-family:var(--mono);font-size:.86em;background:var(--code-bg);padding:.1em .35em;border-radius:5px;word-break:break-all}
+pre{background:var(--code-bg);padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.55;margin:10px 0}
+pre code{background:none;padding:0;font-size:inherit;word-break:normal}
+.layout{display:grid;grid-template-columns:220px minmax(0,1fr);gap:40px;max-width:1180px;margin:0 auto;padding:32px 24px 80px}
+@media (max-width:860px){.layout{grid-template-columns:minmax(0,1fr);gap:0;padding:20px 16px 60px}}
+nav.toc{position:sticky;top:24px;align-self:start;font-size:14px}
+nav.toc .home{display:inline-block;margin-bottom:14px;color:var(--muted);text-decoration:none;font-size:13px}
+nav.toc ol{list-style:none;padding:0;margin:0;border-left:2px solid var(--border)}
+nav.toc li a{display:block;padding:5px 0 5px 14px;margin-left:-2px;border-left:2px solid transparent;color:var(--muted);text-decoration:none}
+nav.toc li a.active,nav.toc li a:hover{color:var(--text);border-left-color:var(--accent)}
+@media (max-width:860px){
+  nav.toc{position:static;margin-bottom:18px}
+  nav.toc ol{display:flex;flex-wrap:wrap;gap:6px;border:0}
+  nav.toc li a{padding:4px 10px;margin:0;border:1px solid var(--border);border-radius:999px;font-size:13px}
+  nav.toc li a.active{border-color:var(--accent)}
+}
+header.hero{margin-bottom:28px}
+.eyebrow{font-size:12.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
+h1{font-size:30px;line-height:1.25;margin:6px 0 10px;letter-spacing:-.01em}
+.lead{font-size:17px;color:var(--text);margin:0 0 14px;max-width:62ch}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font-size:12.5px;padding:3px 10px;border-radius:999px;background:var(--surface-2);border:1px solid var(--border);color:var(--muted)}
+section{margin:44px 0 0;scroll-margin-top:20px}
+h2{font-size:21px;margin:0 0 6px;letter-spacing:-.01em}
+h2 .num{color:var(--accent);margin-right:8px;font-variant-numeric:tabular-nums}
+.sub{color:var(--muted);margin:0 0 16px;font-size:14.5px}
+h3{font-size:16.5px;margin:18px 0 6px}
+.card{overflow-wrap:anywhere;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow)}
+.grid{display:grid;gap:12px}
+.grid.c2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.grid.c3{grid-template-columns:repeat(3,minmax(0,1fr))}
+@media (max-width:700px){.grid.c2,.grid.c3{grid-template-columns:minmax(0,1fr)}}
+.tldr .label{font-size:12px;font-weight:700;letter-spacing:.05em;color:var(--muted);text-transform:uppercase;margin-bottom:4px}
+.tldr .card{border-top:3px solid var(--accent)}
+.tldr .card.good{border-top-color:var(--good)}
+.tldr .card.bad{border-top-color:var(--bad)}
+.tldr p{margin:0}
+/* 흐름 다이어그램: 단계 클릭 시 상세 표시 */
+.flow{display:flex;flex-wrap:wrap;align-items:stretch;gap:0;margin:6px 0 10px}
+.flow .step{flex:1 1 140px;min-width:120px;text-align:left;font:inherit;color:inherit;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 12px;cursor:pointer;position:relative;transition:border-color .15s,background .15s}
+.flow .step:hover{border-color:var(--accent)}
+.flow .step[aria-selected="true"]{border-color:var(--accent);background:var(--accent-soft)}
+.flow .step .k{display:block;font-size:11.5px;color:var(--muted);font-weight:600}
+.flow .step .t{display:block;font-weight:600;font-size:14px;line-height:1.35}
+.flow .step.fail{border-style:dashed;border-color:var(--bad)}
+.flow .step.fail[aria-selected="true"]{background:var(--bad-soft)}
+.flow .arrow{display:flex;align-items:center;padding:0 6px;color:var(--muted);font-size:18px}
+@media (max-width:700px){.flow{flex-direction:column}.flow .arrow{justify-content:center;padding:2px 0;transform:rotate(90deg)}}
+.flow-detail{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:10px;padding:14px 18px;min-height:64px}
+.flow-detail>div{display:none}
+.flow-detail>div.on{display:block}
+.flow-detail p:first-child{margin-top:0}.flow-detail p:last-child{margin-bottom:0}
+/* 탭 */
+.tabs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.tabs button{font:inherit;font-size:13.5px;padding:6px 12px;border-radius:999px;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{background:var(--text);color:var(--bg);border-color:var(--text)}
+.tabpanel{display:none}.tabpanel.on{display:block}
+.kv{display:grid;grid-template-columns:110px minmax(0,1fr);gap:6px 14px;margin:10px 0 0;font-size:14.5px}
+.kv dt{color:var(--muted);font-weight:600}
+.kv dd{margin:0}
+@media (max-width:520px){.kv{grid-template-columns:1fr}.kv dt{margin-top:6px}}
+/* 표 */
+.tablewrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:top}
+th{background:var(--surface-2);font-weight:600;font-size:13px;color:var(--muted);white-space:nowrap}
+tr:last-child td{border-bottom:0}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+.hl{background:var(--accent-soft)}
+/* 막대 그래프 (값은 --v: 0~1 비율) */
+.bars{display:grid;gap:8px}
+.bar{display:grid;grid-template-columns:150px minmax(0,1fr) 92px;align-items:center;gap:10px;font-size:13.5px}
+.bar .track{height:20px;background:var(--surface-2);border-radius:6px;overflow:hidden}
+.bar .fill{height:100%;width:calc(var(--v) * 100%);background:var(--accent);border-radius:6px;min-width:2px;transition:width .6s ease}
+.bar.good .fill{background:var(--good)}.bar.bad .fill{background:var(--bad)}.bar.warn .fill{background:var(--warn)}
+.bar .val{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--mono);font-size:12.5px}
+@media (max-width:520px){.bar{grid-template-columns:100px minmax(0,1fr) 72px}}
+.source{font-size:12.5px;color:var(--muted);margin-top:10px}
+/* 배지·콜아웃 */
+.badge{display:inline-block;font-size:11.5px;font-weight:700;padding:1px 8px;border-radius:999px;vertical-align:middle}
+.badge.good{background:var(--good-soft);color:var(--good)}
+.badge.bad{background:var(--bad-soft);color:var(--bad)}
+.badge.warn{background:var(--warn-soft);color:var(--warn)}
+.badge.info{background:var(--accent-soft);color:var(--accent)}
+.callout{border-radius:10px;padding:12px 16px;margin:12px 0;font-size:14.5px;border:1px solid var(--border);background:var(--surface)}
+.callout.warn{background:var(--warn-soft);border-color:transparent}
+.callout.bad{background:var(--bad-soft);border-color:transparent}
+.callout.good{background:var(--good-soft);border-color:transparent}
+.callout strong:first-child{margin-right:4px}
+/* 아코디언 (면접 Q&A, 약점) */
+details.qa{background:var(--surface);border:1px solid var(--border);border-radius:10px;margin:8px 0;overflow:hidden}
+details.qa summary{cursor:pointer;padding:12px 16px;font-weight:600;list-style:none;display:flex;gap:10px;align-items:flex-start}
+details.qa summary::-webkit-details-marker{display:none}
+details.qa summary::before{content:"Q";flex:none;width:22px;height:22px;border-radius:6px;background:var(--accent-soft);color:var(--accent);font-size:12px;display:grid;place-items:center;margin-top:1px}
+details.qa.risk summary::before{content:"!";background:var(--bad-soft);color:var(--bad)}
+details.qa[open] summary{border-bottom:1px solid var(--border)}
+details.qa .a{padding:12px 16px 14px 48px;font-size:14.5px}
+details.qa .a p{margin:0 0 8px}details.qa .a ul{margin:0;padding-left:18px}
+.qa-tools{display:flex;gap:8px;margin-bottom:8px}
+.qa-tools button,.theme-toggle{font:inherit;font-size:13px;padding:5px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer}
+.theme-toggle{position:fixed;right:16px;bottom:16px;z-index:5;box-shadow:var(--shadow)}
+/* 파일 지도 */
+ul.files{list-style:none;padding:0;margin:0;display:grid;gap:6px}
+ul.files li{display:grid;grid-template-columns:minmax(0,1fr);gap:2px;padding:9px 12px;background:var(--surface);border:1px solid var(--border);border-radius:9px}
+ul.files li code{background:none;padding:0;font-size:12.5px}
+ul.files li span{color:var(--muted);font-size:13.5px}
+footer{margin-top:56px;padding-top:18px;border-top:1px solid var(--border);color:var(--muted);font-size:13px}
+ul.plain{margin:6px 0;padding-left:20px}ul.plain li{margin:3px 0}
+</style>
+</head>
+<body>
+<button class="theme-toggle" type="button" aria-label="테마 전환">◐ 테마</button>
+<div class="layout">
+  <nav class="toc" aria-label="목차">
+    <ol>
+      <li><a href="#map">학습 지도</a></li>
+      <li><a href="#concurrency">동시성</a></li>
+      <li><a href="#cache">캐시</a></li>
+      <li><a href="#tx">분산 트랜잭션</a></li>
+      <li><a href="#payment">결제 시스템</a></li>
+      <li><a href="#spring">Spring·운영·JVM</a></li>
+      <li><a href="#priority">면접 우선순위</a></li>
+    </ol>
+  </nav>
+  <main>
+    <header class="hero">
+      <div class="eyebrow">deep-dive · labs</div>
+      <h1>deep-dive 실험실 전체 지도</h1>
+      <p class="lead">공부하다 직접 돌려 보고 싶은 주제를 모듈 하나씩으로 만든 레포입니다. 모듈은 15개이고, 크게 <strong>동시성 → 캐시 → 분산 트랜잭션 → 결제 시스템</strong> 순서로 이어지며, Spring·운영·JVM 실험이 옆에 붙어 있습니다. 카드를 누르면 모듈별 상세 페이지로 이동합니다.</p>
+      <div class="chips"><span class="chip">Java 21</span><span class="chip">Spring Boot 3.4.1</span><span class="chip">MySQL</span><span class="chip">Redis</span><span class="chip">Kafka</span><span class="chip">Testcontainers</span><span class="chip">JMH</span><span class="chip">GitHub Actions</span></div>
+    </header>
+
+    <section id="map">
+      <h2><span class="num">00</span>학습 지도</h2>
+      <p class="sub">트랙을 누르면 그 트랙이 무엇을 묻는지 나옵니다.</p>
+      <div class="flow" data-flow>
+        <button class="step" data-target="m-con"><span class="k">TRACK 1</span><span class="t">동시성</span></button>
+        <span class="arrow">→</span>
+        <button class="step" data-target="m-cache"><span class="k">TRACK 2</span><span class="t">캐시</span></button>
+        <span class="arrow">→</span>
+        <button class="step" data-target="m-tx"><span class="k">TRACK 3</span><span class="t">분산 트랜잭션</span></button>
+        <span class="arrow">→</span>
+        <button class="step" data-target="m-pay"><span class="k">TRACK 4</span><span class="t">결제 시스템</span></button>
+      </div>
+      <div class="flow-detail">
+        <div id="m-con"><p><strong>"여러 요청이 같은 데이터를 동시에 바꾸면 어떻게 지키나?"</strong></p><p>선착순 쿠폰 재고(<code>coupon-issue</code>)에서 락 9가지를 같은 조건으로 비교하고, 좌석 예약(<code>seat-reservation</code>)에서 Redis 선점과 Kafka 비동기 확정으로 RDB 병목까지 다룹니다.</p></div>
+        <div id="m-cache"><p><strong>"DB 부하를 캐시로 줄일 때 무엇이 깨지나?"</strong></p><p>순수 Java로 캐시 패턴 5종과 Stampede·Penetration·Avalanche를 보고(<code>cache-patterns</code>), Spring Cache를 로컬(<code>spring-cache-local</code>)과 Redis(<code>spring-cache-redis</code>)로 옮겨 가며 키 설계·Null 캐싱·TTL Jitter·핫키 분산 락을 확인합니다.</p></div>
+        <div id="m-tx"><p><strong>"DB가 여러 개로 나뉘면 원자성은 어떻게 되나?"</strong></p><p>같은 좌석 예약 시나리오를 Monolith → MSA → 2PC → TCC 순서로 바꿔 가며, 잔액 부족으로 실패할 때 좌석이 어떻게 남는지 비교합니다. MSA에서 좌석 2석이 남는 부분 커밋이 생기고, 2PC는 이를 없애는 대신 블로킹을, TCC는 블로킹을 없애는 대신 격리 포기와 애플리케이션 복잡도를 얻습니다.</p></div>
+        <div id="m-pay"><p><strong>"하나의 트랜잭션으로 묶지 않고도 돈이 맞게 하려면?"</strong></p><p>Payment·Wallet·Ledger 세 서비스를 Kafka로 잇고, 트랜잭셔널 아웃박스·PSP 재시도·낙관적 락·복식부기 장부로 최종 일관성을 노리는 결제 시스템(<code>payment-system</code>)입니다. 일부 주제(DLQ 처리, Bulkhead, 대사)는 아직 구현되지 않았습니다.</p></div>
+      </div>
+    </section>
+
+    <section id="concurrency">
+      <h2><span class="num">01</span>동시성</h2>
+      <p class="sub">같은 자원을 동시에 바꿀 때의 정합성과 처리량</p>
+      <div class="grid c2">
+        <a class="card" href="coupon-issue/overview.html" style="text-decoration:none;color:inherit">
+          <h3 style="margin-top:0">coupon-issue <span class="badge info">수치 있음</span></h3>
+          <p>선착순 쿠폰 200개를 동시에 차감할 때의 Lost Update. 락 없음·synchronized·원자적 UPDATE·비관적/낙관적/네임드 락·Redis 분산락·Lua·Redisson 9가지 비교.</p>
+          <p class="source">핵심: 한 행에 경합이 몰리면 낙관적 락은 재시도 폭증 → 가장 느림</p>
+        </a>
+        <a class="card" href="seat-reservation/overview.html" style="text-decoration:none;color:inherit">
+          <h3 style="margin-top:0">seat-reservation <span class="badge info">수치 있음</span></h3>
+          <p>좌석 이중 배정·1인 1좌석 불변식을 Redis <code>SADD</code>로 지키고, 버스트 부하에서 DB 직접 쓰기와 Kafka 경유 비동기 확정을 비교.</p>
+          <p class="source">핵심: 요청 응답성 ↔ 최종 확정 지연의 트레이드오프</p>
+        </a>
+      </div>
+    </section>
+
+    <section id="cache">
+      <h2><span class="num">02</span>캐시</h2>
+      <p class="sub">읽기/쓰기 패턴, 장애 패턴, Spring Cache 추상화</p>
+      <div class="grid c3">
+        <a class="card" href="cache-patterns/overview.html" style="text-decoration:none;color:inherit">
+          <h3 style="margin-top:0">cache-patterns</h3>
+          <p>Cache Aside·Read Through·Write Through·Write Around·Write Behind, 그리고 Stampede·Penetration·Avalanche를 순수 Java 단위 테스트로 관찰.</p>
+        </a>
+        <a class="card" href="spring-cache-local/overview.html" style="text-decoration:none;color:inherit">
+          <h3 style="margin-top:0">spring-cache-local</h3>
+          <p><code>@Cacheable</code>/<code>@CachePut</code>/<code>@CacheEvict</code> 동작과 캐시 키 설계(SimpleKey, equals, 테이블 버전 키). 로컬 캐시의 다중 서버 한계.</p>
+        </a>
+        <a class="card" href="spring-cache-redis/overview.html" style="text-decoration:none;color:inherit">
+          <h3 style="margin-top:0">spring-cache-redis</h3>
+          <p>Spring Cache와 <code>RedisTemplate</code> 직접 구현 비교. Null sentinel, TTL Jitter, 핫키 분산 락(SET NX + UUID 토큰 + Lua 해제).</p>
+        </a>
+      </div>
+    </section>
+
+    <section id="tx">
+      <h2><span class="num">03</span>분산 트랜잭션</h2>
+      <p class="sub">같은 실패 시나리오(잔액 50,000으로 2석×30,000 예약)를 네 단계로 비교</p>
+      <div class="tablewrap" style="margin-bottom:12px">
+        <table>
+          <thead><tr><th>단계</th><th class="num">실패 후 좌석(reserved)</th><th>얻은 것</th><th>대가</th></tr></thead>
+          <tbody>
+            <tr><td><a href="distributed-transaction-monolith/overview.html">Monolith</a></td><td class="num">0</td><td>로컬 트랜잭션 하나로 원자성</td><td>DB를 나눌 수 없음</td></tr>
+            <tr class="hl"><td><a href="distributed-transaction-msa/overview.html">MSA</a></td><td class="num"><strong>2</strong></td><td>서비스·DB 분리</td><td>부분 커밋, 보상·멱등성 없음</td></tr>
+            <tr><td><a href="distributed-transaction-2pc/overview.html">2PC (MySQL XA)</a></td><td class="num">0</td><td>원자성 회복</td><td>prepared 상태 락 유지, 코디네이터 장애 시 블로킹</td></tr>
+            <tr><td><a href="distributed-transaction-tcc/overview.html">TCC</a></td><td class="num">0</td><td>락 없이 정합성</td><td>중간 상태 노출(격리 포기), 멱등·빈 취소·매달림 직접 처리</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="source">출처: 각 모듈 README와 테스트(ReservationServiceTest, MsaLocalTransactionTest, TwoPhaseCommitTest, TryConfirmCancelTest). 지연·성능 수치는 측정하지 않았습니다.</p>
+    </section>
+
+    <section id="payment">
+      <h2><span class="num">04</span>결제 시스템</h2>
+      <p class="sub">앞의 트랙을 모두 합친 종합 실험</p>
+      <a class="card" href="payment-system/overview.html" style="display:block;text-decoration:none;color:inherit">
+        <h3 style="margin-top:0">payment-system <span class="badge warn">진행 중</span></h3>
+        <p>Payment(WebFlux·R2DBC) → Kafka → Wallet·Ledger(MVC·JPA). Toss PSP 승인과 에러 분류·재시도, 트랜잭셔널 아웃박스, 지갑 정산 낙관적 락, 복식부기 장부, 결제 완료 집계.</p>
+        <div class="callout warn" style="margin-bottom:0"><strong>주의</strong> 모듈 README는 아직 "스캐폴딩만 있다"고 적혀 있어 실제 코드와 다릅니다. 상세 페이지에서 계획과 실제 구현을 나눠 정리했습니다.</div>
+      </a>
+    </section>
+
+    <section id="spring">
+      <h2><span class="num">05</span>Spring·운영·JVM</h2>
+      <p class="sub">프레임워크 동작과 관측성, 테스트 인프라, 성능 측정</p>
+      <div class="grid c2">
+        <a class="card" href="spring/overview.html" style="text-decoration:none;color:inherit">
+          <h3 style="margin-top:0">spring</h3>
+          <p><code>@Async</code> vs <code>ExecutorService</code>, self-invocation 함정, 순차 vs 병렬 실행, <code>@Retryable</code>로 재시도할 예외와 하지 않을 예외 구분.</p>
+        </a>
+        <a class="card" href="spring-data-jpa/overview.html" style="text-decoration:none;color:inherit">
+          <h3 style="margin-top:0">spring-data-jpa</h3>
+          <p><code>@Version</code> 낙관적 락 충돌을 결정적으로 재현하고, Hibernate <code>StatementInspector</code>로 요청당 SQL 수를 Micrometer 메트릭으로 발행.</p>
+        </a>
+        <a class="card" href="spring-test-infra/overview.html" style="text-decoration:none;color:inherit">
+          <h3 style="margin-top:0">spring-test-infra</h3>
+          <p><code>@DynamicPropertySource</code> 우선순위, Testcontainers 수명주기, ArchUnit 계층·필드 주입 규칙 검증.</p>
+        </a>
+        <a class="card" href="spring-boot-actuator/overview.html" style="text-decoration:none;color:inherit">
+          <h3 style="margin-top:0">spring-boot-actuator</h3>
+          <p>Health·Info·Counter·Gauge·Timer·Percentile·HTTP Metrics·Custom Endpoint를 13단계로. "언제 무엇을 쓰나" 선택 기준.</p>
+        </a>
+        <a class="card" href="java-sandbox/overview.html" style="text-decoration:none;color:inherit">
+          <h3 style="margin-top:0">java-sandbox <span class="badge info">수치 있음</span></h3>
+          <p>BouncyCastle Provider를 매 호출 등록 vs 1회 등록을 JMH로 측정하고, gc·stack 프로파일러로 원인(할당 비용, <code>getService</code> 경합)을 확인.</p>
+        </a>
+      </div>
+    </section>
+
+    <section id="priority">
+      <h2><span class="num">06</span>면접 우선순위</h2>
+      <p class="sub">시간이 없을 때 먼저 볼 순서 (개인 추천)</p>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>순서</th><th>모듈</th><th>이유</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td><a href="payment-system/overview.html">payment-system</a></td><td>가장 크고 실무와 가까움. 약점도 가장 많아 꼬리질문이 집중될 곳</td></tr>
+            <tr><td>2</td><td><a href="distributed-transaction-msa/overview.html">분산 트랜잭션 4단계</a></td><td>"왜 결제 시스템은 2PC 대신 아웃박스를 썼나"의 근거가 되는 이야기</td></tr>
+            <tr><td>3</td><td><a href="coupon-issue/overview.html">coupon-issue</a></td><td>동시성 질문의 단골. 9가지 방식의 트레이드오프를 수치와 함께 설명 가능</td></tr>
+            <tr><td>4</td><td><a href="seat-reservation/overview.html">seat-reservation</a></td><td>Redis + Kafka 조합, 동기 vs 비동기 트레이드오프</td></tr>
+            <tr><td>5</td><td><a href="spring-cache-redis/overview.html">캐시 3종</a></td><td>캐시 장애 패턴과 핫키 대응</td></tr>
+            <tr><td>6</td><td><a href="java-sandbox/overview.html">java-sandbox</a></td><td>"측정으로 원인을 찾은 경험" 질문에 쓰기 좋음</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <footer>각 모듈 README와 소스 코드를 근거로 정리했습니다. 모듈별 페이지에서 수치의 출처와 확인되지 않은 부분을 구분해 표기했습니다.</footer>
+  </main>
+</div>
+<script>
+/* ===== 공통 스크립트 (모든 모듈 overview.html에서 동일하게 유지) ===== */
+(function(){
+  var root=document.documentElement;
+  try{var saved=localStorage.getItem('deepdive-theme');if(saved)root.setAttribute('data-theme',saved);}catch(e){}
+  var tt=document.querySelector('.theme-toggle');
+  if(tt)tt.addEventListener('click',function(){
+    var cur=root.getAttribute('data-theme');
+    if(!cur)cur=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';
+    var next=cur==='dark'?'light':'dark';root.setAttribute('data-theme',next);
+    try{localStorage.setItem('deepdive-theme',next);}catch(e){}
+  });
+  document.querySelectorAll('[data-flow]').forEach(function(flow){
+    var steps=flow.querySelectorAll('.step');var detail=flow.nextElementSibling;
+    function show(btn){
+      steps.forEach(function(s){s.setAttribute('aria-selected',s===btn?'true':'false');});
+      if(detail)detail.querySelectorAll(':scope>div').forEach(function(d){d.classList.toggle('on',d.id===btn.dataset.target);});
+    }
+    steps.forEach(function(s){s.addEventListener('click',function(){show(s);});});
+    if(steps[0])show(steps[0]);
+  });
+  document.querySelectorAll('[data-tabs]').forEach(function(box){
+    var btns=box.querySelectorAll(':scope>.tabs>button');
+    function show(btn){
+      btns.forEach(function(b){b.setAttribute('aria-selected',b===btn?'true':'false');});
+      box.querySelectorAll(':scope>.tabpanel').forEach(function(p){p.classList.toggle('on',p.id===btn.dataset.target);});
+    }
+    btns.forEach(function(b){b.addEventListener('click',function(){show(b);});});
+    if(btns[0])show(btns[0]);
+  });
+  document.querySelectorAll('[data-qa]').forEach(function(b){
+    b.addEventListener('click',function(){
+      var sec=b.closest('section');var open=b.dataset.qa==='open';
+      sec.querySelectorAll('details.qa').forEach(function(d){d.open=open;});
+    });
+  });
+  var links=document.querySelectorAll('nav.toc a[href^="#"]');
+  if('IntersectionObserver' in window){
+    var io=new IntersectionObserver(function(es){es.forEach(function(e){
+      if(e.isIntersecting){links.forEach(function(l){l.classList.toggle('active',l.getAttribute('href')==='#'+e.target.id);});}
+    });},{rootMargin:'-20% 0px -70% 0px'});
+    document.querySelectorAll('main section[id]').forEach(function(s){io.observe(s);});
+  }
+})();
+</script>
+</body>
+</html>
