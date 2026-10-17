@@ -2,29 +2,42 @@ package dev.deepdive.paymentsystem.wallet.adapter.out.persistence.repository;
 
 import dev.deepdive.paymentsystem.wallet.adapter.out.persistence.entity.JpaWalletEntity;
 import dev.deepdive.paymentsystem.wallet.adapter.out.persistence.entity.JpaWalletMapper;
+import dev.deepdive.paymentsystem.wallet.adapter.out.persistence.entity.JpaWalletTransactionEntity;
 import dev.deepdive.paymentsystem.wallet.adapter.out.persistence.exception.RetryExhaustedWithOptimisticLockingFailureException;
+import dev.deepdive.paymentsystem.wallet.application.exception.SettlementAlreadyProcessedException;
 import dev.deepdive.paymentsystem.wallet.domain.Wallet;
 import dev.deepdive.paymentsystem.wallet.domain.WalletTransaction;
+import org.springframework.dao.CannotAcquireLockException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 
 @Repository
 public class JpaWalletRepository implements WalletRepository {
 
-    private static final int MAX_RETRIES = 3;
-    private static final int BASE_DELAY = 100;
+    /**
+     * 첫 시도가 낙관적 락 충돌로 실패한 뒤 추가로 몇 번 더 시도하는지. 총 시도 횟수는 1 + MAX_RETRIES.
+     * 다 써도 실패하면 예외를 던져 메시지 재시도(바인더 max-attempts) → DLQ 로 넘긴다.
+     */
+    static final int MAX_RETRIES = 3;
+    static final long BASE_DELAY_MILLIS = 50;
+    static final long MAX_DELAY_MILLIS = 1_000;
 
     private final SpringDataJpaWalletRepository springDataJpaWalletRepository;
     private final JpaWalletMapper jpaWalletMapper;
     private final WalletTransactionRepository walletTransactionRepository;
     private final TransactionTemplate transactionTemplate;
+    private final OptimisticLockRetryBackoff backoff =
+            new OptimisticLockRetryBackoff(BASE_DELAY_MILLIS, MAX_DELAY_MILLIS, () -> ThreadLocalRandom.current().nextDouble());
 
     public JpaWalletRepository(
             SpringDataJpaWalletRepository springDataJpaWalletRepository,
@@ -47,10 +60,39 @@ public class JpaWalletRepository implements WalletRepository {
 
     @Override
     public void save(List<Wallet> wallets) {
+        // 지갑은 Set 에서 와서 순서가 매번 다르다. 동시에 정산하는 트랜잭션들이 행 락을 서로 다른 순서로 잡으면
+        // 교착(deadlock)이 난다. 지갑 id·참조 id 순으로 정렬해 락 순서를 고정한다.
+        List<Wallet> ordered = wallets.stream().sorted(Comparator.comparingLong(Wallet::id)).toList();
+        try {
+            saveWithOptimisticLockRetry(ordered);
+        } catch (DataIntegrityViolationException e) {
+            // 잔액 갱신과 거래 INSERT 는 한 트랜잭션이라 함께 롤백됐다. 같은 주문 라인이 이미 정산된 경우만 "이미 처리됨"으로 바꾼다.
+            if (isDuplicateIdempotencyKey(e)) {
+                throw new SettlementAlreadyProcessedException("이미 정산된 지갑 거래입니다.", e);
+            }
+            throw e;
+        }
+    }
+
+    private void saveWithOptimisticLockRetry(List<Wallet> wallets) {
         try {
             performSaveOperation(wallets);
-        } catch (ObjectOptimisticLockingFailureException e) {
-            retrySaveOperation(wallets);
+            return;
+        } catch (ObjectOptimisticLockingFailureException | CannotAcquireLockException e) {
+            // 아래에서 최신 잔액을 다시 읽어 재시도한다. 교착으로 희생된 트랜잭션도 전부 롤백됐으므로 같은 방식으로 다시 시도한다.
+        }
+
+        for (int retry = 1; ; retry++) {
+            waitForNextRetry(retry);
+            try {
+                performSaveOperationWithRecent(wallets);
+                return;
+            } catch (ObjectOptimisticLockingFailureException | CannotAcquireLockException e) {
+                if (retry >= MAX_RETRIES) {
+                    throw new RetryExhaustedWithOptimisticLockingFailureException(
+                            e.getMessage() != null ? e.getMessage() : "exhausted retry count.");
+                }
+            }
         }
     }
 
@@ -60,23 +102,6 @@ public class JpaWalletRepository implements WalletRepository {
                     wallets.stream().map(jpaWalletMapper::mapToJpaEntity).toList());
             walletTransactionRepository.save(flattenTransactions(wallets));
         });
-    }
-
-    private void retrySaveOperation(List<Wallet> wallets) {
-        int retryCount = 0;
-
-        while (true) {
-            try {
-                performSaveOperationWithRecent(wallets);
-                return;
-            } catch (ObjectOptimisticLockingFailureException e) {
-                if (++retryCount > MAX_RETRIES) {
-                    throw new RetryExhaustedWithOptimisticLockingFailureException(
-                            e.getMessage() != null ? e.getMessage() : "exhausted retry count.");
-                }
-                waitForNextRetry(BASE_DELAY);
-            }
-        }
     }
 
     private void performSaveOperationWithRecent(List<Wallet> wallets) {
@@ -103,18 +128,30 @@ public class JpaWalletRepository implements WalletRepository {
 
     private List<WalletTransaction> flattenTransactions(List<Wallet> wallets) {
         return wallets.stream()
-                .flatMap(wallet -> wallet.walletTransactions().stream())
+                .flatMap(wallet -> wallet.walletTransactions().stream()
+                        .sorted(Comparator.comparingLong(WalletTransaction::referenceId)))
                 .toList();
     }
 
-    private void waitForNextRetry(int baseDelay) {
-        long jitter = (long) (Math.random() * baseDelay);
-
+    private void waitForNextRetry(int retry) {
         try {
-            Thread.sleep(jitter);
+            Thread.sleep(backoff.delayMillis(retry));
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new RuntimeException("Interrupted during retry wait", e);
+            throw new IllegalStateException("Interrupted during retry wait", e);
         }
+    }
+
+    private static boolean isDuplicateIdempotencyKey(Throwable error) {
+        for (Throwable cause = error; cause != null; cause = cause.getCause()) {
+            String message = cause.getMessage();
+            if (message != null && message.contains(JpaWalletTransactionEntity.IDEMPOTENCY_KEY_CONSTRAINT)) {
+                return true;
+            }
+            if (cause.getCause() == cause) {
+                break;
+            }
+        }
+        return false;
     }
 }

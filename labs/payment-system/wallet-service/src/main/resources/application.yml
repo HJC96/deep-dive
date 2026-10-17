@@ -8,9 +8,13 @@ spring:
     url: ${WALLET_DB_URL:jdbc:mysql://localhost:3306/wallet_db}
     username: ${WALLET_DB_USERNAME:root}
     password: ${WALLET_DB_PASSWORD:root}
+  sql:
+    init:
+      # schema.sql 을 기동 때마다 적용한다(멱등 DDL). Hibernate 는 스키마를 만들지 않고 엔티티와 맞는지만 검사한다.
+      mode: always
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
     show-sql: true
     properties:
       hibernate:
