@@ -1,0 +1,452 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>spring-test-infra 한눈에</title>
+<style>
+/* ===== 공통 스타일 (모든 모듈 overview.html에서 동일하게 유지) ===== */
+:root{
+  --bg:#f7f7f5;--surface:#ffffff;--surface-2:#f0efeb;--border:#e2e0da;
+  --text:#1d1d1b;--muted:#6b6a65;--accent:#2f5bd3;--accent-soft:#e6ecfb;
+  --good:#1f8a4c;--good-soft:#e3f4ea;--bad:#c2410c;--bad-soft:#fcebe1;
+  --warn:#a16207;--warn-soft:#fbf3dc;--code-bg:#f3f2ee;
+  --shadow:0 1px 2px rgba(0,0,0,.04),0 4px 16px rgba(0,0,0,.04);
+  --radius:12px;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --sans:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Pretendard","Noto Sans KR","Segoe UI",sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#141413;--surface:#1c1c1a;--surface-2:#252522;--border:#33322e;
+    --text:#ecebe6;--muted:#a09e96;--accent:#7c9cff;--accent-soft:#1f2a47;
+    --good:#4ccf85;--good-soft:#16301f;--bad:#ff8a5c;--bad-soft:#3a1f14;
+    --warn:#e8b84a;--warn-soft:#3a2f12;--code-bg:#22221f;
+    --shadow:none;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#141413;--surface:#1c1c1a;--surface-2:#252522;--border:#33322e;
+  --text:#ecebe6;--muted:#a09e96;--accent:#7c9cff;--accent-soft:#1f2a47;
+  --good:#4ccf85;--good-soft:#16301f;--bad:#ff8a5c;--bad-soft:#3a1f14;
+  --warn:#e8b84a;--warn-soft:#3a2f12;--code-bg:#22221f;
+  --shadow:none;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);line-height:1.65;font-size:15.5px;-webkit-font-smoothing:antialiased}
+a{color:var(--accent)}
+code,.mono{font-family:var(--mono);font-size:.86em;background:var(--code-bg);padding:.1em .35em;border-radius:5px;word-break:break-all}
+pre{background:var(--code-bg);padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.55;margin:10px 0}
+pre code{background:none;padding:0;font-size:inherit;word-break:normal}
+.layout{display:grid;grid-template-columns:220px minmax(0,1fr);gap:40px;max-width:1180px;margin:0 auto;padding:32px 24px 80px}
+@media (max-width:860px){.layout{grid-template-columns:minmax(0,1fr);gap:0;padding:20px 16px 60px}}
+nav.toc{position:sticky;top:24px;align-self:start;font-size:14px}
+nav.toc .home{display:inline-block;margin-bottom:14px;color:var(--muted);text-decoration:none;font-size:13px}
+nav.toc ol{list-style:none;padding:0;margin:0;border-left:2px solid var(--border)}
+nav.toc li a{display:block;padding:5px 0 5px 14px;margin-left:-2px;border-left:2px solid transparent;color:var(--muted);text-decoration:none}
+nav.toc li a.active,nav.toc li a:hover{color:var(--text);border-left-color:var(--accent)}
+@media (max-width:860px){
+  nav.toc{position:static;margin-bottom:18px}
+  nav.toc ol{display:flex;flex-wrap:wrap;gap:6px;border:0}
+  nav.toc li a{padding:4px 10px;margin:0;border:1px solid var(--border);border-radius:999px;font-size:13px}
+  nav.toc li a.active{border-color:var(--accent)}
+}
+header.hero{margin-bottom:28px}
+.eyebrow{font-size:12.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
+h1{font-size:30px;line-height:1.25;margin:6px 0 10px;letter-spacing:-.01em}
+.lead{font-size:17px;color:var(--text);margin:0 0 14px;max-width:62ch}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font-size:12.5px;padding:3px 10px;border-radius:999px;background:var(--surface-2);border:1px solid var(--border);color:var(--muted)}
+section{margin:44px 0 0;scroll-margin-top:20px}
+h2{font-size:21px;margin:0 0 6px;letter-spacing:-.01em}
+h2 .num{color:var(--accent);margin-right:8px;font-variant-numeric:tabular-nums}
+.sub{color:var(--muted);margin:0 0 16px;font-size:14.5px}
+h3{font-size:16.5px;margin:18px 0 6px}
+.card{overflow-wrap:anywhere;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow)}
+.grid{display:grid;gap:12px}
+.grid.c2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.grid.c3{grid-template-columns:repeat(3,minmax(0,1fr))}
+@media (max-width:700px){.grid.c2,.grid.c3{grid-template-columns:minmax(0,1fr)}}
+.tldr .label{font-size:12px;font-weight:700;letter-spacing:.05em;color:var(--muted);text-transform:uppercase;margin-bottom:4px}
+.tldr .card{border-top:3px solid var(--accent)}
+.tldr .card.good{border-top-color:var(--good)}
+.tldr .card.bad{border-top-color:var(--bad)}
+.tldr p{margin:0}
+/* 흐름 다이어그램: 단계 클릭 시 상세 표시 */
+.flow{display:flex;flex-wrap:wrap;align-items:stretch;gap:0;margin:6px 0 10px}
+.flow .step{flex:1 1 140px;min-width:120px;text-align:left;font:inherit;color:inherit;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 12px;cursor:pointer;position:relative;transition:border-color .15s,background .15s}
+.flow .step:hover{border-color:var(--accent)}
+.flow .step[aria-selected="true"]{border-color:var(--accent);background:var(--accent-soft)}
+.flow .step .k{display:block;font-size:11.5px;color:var(--muted);font-weight:600}
+.flow .step .t{display:block;font-weight:600;font-size:14px;line-height:1.35}
+.flow .step.fail{border-style:dashed;border-color:var(--bad)}
+.flow .step.fail[aria-selected="true"]{background:var(--bad-soft)}
+.flow .arrow{display:flex;align-items:center;padding:0 6px;color:var(--muted);font-size:18px}
+@media (max-width:700px){.flow{flex-direction:column}.flow .step{flex:none}.flow .arrow{justify-content:center;padding:2px 0;transform:rotate(90deg)}}
+.flow-detail{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:10px;padding:14px 18px;min-height:64px}
+.flow-detail>div{display:none}
+.flow-detail>div.on{display:block}
+.flow-detail p:first-child{margin-top:0}.flow-detail p:last-child{margin-bottom:0}
+/* 탭 */
+.tabs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.tabs button{font:inherit;font-size:13.5px;padding:6px 12px;border-radius:999px;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{background:var(--text);color:var(--bg);border-color:var(--text)}
+.tabpanel{display:none}.tabpanel.on{display:block}
+.kv{display:grid;grid-template-columns:110px minmax(0,1fr);gap:6px 14px;margin:10px 0 0;font-size:14.5px}
+.kv dt{color:var(--muted);font-weight:600}
+.kv dd{margin:0}
+@media (max-width:520px){.kv{grid-template-columns:1fr}.kv dt{margin-top:6px}}
+/* 표 */
+.tablewrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:top}
+th{background:var(--surface-2);font-weight:600;font-size:13px;color:var(--muted);white-space:nowrap}
+tr:last-child td{border-bottom:0}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+.hl{background:var(--accent-soft)}
+/* 막대 그래프 (값은 --v: 0~1 비율) */
+.bars{display:grid;gap:8px}
+.bar{display:grid;grid-template-columns:150px minmax(0,1fr) 92px;align-items:center;gap:10px;font-size:13.5px}
+.bar .track{height:20px;background:var(--surface-2);border-radius:6px;overflow:hidden}
+.bar .fill{height:100%;width:calc(var(--v) * 100%);background:var(--accent);border-radius:6px;min-width:2px;transition:width .6s ease}
+.bar.good .fill{background:var(--good)}.bar.bad .fill{background:var(--bad)}.bar.warn .fill{background:var(--warn)}
+.bar .val{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--mono);font-size:12.5px}
+@media (max-width:520px){.bar{grid-template-columns:100px minmax(0,1fr) 72px}}
+.source{font-size:12.5px;color:var(--muted);margin-top:10px}
+/* 배지·콜아웃 */
+.badge{display:inline-block;font-size:11.5px;font-weight:700;padding:1px 8px;border-radius:999px;vertical-align:middle}
+.badge.good{background:var(--good-soft);color:var(--good)}
+.badge.bad{background:var(--bad-soft);color:var(--bad)}
+.badge.warn{background:var(--warn-soft);color:var(--warn)}
+.badge.info{background:var(--accent-soft);color:var(--accent)}
+.callout{border-radius:10px;padding:12px 16px;margin:12px 0;font-size:14.5px;border:1px solid var(--border);background:var(--surface)}
+.callout.warn{background:var(--warn-soft);border-color:transparent}
+.callout.bad{background:var(--bad-soft);border-color:transparent}
+.callout.good{background:var(--good-soft);border-color:transparent}
+.callout strong:first-child{margin-right:4px}
+/* 아코디언 (면접 Q&A, 약점) */
+details.qa{background:var(--surface);border:1px solid var(--border);border-radius:10px;margin:8px 0;overflow:hidden}
+details.qa summary{cursor:pointer;padding:12px 16px;font-weight:600;list-style:none;display:flex;gap:10px;align-items:flex-start}
+details.qa summary::-webkit-details-marker{display:none}
+details.qa summary::before{content:"Q";flex:none;width:22px;height:22px;border-radius:6px;background:var(--accent-soft);color:var(--accent);font-size:12px;display:grid;place-items:center;margin-top:1px}
+details.qa.risk summary::before{content:"!";background:var(--bad-soft);color:var(--bad)}
+details.qa[open] summary{border-bottom:1px solid var(--border)}
+details.qa .a{padding:12px 16px 14px 48px;font-size:14.5px}
+details.qa .a p{margin:0 0 8px}details.qa .a ul{margin:0;padding-left:18px}
+.qa-tools{display:flex;gap:8px;margin-bottom:8px}
+.qa-tools button,.theme-toggle{font:inherit;font-size:13px;padding:5px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer}
+.theme-toggle{position:fixed;right:16px;bottom:16px;z-index:5;box-shadow:var(--shadow)}
+/* 파일 지도 */
+ul.files{list-style:none;padding:0;margin:0;display:grid;gap:6px}
+ul.files li{display:grid;grid-template-columns:minmax(0,1fr);gap:2px;padding:9px 12px;background:var(--surface);border:1px solid var(--border);border-radius:9px}
+ul.files li code{background:none;padding:0;font-size:12.5px}
+ul.files li span{color:var(--muted);font-size:13.5px}
+footer{margin-top:56px;padding-top:18px;border-top:1px solid var(--border);color:var(--muted);font-size:13px}
+ul.plain{margin:6px 0;padding-left:20px}ul.plain li{margin:3px 0}
+</style>
+</head>
+<body>
+<button class="theme-toggle" type="button" aria-label="테마 전환">◐ 테마</button>
+<div class="layout">
+  <nav class="toc" aria-label="목차">
+    <a class="home" href="../index.html">← 전체 모듈</a>
+    <ol>
+      <li><a href="#tldr">한눈에</a></li>
+      <li><a href="#flow">흐름</a></li>
+      <li><a href="#cases">비교·핵심 구현</a></li>
+      <li><a href="#results">결과·수치</a></li>
+      <li><a href="#limits">한계·약점</a></li>
+      <li><a href="#interview">면접 Q&amp;A</a></li>
+      <li><a href="#files">파일 지도</a></li>
+    </ol>
+  </nav>
+  <main>
+    <header class="hero">
+      <div class="eyebrow">deep-dive · labs/spring-test-infra</div>
+      <h1>Testcontainers · 동적 프로퍼티 · ArchUnit — 테스트 인프라를 작은 실험으로</h1>
+      <p class="lead">실제 MySQL로 테스트하려면 실행할 때마다 바뀌는 랜덤 포트·JDBC URL을 Spring 설정에 넣어야 합니다. 이 모듈은 정적 yml을 <b>일부러 틀리게</b> 두고 <code>@DynamicPropertySource</code>가 덮어써 진짜 컨테이너 DB에 붙는지 검증합니다. 또 컨테이너 생명주기(<code>@Container</code> vs 수동), ArchUnit으로 계층 의존 방향과 필드 주입 금지를 테스트로 고정합니다.</p>
+      <div class="chips"><span class="chip">Java 21</span><span class="chip">Spring Boot 3.4.1</span><span class="chip">Testcontainers (MySQL 8.0.36)</span><span class="chip">ArchUnit 1.4.1</span><span class="chip">Docker 필요</span></div>
+    </header>
+
+    <section id="tldr" class="tldr">
+      <h2><span class="num">01</span>한눈에</h2>
+      <p class="sub">30초 요약</p>
+      <div class="grid c3">
+        <div class="card bad"><div class="label">문제</div><p>컨테이너 DB 주소는 실행 시점에야 정해져 yml에 미리 쓸 수 없습니다. 컨테이너 시작/종료 책임이 흩어지기 쉽고, “Controller→Service→Repository”나 “생성자 주입” 같은 규칙은 코드 리뷰만으로는 무너집니다.</p></div>
+        <div class="card"><div class="label">접근</div><p>① 틀린 정적 datasource + 동적 등록 → <code>select database()</code>로 실제 연결 확인 ② <code>@Container</code> 유무·수동 start/stop 비교 ③ ArchUnit <code>layeredArchitecture()</code> ④ <code>NO_CLASSES_SHOULD_USE_FIELD_INJECTION</code>.</p></div>
+        <div class="card good"><div class="label">결론</div><p>동적 프로퍼티가 정적 yml보다 <b>우선</b>합니다. <code>@Container</code>는 JUnit이 생명주기를 맡고, 없으면 객체만 만들어질 뿐 시작되지 않습니다. 아키텍처 규칙은 <b>바이트코드 기준 테스트</b>로 깨지면 실패하게 만들 수 있습니다.</p></div>
+      </div>
+    </section>
+
+    <section id="flow">
+      <h2><span class="num">02</span>흐름</h2>
+      <p class="sub">단계를 클릭하면 상세 설명이 나옵니다. (DynamicPropertySourceTest)</p>
+      <div class="flow" data-flow>
+        <button class="step" data-target="ti-f1"><span class="k">STEP 1</span><span class="t">틀린 정적 yml 로드</span></button>
+        <span class="arrow">→</span>
+        <button class="step" data-target="ti-f2"><span class="k">STEP 2</span><span class="t">MySQL 컨테이너 시작</span></button>
+        <span class="arrow">→</span>
+        <button class="step" data-target="ti-f3"><span class="k">STEP 3</span><span class="t">동적 프로퍼티 등록</span></button>
+        <span class="arrow">→</span>
+        <button class="step" data-target="ti-f4"><span class="k">STEP 4</span><span class="t">select database()</span></button>
+        <span class="arrow">→</span>
+        <button class="step fail" data-target="ti-f5"><span class="k">만약 없다면</span><span class="t">localhost:1 연결</span></button>
+      </div>
+      <div class="flow-detail">
+        <div id="ti-f1"><p><code>@ActiveProfiles("dynamic-property-source")</code>로 <code>application-dynamic-property-source.yml</code>이 켜집니다. 값은 일부러 틀림: <code>jdbc:mysql://localhost:1/this_datasource_should_not_be_used</code>, <code>wrong-user</code>, <code>wrong-password</code>.</p></div>
+        <div id="ti-f2"><p><code>@Testcontainers</code> + <code>@Container static MySQLContainer</code> → JUnit 확장이 테스트 클래스 시작 전에 컨테이너를 띄웁니다(DB명 <code>dynamic_property_source</code>, user <code>test</code>). 호스트 포트는 랜덤.</p></div>
+        <div id="ti-f3"><p><code>@DynamicPropertySource static void registerProperties(DynamicPropertyRegistry)</code>가 <code>spring.datasource.url/username/password</code>를 컨테이너 값(Supplier)으로 등록. 이 값은 Spring <code>Environment</code>에서 yml보다 높은 우선순위를 가집니다.</p></div>
+        <div id="ti-f4"><p>자동 구성된 <code>DataSource</code>로 연결해 <code>select database()</code> = <code>dynamic_property_source</code>, <code>connection.isValid(2)</code> = true. URL에 <code>localhost:1</code>이 없고 username이 <code>test</code>인지도 단언합니다.</p></div>
+        <div id="ti-f5"><p>동적 등록이 없다면 DataSource는 정적 값(<code>localhost:1</code>, <code>wrong-user</code>)으로 연결을 시도해 실패할 것입니다. <span class="badge warn">추론</span> 이 실패 경로 자체는 테스트로 실행하지 않습니다 — 그래서 일부러 틀린 값을 두어 “통과했다 = 동적 값이 이겼다”가 되게 설계한 것입니다.</p></div>
+      </div>
+    </section>
+
+    <section id="cases">
+      <h2><span class="num">03</span>비교·핵심 구현</h2>
+      <p class="sub">탭을 눌러 케이스별로 봅니다.</p>
+      <div data-tabs>
+        <div class="tabs" role="tablist">
+          <button role="tab" data-target="ti-t1">1. 동적 datasource</button>
+          <button role="tab" data-target="ti-t2">2. 컨테이너 생명주기</button>
+          <button role="tab" data-target="ti-t3">3. 계층 아키텍처</button>
+          <button role="tab" data-target="ti-t4">4. 필드 주입 금지</button>
+        </div>
+        <div class="tabpanel card" id="ti-t1">
+          <h3>@DynamicPropertySource — 실행 시점 값 주입 <span class="badge good">통과</span></h3>
+          <pre><code>@Testcontainers
+@SpringBootTest
+@ActiveProfiles("dynamic-property-source")
+class DynamicPropertySourceTest {
+
+    @Container
+    private static final MySQLContainer MYSQL = new MySQLContainer(DockerImageName.parse("mysql:8.0.36"))
+            .withDatabaseName("dynamic_property_source")
+            .withUsername("test")
+            .withPassword("test");
+
+    @DynamicPropertySource
+    static void registerProperties(DynamicPropertyRegistry registry) {
+        registry.add("spring.datasource.url", () -&gt; MYSQL.getJdbcUrl() + "?serverTimezone=UTC");
+        registry.add("spring.datasource.username", MYSQL::getUsername);
+        registry.add("spring.datasource.password", MYSQL::getPassword);
+    }
+    // ...
+}</code></pre>
+          <dl class="kv">
+            <dt>왜 static</dt><dd>ApplicationContext를 만들기 <b>전에</b> 호출되어야 하므로 인스턴스가 없는 static 메서드입니다.</dd>
+            <dt>왜 Supplier</dt><dd><code>MYSQL::getUsername</code>처럼 지연 평가 — 컨테이너가 뜬 뒤 실제 값을 읽습니다.</dd>
+            <dt>결과</dt><dd>URL이 <code>jdbc:mysql://localhost:</code>로 시작하고 <code>/dynamic_property_source</code> 포함, <code>localhost:1</code> 미포함. username <code>test</code>. 쿼리 결과 <code>dynamic_property_source</code>.</dd>
+          </dl>
+        </div>
+        <div class="tabpanel card" id="ti-t2">
+          <h3>@Container vs 수동 start/stop <span class="badge info">생명주기</span></h3>
+          <div class="grid c2">
+            <div>
+              <p><b>@Container (자동)</b></p>
+              <pre><code>@Testcontainers
+class ContainerAnnotationLifecycleTest {
+    @Container
+    private static final MySQLContainer MANAGED_MYSQL = ...;
+
+    // 어노테이션 없는 컨테이너
+    MySQLContainer notManagedMySQL = new MySQLContainer(MYSQL_IMAGE)...;
+    assertThat(notManagedMySQL.isRunning()).isFalse();
+
+    assertThat(MANAGED_MYSQL.isRunning()).isTrue();
+}</code></pre>
+            </div>
+            <div>
+              <p><b>수동</b></p>
+              <pre><code>class ManualContainerLifecycleTest {
+    @BeforeAll
+    static void startContainer() {
+        startCalled = true;
+        MYSQL.start();
+    }
+
+    @AfterAll
+    static void stopContainer() {
+        MYSQL.stop();
+    }
+}</code></pre>
+            </div>
+          </div>
+          <dl class="kv">
+            <dt>차이</dt><dd><code>@Container</code>는 선언 = 시작·종료 위임. 수동은 선언/시작/종료(+ Spring 프로퍼티 등록) 위치가 흩어집니다.</dd>
+            <dt>세 번째 방식</dt><dd>spring-data-jpa 모듈의 <code>MySQLContainerTest</code>는 <code>static {}</code>에서 한 번 start하고 stop하지 않는 <b>싱글톤 컨테이너</b> 패턴 — 캐시된 Spring 컨텍스트가 죽은 포트를 가리키지 않게 하려는 것입니다(그 파일 주석).</dd>
+          </dl>
+        </div>
+        <div class="tabpanel card" id="ti-t3">
+          <h3>ArchUnit — 계층 의존 방향 고정 <span class="badge good">통과</span></h3>
+          <pre><code>ArchRule rule = layeredArchitecture()
+        .consideringAllDependencies()
+        .layer("Controller").definedBy(BASE_PACKAGE + ".controller..")
+        .layer("Service").definedBy(BASE_PACKAGE + ".service..")
+        .layer("Repository").definedBy(BASE_PACKAGE + ".repository..")
+        .whereLayer("Controller").mayNotBeAccessedByAnyLayer()
+        .whereLayer("Service").mayOnlyBeAccessedByLayers("Controller")
+        .whereLayer("Repository").mayOnlyBeAccessedByLayers("Service");
+
+assertThatCode(() -&gt; rule.check(classes)).doesNotThrowAnyException();</code></pre>
+          <div class="tablewrap" style="padding:12px 8px;margin:10px 0">
+            <svg viewBox="0 0 560 170" role="img" aria-label="허용된 계층 의존과 금지된 의존" style="display:block;width:100%;min-width:520px;height:auto;font-family:var(--sans)">
+              <defs>
+                <marker id="ti-arr-g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--good)"/></marker>
+                <marker id="ti-arr-b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--bad)"/></marker>
+              </defs>
+              <rect x="20" y="30" width="130" height="44" rx="8" style="fill:var(--accent-soft);stroke:var(--accent)"/>
+              <text x="85" y="57" text-anchor="middle" style="fill:var(--text);font-size:13px">SampleController</text>
+              <rect x="215" y="30" width="130" height="44" rx="8" style="fill:var(--accent-soft);stroke:var(--accent)"/>
+              <text x="280" y="57" text-anchor="middle" style="fill:var(--text);font-size:13px">SampleService</text>
+              <rect x="410" y="30" width="135" height="44" rx="8" style="fill:var(--accent-soft);stroke:var(--accent)"/>
+              <text x="477" y="57" text-anchor="middle" style="fill:var(--text);font-size:13px">SampleRepository</text>
+              <line x1="150" y1="52" x2="213" y2="52" style="stroke:var(--good);stroke-width:2" marker-end="url(#ti-arr-g)"/>
+              <line x1="345" y1="52" x2="408" y2="52" style="stroke:var(--good);stroke-width:2" marker-end="url(#ti-arr-g)"/>
+              <text x="182" y="22" text-anchor="middle" style="fill:var(--good);font-size:11px">허용</text>
+              <text x="377" y="22" text-anchor="middle" style="fill:var(--good);font-size:11px">허용</text>
+              <path d="M477,74 C477,120 85,120 85,76" style="fill:none;stroke:var(--bad);stroke-width:1.5;stroke-dasharray:5 4" marker-end="url(#ti-arr-b)"/>
+              <text x="280" y="118" text-anchor="middle" style="fill:var(--bad);font-size:11.5px">Repository → Controller 접근 = 규칙 위반 (AssertionError)</text>
+              <rect x="20" y="132" width="525" height="30" rx="8" style="fill:var(--warn-soft);stroke:var(--warn);stroke-dasharray:4 3"/>
+              <text x="282" y="152" text-anchor="middle" style="fill:var(--text);font-size:11.5px">legacy/LegacyNotificationService — 계층 밖이라 이 검증에서 제외 (import 대상 아님)</text>
+            </svg>
+          </div>
+          <dl class="kv">
+            <dt>legacy 제외 이유</dt><dd><code>mayOnlyBeAccessedByLayers</code>는 계층으로 정의되지 않은 패키지의 접근도 위반으로 잡기 때문(README). 그래서 <code>importPackages</code>에 controller/service/repository만 넣습니다.</dd>
+            <dt>주의</dt><dd>“위반 시 AssertionError”는 README 설명이며, 위반 예제로 실패를 확인하는 테스트는 없습니다(한계 참고).</dd>
+          </dl>
+        </div>
+        <div class="tabpanel card" id="ti-t4">
+          <h3>필드 주입 금지 규칙 <span class="badge bad">legacy에서 위반 탐지</span></h3>
+          <pre><code>// legacy/LegacyNotificationService — 일부러 위반
+@Service
+public class LegacyNotificationService {
+    @Autowired
+    private SampleRepository sampleRepository;
+}
+
+// CodingRuleTest
+JavaClasses classes = new ClassFileImporter().importPackages(BASE_PACKAGE + ".legacy");
+assertThatThrownBy(() -&gt; NO_CLASSES_SHOULD_USE_FIELD_INJECTION.check(classes))
+        .isInstanceOf(AssertionError.class);</code></pre>
+          <dl class="kv">
+            <dt>결과</dt><dd>controller/service/repository만 import → 통과(전부 생성자 주입). legacy만 import → <code>AssertionError</code>.</dd>
+            <dt>왜 금지</dt><dd>필수 의존성이 생성자에 드러나지 않고, 테스트에서 목 주입에 리플렉션이 필요하며, 순환 의존이 생성 시점에 드러나지 않습니다(README).</dd>
+          </dl>
+        </div>
+      </div>
+    </section>
+
+    <section id="results">
+      <h2><span class="num">04</span>결과·수치</h2>
+      <p class="sub">이 모듈은 성능 수치가 없습니다. 테스트가 단언하는 사실만 정리합니다.</p>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>테스트</th><th>단언 (검증된 사실)</th><th>결과</th></tr></thead>
+          <tbody>
+            <tr><td>DynamicPropertySourceTest</td><td>datasource URL ≠ <code>localhost:1</code>, username = <code>test</code>, <code>select database()</code> = <code>dynamic_property_source</code></td><td><span class="badge good">동적 값 우선</span></td></tr>
+            <tr><td>ContainerAnnotationLifecycleTest #1</td><td>@Container 없는 컨테이너 <code>isRunning()</code> = false</td><td><span class="badge warn">자동 시작 안 됨</span></td></tr>
+            <tr><td>ContainerAnnotationLifecycleTest #2</td><td>@Container 컨테이너 <code>isRunning()</code> = true, URL에 <code>managed_lifecycle</code></td><td><span class="badge good">JUnit이 시작</span></td></tr>
+            <tr><td>ManualContainerLifecycleTest</td><td><code>startCalled</code> = true, running, URL에 <code>manual_lifecycle</code></td><td><span class="badge good">수동 시작</span></td></tr>
+            <tr><td>LayeredArchitectureTest</td><td>3계층 규칙 <code>check()</code> 예외 없음</td><td><span class="badge good">통과</span></td></tr>
+            <tr><td>CodingRuleTest #1</td><td>생성자 주입 패키지 → 예외 없음</td><td><span class="badge good">통과</span></td></tr>
+            <tr class="hl"><td>CodingRuleTest #2</td><td>legacy 패키지 → <code>AssertionError</code></td><td><span class="badge bad">위반 탐지</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="source">출처: <code>src/test/java</code> 각 테스트의 단언문. 실행 시간 등 수치 기록은 README·코드 어디에도 없습니다.</div>
+    </section>
+
+    <section id="limits">
+      <h2><span class="num">05</span>한계·약점</h2>
+      <p class="sub">README가 스스로 밝힌 한계와, 코드에서 확인되는 약점.</p>
+      <details class="qa risk"><summary><span><span class="badge warn">README-코드 불일치</span> 케이스 1 README 스니펫이 실제 테스트와 다름</span></summary><div class="a"><p>README 스니펫에는 <code>@ActiveProfiles("dynamic-property-source")</code>와 <code>.withDatabaseName("dynamic_property_source").withUsername("test").withPassword("test")</code>가 없습니다. README만 보고 따라 하면 틀린 yml 프로필이 켜지지 않아 “틀린 값을 덮어쓴다”는 실험 의미가 사라지고, DB 이름 단언도 성립하지 않습니다. 실제 코드는 <code>DynamicPropertySourceTest.java</code>를 보세요.</p></div></details>
+      <details class="qa risk"><summary><span><span class="badge bad">코드</span> 계층 위반 음성 테스트 없음</span></summary><div class="a"><p>README는 “Repository가 Controller를 호출하면 <code>check()</code>가 AssertionError”라고 하지만, 위반 예제 코드와 그 실패를 단언하는 테스트는 없습니다. 필드 주입 규칙(CodingRuleTest)과 달리 규칙이 실제로 위반을 잡는지 증명되지 않습니다.</p></div></details>
+      <details class="qa risk"><summary><span><span class="badge bad">코드</span> “@Container 없으면 시작 안 됨” 테스트는 자명함</span></summary><div class="a"><p><code>new MySQLContainer(...)</code> 직후 <code>isRunning()</code>이 false인 것은 @Container와 무관하게 당연합니다. 비교 대상인 <code>notManagedMySQL</code>은 지역 변수라 애초에 확장이 관리할 수 없습니다. 어노테이션 유무의 차이를 보여 주려면 같은 위치(static 필드)에 어노테이션만 빼고 비교하는 편이 정확합니다.</p></div></details>
+      <details class="qa risk"><summary><span><span class="badge warn">README-코드 불일치</span> 수동 방식의 “Spring 프로퍼티 등록 책임”</span></summary><div class="a"><p>README는 수동 방식에서 선언·시작·종료·Spring 프로퍼티 등록 책임이 흩어진다고 설명하지만, <code>ManualContainerLifecycleTest</code>는 Spring 컨텍스트 없이 컨테이너만 다룹니다.</p></div></details>
+      <details class="qa risk"><summary><span><span class="badge bad">코드</span> 빌드 설정이 다른 모듈과 다름 · 컨테이너 재사용 없음</span></summary><div class="a"><ul><li><code>org.springframework.boot</code> 플러그인 3.4.1을 직접 적용하면서 BOM(<code>platform(...)</code>)도 함께 씁니다(버전이 루트 <code>dependencyVersions</code>와 별도로 하드코딩). spring, spring-data-jpa, spring-boot-actuator 등은 <code>java</code>(+<code>application</code>) 플러그인 + BOM 방식이라 모듈 간 빌드 방식이 섞여 있습니다.</li><li>세 테스트 클래스가 각각 MySQL 컨테이너를 띄워 느립니다(싱글톤/재사용 미적용).</li><li>Docker가 없으면 Testcontainers 테스트는 실행 불가(README: “Docker가 떠 있어야 한다”).</li></ul></div></details>
+      <details class="qa risk"><summary><span><span class="badge info">일반 지식</span> 다루지 않은 대안: @ServiceConnection</span></summary><div class="a"><p>Spring Boot 3.1+에서는 컨테이너 필드에 <code>@ServiceConnection</code>을 붙이면 datasource 프로퍼티 등록을 자동으로 해 줍니다. 이 모듈은 원리 학습을 위해 <code>@DynamicPropertySource</code>만 다룹니다.</p></div></details>
+    </section>
+
+    <section id="interview">
+      <h2><span class="num">06</span>면접 Q&amp;A</h2>
+      <p class="sub">질문을 먼저 읽고 스스로 답해 본 뒤 펼쳐 보세요.</p>
+      <div class="qa-tools"><button type="button" data-qa="open">모두 펼치기</button><button type="button" data-qa="close">모두 접기</button></div>
+      <details class="qa"><summary>@DynamicPropertySource는 왜 필요하고 왜 static이어야 하나요?</summary><div class="a"><p>컨테이너의 포트·JDBC URL은 실행할 때 정해지므로 yml에 미리 쓸 수 없습니다. 테스트 ApplicationContext가 만들어질 때 <code>DynamicPropertyRegistry</code>로 Environment에 값을 넣어 줍니다. 컨텍스트 생성 전에 호출되어야 해 static이고, 값은 Supplier라 컨테이너가 뜬 뒤 읽힙니다.</p></div></details>
+      <details class="qa"><summary>정적 yml과 동적 프로퍼티가 충돌하면 무엇이 이기나요? 어떻게 증명했나요?</summary><div class="a"><p>동적 프로퍼티가 이깁니다. 정적 값을 일부러 접속 불가능한 <code>localhost:1</code>/<code>wrong-user</code>로 두고, 테스트가 실제 DB에 연결해 <code>select database()</code> = <code>dynamic_property_source</code>를 받으면 동적 값이 쓰였다는 증거입니다.</p></div></details>
+      <details class="qa"><summary>H2 대신 Testcontainers로 실제 MySQL을 쓰는 이유는?</summary><div class="a"><p><span class="badge info">일반 지식</span> H2는 SQL 방언·락·격리 수준·함수가 MySQL과 달라 “테스트는 통과, 운영에선 실패”가 생깁니다. 운영과 같은 엔진·버전(<code>mysql:8.0.36</code>)으로 테스트해 이 차이를 없앱니다. 대가는 Docker 의존과 느린 기동입니다.</p></div></details>
+      <details class="qa"><summary>@Testcontainers/@Container는 컨테이너를 언제 시작·종료하나요?</summary><div class="a"><p><code>@Testcontainers</code> JUnit 확장이 <code>@Container</code> 필드를 찾아 관리합니다. <span class="badge info">일반 지식</span> static 필드면 테스트 클래스 시작 시 1번 시작해 클래스 끝에 종료, 인스턴스 필드면 테스트 메서드마다 시작/종료합니다. 이 모듈의 필드는 모두 static입니다.</p></div></details>
+      <details class="qa"><summary>여러 테스트 클래스가 컨테이너를 공유하려면?</summary><div class="a"><p>싱글톤 컨테이너 패턴: 추상 베이스 클래스의 <code>static {}</code>에서 한 번 start하고 stop하지 않습니다(JVM 종료 시 Ryuk가 정리). spring-data-jpa의 <code>MySQLContainerTest</code>가 이 방식이며, 클래스 단위로 컨테이너를 내리면 캐시된 Spring 컨텍스트가 죽은 포트를 가리키는 문제를 피합니다.</p></div></details>
+      <details class="qa"><summary>ArchUnit은 무엇을 기준으로 검사하나요?</summary><div class="a"><p>컴파일된 <code>.class</code> 파일을 <code>ClassFileImporter</code>로 읽어 의존 관계를 분석하고, <code>ArchRule.check(classes)</code>에서 위반이 있으면 <code>AssertionError</code>를 던집니다. 그래서 일반 단위 테스트처럼 CI에서 규칙 위반을 막을 수 있습니다.</p></div></details>
+      <details class="qa"><summary>필드 주입은 왜 지양하나요?</summary><div class="a"><ul><li>필수 의존성이 생성자 시그니처에 드러나지 않음 — 의존이 없는 상태로도 객체 생성 가능.</li><li>테스트에서 목을 넣으려면 리플렉션이나 Spring 컨텍스트가 필요.</li><li>순환 의존이 생성 시점에 드러나지 않음.</li><li><span class="badge info">일반 지식</span> 생성자 주입은 <code>final</code> 필드로 불변성도 보장.</li></ul></div></details>
+      <details class="qa"><summary><code>mayOnlyBeAccessedByLayers</code>를 쓸 때 legacy 패키지를 왜 import에서 뺐나요?</summary><div class="a"><p>이 규칙은 정의된 계층 외의 패키지가 접근하는 것도 위반으로 봅니다. legacy의 <code>LegacyNotificationService</code>가 <code>SampleRepository</code>를 쓰므로, 포함하면 계층 규칙이 깨집니다. 그래서 계층 검증은 3개 패키지만, 필드 주입 위반은 legacy만 따로 검사합니다.</p></div></details>
+    </section>
+
+    <section id="files">
+      <h2><span class="num">07</span>파일 지도</h2>
+      <p class="sub">코드를 다시 볼 때 여기서부터. (경로는 <code>labs/spring-test-infra/</code> 기준)</p>
+      <ul class="files">
+        <li><code>src/test/java/dev/deepdive/springtestinfra/dynamicproperty/DynamicPropertySourceTest.java</code><span>동적 datasource 주입 검증</span></li>
+        <li><code>src/test/resources/application-dynamic-property-source.yml</code><span>일부러 틀린 정적 datasource</span></li>
+        <li><code>src/test/java/dev/deepdive/springtestinfra/container/ContainerAnnotationLifecycleTest.java</code><span>@Container 유무 비교</span></li>
+        <li><code>src/test/java/dev/deepdive/springtestinfra/container/ManualContainerLifecycleTest.java</code><span>@BeforeAll start / @AfterAll stop</span></li>
+        <li><code>src/test/java/dev/deepdive/springtestinfra/archunit/LayeredArchitectureTest.java</code><span>Controller → Service → Repository 규칙</span></li>
+        <li><code>src/test/java/dev/deepdive/springtestinfra/archunit/CodingRuleTest.java</code><span>필드 주입 금지 통과/위반</span></li>
+        <li><code>src/main/java/dev/deepdive/springtestinfra/archunit/example/controller/SampleController.java</code><span>예제 계층 (생성자 주입)</span></li>
+        <li><code>src/main/java/dev/deepdive/springtestinfra/archunit/example/service/SampleService.java</code><span>예제 계층 (생성자 주입)</span></li>
+        <li><code>src/main/java/dev/deepdive/springtestinfra/archunit/example/repository/SampleRepository.java</code><span>예제 계층</span></li>
+        <li><code>src/main/java/dev/deepdive/springtestinfra/archunit/example/legacy/LegacyNotificationService.java</code><span>일부러 @Autowired 필드 주입</span></li>
+        <li><code>build.gradle</code><span>Boot 플러그인 3.4.1 직접 적용, Testcontainers, archunit-junit5 1.4.1</span></li>
+      </ul>
+    </section>
+
+    <footer>README와 소스 코드를 근거로 정리한 문서입니다. 수치는 README에 기록된 값이며, 테스트로 검증되지 않은 값은 그렇게 표기했습니다.</footer>
+  </main>
+</div>
+<script>
+/* ===== 공통 스크립트 (모든 모듈 overview.html에서 동일하게 유지) ===== */
+(function(){
+  var root=document.documentElement;
+  try{var saved=localStorage.getItem('deepdive-theme');if(saved)root.setAttribute('data-theme',saved);}catch(e){}
+  var tt=document.querySelector('.theme-toggle');
+  if(tt)tt.addEventListener('click',function(){
+    var cur=root.getAttribute('data-theme');
+    if(!cur)cur=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';
+    var next=cur==='dark'?'light':'dark';root.setAttribute('data-theme',next);
+    try{localStorage.setItem('deepdive-theme',next);}catch(e){}
+  });
+  document.querySelectorAll('[data-flow]').forEach(function(flow){
+    var steps=flow.querySelectorAll('.step');var detail=flow.nextElementSibling;
+    function show(btn){
+      steps.forEach(function(s){s.setAttribute('aria-selected',s===btn?'true':'false');});
+      if(detail)detail.querySelectorAll(':scope>div').forEach(function(d){d.classList.toggle('on',d.id===btn.dataset.target);});
+    }
+    steps.forEach(function(s){s.addEventListener('click',function(){show(s);});});
+    if(steps[0])show(steps[0]);
+  });
+  document.querySelectorAll('[data-tabs]').forEach(function(box){
+    var btns=box.querySelectorAll(':scope>.tabs>button');
+    function show(btn){
+      btns.forEach(function(b){b.setAttribute('aria-selected',b===btn?'true':'false');});
+      box.querySelectorAll(':scope>.tabpanel').forEach(function(p){p.classList.toggle('on',p.id===btn.dataset.target);});
+    }
+    btns.forEach(function(b){b.addEventListener('click',function(){show(b);});});
+    if(btns[0])show(btns[0]);
+  });
+  document.querySelectorAll('[data-qa]').forEach(function(b){
+    b.addEventListener('click',function(){
+      var sec=b.closest('section');var open=b.dataset.qa==='open';
+      sec.querySelectorAll('details.qa').forEach(function(d){d.open=open;});
+    });
+  });
+  var links=document.querySelectorAll('nav.toc a[href^="#"]');
+  if('IntersectionObserver' in window){
+    var io=new IntersectionObserver(function(es){es.forEach(function(e){
+      if(e.isIntersecting){links.forEach(function(l){l.classList.toggle('active',l.getAttribute('href')==='#'+e.target.id);});}
+    });},{rootMargin:'-20% 0px -70% 0px'});
+    document.querySelectorAll('main section[id]').forEach(function(s){io.observe(s);});
+  }
+})();
+</script>
+</body>
+</html>
