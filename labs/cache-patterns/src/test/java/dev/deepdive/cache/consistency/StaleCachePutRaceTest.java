@@ -61,4 +61,42 @@ class StaleCachePutRaceTest {
         assertThat(cache.get(1L)).contains(v2);
         assertThat(cache.rejectedPuts()).isEqualTo(1);
     }
+
+    @Test
+    void 버전_캐시는_evict_후에도_버전을_기억해_뒤늦은_stale_put을_거부한다() {
+        VersionedCache<Long, Product> cache = new VersionedCache<>();
+        Product v1 = new Product(1L, "keyboard", 120_000);
+        Product v2 = new Product(1L, "keyboard", 99_000);
+        cache.put(1L, 1L, v1);
+
+        // 읽기 A: 버전 1의 v1을 읽음(아직 put 전)
+        // 쓰기 B: 저장소를 버전 2로 갱신하고 캐시를 무효화(evict)
+        cache.evict(1L, 2L);
+        assertThat(cache.get(1L)).isEmpty();
+
+        // 읽기 A: 뒤늦게 버전 1의 v1을 put -> tombstone(버전 2)보다 낮아 거부
+        // (예전 구현은 evict가 버전까지 지워 이 put이 그대로 받아들여졌다)
+        cache.put(1L, 1L, v1);
+
+        assertThat(cache.get(1L)).isEmpty();
+        assertThat(cache.rejectedPuts()).isEqualTo(1);
+
+        // 이후 정상 읽기가 버전 2의 v2를 채우는 것은 허용
+        cache.put(1L, 2L, v2);
+        assertThat(cache.get(1L)).contains(v2);
+    }
+
+    @Test
+    void 버전_없는_evict도_지금까지_본_버전을_tombstone으로_남긴다() {
+        VersionedCache<Long, Product> cache = new VersionedCache<>();
+        Product v1 = new Product(1L, "keyboard", 120_000);
+        Product v2 = new Product(1L, "keyboard", 99_000);
+        cache.put(1L, 2L, v2);
+
+        cache.evict(1L);
+        cache.put(1L, 1L, v1);
+
+        assertThat(cache.get(1L)).isEmpty();
+        assertThat(cache.rejectedPuts()).isEqualTo(1);
+    }
 }

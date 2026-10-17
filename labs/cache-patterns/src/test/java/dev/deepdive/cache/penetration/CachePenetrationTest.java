@@ -4,6 +4,7 @@ import dev.deepdive.cache.aside.CacheAsideProductService;
 import dev.deepdive.cache.domain.Product;
 import dev.deepdive.cache.infrastructure.InMemoryCache;
 import dev.deepdive.cache.repository.InMemoryProductStore;
+import dev.deepdive.cache.support.MutableClock;
 import org.junit.jupiter.api.Test;
 
 import java.util.Optional;
@@ -17,6 +18,7 @@ class CachePenetrationTest {
 
     private static final long MISSING_ID = 99L;
     private static final int ATTEMPTS = 5;
+    private static final long NEGATIVE_TTL = 1_000L;
 
     @Test
     void 보호_없는_cache_aside는_없는_키를_매번_저장소로_관통시킨다() {
@@ -35,7 +37,7 @@ class CachePenetrationTest {
     @Test
     void negative_캐싱은_반복되는_저장소_조회를_막는다() {
         InMemoryProductStore store = new InMemoryProductStore(new Product(1L, "keyboard", 120_000));
-        NegativeCachingCache<Long, Product> cache = new NegativeCachingCache<>();
+        NegativeCachingCache<Long, Product> cache = new NegativeCachingCache<>(new MutableClock(0), NEGATIVE_TTL);
 
         for (int i = 0; i < ATTEMPTS; i++) {
             assertThat(cache.get(MISSING_ID, store::findById)).isEmpty();
@@ -44,6 +46,30 @@ class CachePenetrationTest {
         // 첫 조회에서 empty도 캐싱하므로 저장소는 단 1번만 조회된다.
         assertThat(store.readCount()).isEqualTo(1);
         assertThat(cache.hasNegativeEntry(MISSING_ID)).isTrue();
+    }
+
+    @Test
+    void negative_엔트리는_TTL이_지나면_만료되어_나중에_생긴_값을_가리지_않는다() {
+        InMemoryProductStore store = new InMemoryProductStore(new Product(1L, "keyboard", 120_000));
+        MutableClock clock = new MutableClock(0);
+        NegativeCachingCache<Long, Product> cache = new NegativeCachingCache<>(clock, NEGATIVE_TTL);
+
+        assertThat(cache.get(MISSING_ID, store::findById)).isEmpty();
+
+        // 없던 상품이 나중에 생성된다.
+        Product created = new Product(MISSING_ID, "mouse", 30_000);
+        store.save(created);
+
+        // TTL 안: empty 마커가 아직 hit -> 저장소를 다시 보지 않는다(짧은 동안은 새 값을 가림).
+        clock.advance(NEGATIVE_TTL - 1);
+        assertThat(cache.get(MISSING_ID, store::findById)).isEmpty();
+        assertThat(store.readCount()).isEqualTo(1);
+
+        // TTL 경과: negative 엔트리가 만료되어 저장소를 다시 조회 -> 새 값이 보인다.
+        clock.advance(1);
+        assertThat(cache.hasNegativeEntry(MISSING_ID)).isFalse();
+        assertThat(cache.get(MISSING_ID, store::findById)).contains(created);
+        assertThat(store.readCount()).isEqualTo(2);
     }
 
     @Test
