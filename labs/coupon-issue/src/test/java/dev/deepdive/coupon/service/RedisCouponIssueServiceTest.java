@@ -84,6 +84,28 @@ class RedisCouponIssueServiceTest extends RedisContainerTest {
     }
 
     @Test
+    void redis_분산락은_TTL_만료_후_다른_요청이_잡은_락을_지우지_않는다() {
+        String myToken = redisLockCouponIssueService.lock(REDIS_LOCK_KEY);
+
+        // 내 락이 TTL로 만료된 뒤 다른 요청이 같은 key로 새 락을 잡은 상황을 흉내 낸다.
+        redisTemplate.delete(REDIS_LOCK_KEY);
+        redisTemplate.opsForValue().set(REDIS_LOCK_KEY, "other-token");
+
+        boolean released = redisLockCouponIssueService.unlock(REDIS_LOCK_KEY, myToken);
+
+        assertThat(released).isFalse();
+        assertThat(redisTemplate.opsForValue().get(REDIS_LOCK_KEY)).isEqualTo("other-token");
+    }
+
+    @Test
+    void redis_분산락은_자기_토큰이면_해제된다() {
+        String myToken = redisLockCouponIssueService.lock(REDIS_LOCK_KEY);
+
+        assertThat(redisLockCouponIssueService.unlock(REDIS_LOCK_KEY, myToken)).isTrue();
+        assertThat(redisTemplate.hasKey(REDIS_LOCK_KEY)).isFalse();
+    }
+
+    @Test
     void redis_lua로_재고보다_많이_요청해도_재고가_음수가_되지_않는다() throws Exception {
         AtomicInteger issuedCount = new AtomicInteger();
         CountDownLatch start = new CountDownLatch(1);
