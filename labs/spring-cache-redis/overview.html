@@ -309,6 +309,7 @@ return loaded;</code></pre>
             <dt>왜 짧게</dt><dd>나중에 그 id의 책이 실제로 생기면 sentinel이 새 값을 가립니다. 정상 값(10분)보다 훨씬 짧은 30초.</dd>
             <dt>결과</dt><dd>999L을 20회 조회해도 <code>readCount</code> 1, 값 <code>"__NULL__"</code>, TTL 1~30초.</dd>
             <dt>비교</dt><dd>@Cacheable 쪽은 <code>cache-null-values: false</code> + <code>unless</code>라 없는 id는 매번 원본 조회(2회 → 2).</dd>
+            <dt>키 공유</dt><dd><span class="badge good">수정함</span> sentinel은 Book JSON과 같은 key(<code>book:{id}</code>)에 저장되므로, 일반 조회 <code>findBookById</code>도 sentinel을 먼저 확인해 <code>Optional.empty()</code>(없음 hit)로 돌려줍니다. 예전엔 JSON으로 파싱하려다 예외가 났습니다.</dd>
           </dl>
         </div>
 
@@ -318,15 +319,19 @@ return loaded;</code></pre>
     String key = "book:" + book.id();
     Duration ttl = baseTtl;
     if (!maxJitter.isZero() &amp;&amp; !maxJitter.isNegative()) {
-        long jitterMillis = Math.floorMod(key.hashCode(), maxJitter.toMillis() + 1);
-        ttl = baseTtl.plusMillis(jitterMillis);
+        ttl = baseTtl.plusMillis(jitterMillis(key, maxJitter.toMillis()));
     }
     redisTemplate.opsForValue().set(key, objectMapper.writeValueAsString(book), ttl);
+}
+
+// hash를 SplitMix64 finalizer로 섞은 뒤 나머지 → 인접 key도 범위 전체로 흩어짐
+static long jitterMillis(String key, long maxJitterMillis) {
+    return Math.floorMod(mix(key.hashCode()), maxJitterMillis + 1);
 }</code></pre>
           <dl class="kv">
-            <dt>어떻게</dt><dd>key의 <code>hashCode</code>로 0~maxJitter ms를 결정적으로 더함. 테스트는 base 60초, jitter 10초.</dd>
-            <dt>결과</dt><dd><code>RedisTemplateBookCacheTest</code>: 5개 키 TTL이 모두 50~70초 범위이고, 서로 다른 값이 2개 이상.</dd>
-            <dt>함정</dt><dd>연속 id는 <code>"book:1"</code>~<code>"book:5"</code>의 hashCode가 1씩 차이 나서 jitter도 1ms씩만 다릅니다(결과·수치 섹션 참고). 테스트는 통과하지만 분산 효과는 거의 없음.</dd>
+            <dt>어떻게</dt><dd>key의 <code>hashCode</code>를 섞어(SplitMix64) 0~maxJitter ms를 결정적으로 더함(같은 key면 항상 같은 jitter). 테스트는 base 60초, jitter 10초.</dd>
+            <dt>결과</dt><dd><code>RedisTemplateBookCacheTest</code>: 5개 키 TTL이 모두 50~70초 범위, 서로 다른 값 2개 이상, <b>최대-최소 차이 5초 초과</b>. 인접 key 100개의 jitter가 1초 단위 구간 9개 이상에 퍼지는지도 확인.</dd>
+            <dt>함정 <span class="badge good">수정함</span></dt><dd>예전엔 <code>key.hashCode()</code>를 그대로 나머지 연산해서, 연속 id <code>"book:1"</code>~<code>"book:5"</code>의 jitter가 133~137ms로 1ms씩만 달랐습니다(분산 효과 거의 없음). 테스트도 "값이 2개 이상 다름"만 봐서 드러나지 않았습니다.</dd>
           </dl>
         </div>
 
@@ -422,16 +427,16 @@ return Optional.empty();</code></pre>
         </div>
       </div>
       <div class="card" style="margin-top:12px">
-        <h3 style="margin-top:0">TTL Jitter — 테스트 입력의 실제 jitter (코드로 계산한 값)</h3>
-        <p class="sub">base 60초 + <code>floorMod("book:N".hashCode(), 10001)</code> ms. 막대 길이 = jitter / 최대 10,000ms.</p>
+        <h3 style="margin-top:0">TTL Jitter — 테스트 입력의 실제 jitter (코드로 계산한 값) <span class="badge good">수정함</span></h3>
+        <p class="sub">base 60초 + <code>floorMod(mix("book:N".hashCode()), 10001)</code> ms. 막대 길이 = jitter / 최대 10,000ms.</p>
         <div class="bars">
-          <div class="bar warn" style="--v:.0133"><span>book:1</span><div class="track"><div class="fill"></div></div><span class="val">+133 ms</span></div>
-          <div class="bar warn" style="--v:.0134"><span>book:2</span><div class="track"><div class="fill"></div></div><span class="val">+134 ms</span></div>
-          <div class="bar warn" style="--v:.0135"><span>book:3</span><div class="track"><div class="fill"></div></div><span class="val">+135 ms</span></div>
-          <div class="bar warn" style="--v:.0136"><span>book:4</span><div class="track"><div class="fill"></div></div><span class="val">+136 ms</span></div>
-          <div class="bar warn" style="--v:.0137"><span>book:5</span><div class="track"><div class="fill"></div></div><span class="val">+137 ms</span></div>
+          <div class="bar good" style="--v:.0483"><span>book:1</span><div class="track"><div class="fill"></div></div><span class="val">+483 ms</span></div>
+          <div class="bar good" style="--v:.886"><span>book:2</span><div class="track"><div class="fill"></div></div><span class="val">+8,860 ms</span></div>
+          <div class="bar good" style="--v:.7524"><span>book:3</span><div class="track"><div class="fill"></div></div><span class="val">+7,524 ms</span></div>
+          <div class="bar good" style="--v:.8673"><span>book:4</span><div class="track"><div class="fill"></div></div><span class="val">+8,673 ms</span></div>
+          <div class="bar good" style="--v:.0533"><span>book:5</span><div class="track"><div class="fill"></div></div><span class="val">+533 ms</span></div>
         </div>
-        <div class="source">출처: Java <code>String.hashCode</code> 규칙으로 직접 계산(측정 아님). 테스트는 "50~70초 범위 + 서로 다른 값 2개 이상"만 단언하므로 통과하지만, 10초 jitter 중 실제로 쓰인 폭은 5ms.</div>
+        <div class="source">출처: <code>String.hashCode</code> + SplitMix64 finalizer로 직접 계산(측정 아님). 예전 구현(<code>floorMod(hashCode, 10001)</code>)은 같은 다섯 key가 +133~137ms로 5ms 안에 몰렸습니다. 지금은 약 0.5~8.9초로 퍼지고, 테스트가 TTL 차이 5초 초과를 단언합니다.</div>
       </div>
     </section>
 
@@ -441,11 +446,11 @@ return Optional.empty();</code></pre>
       <details class="qa risk"><summary><span><span class="badge info">README 인정</span> 대기 요청의 empty는 "없음"과 "시간 초과"를 구분하지 못한다</span></summary><div class="a"><p>대기 루프는 sleep만 약 1초(10ms × 100), 락 TTL은 3초. 원본 조회가 대기보다 오래 걸리면 대기 요청은 캐시가 곧 채워지더라도 먼저 <code>Optional.empty()</code>를 받습니다. 호출자는 "책이 없다"로 오해할 수 있습니다(코드 주석도 인정).</p></div></details>
       <details class="qa risk"><summary><span><span class="badge info">README 인정</span> 락 경로는 없는 책을 캐싱하지 않는다</span></summary><div class="a"><p><code>findWithDistributedLock</code>은 Negative Caching을 하지 않아, 없는 id를 반복 조회하면 매번 락을 잡고 원본을 다시 확인합니다. Null sentinel은 <code>findBookByIdWithNullCaching</code>에만 있습니다.</p></div></details>
       <details class="qa risk"><summary><span><span class="badge info">README 인정</span> @Cacheable은 분산 락이 아니다</span></summary><div class="a"><p>"기본 <code>RedisCacheManager</code>는 non-locking이므로 <code>@Cacheable</code>이 분산 락을 대신하지는 않는다." Spring Cache 경로에는 stampede 방어가 없습니다.</p></div></details>
-      <details class="qa risk"><summary><span><span class="badge warn">코드 확인</span> TTL Jitter가 연속 키에서는 거의 0</span></summary><div class="a"><p><code>"book:1"</code>~<code>"book:5"</code>는 마지막 글자만 다르므로 hashCode가 1씩 차이 → jitter가 133~137ms로 5ms 안에 몰립니다. 의도한 0~10초 분산이 안 됩니다. 테스트 단언("값이 2개 이상 다름")이 약해서 드러나지 않습니다. 또 jitter는 일괄 적재 헬퍼 <code>cacheBooksWithJitter</code>에만 있고, 실제 조회 경로(<code>findBookById</code>, @Cacheable 10m)는 고정 TTL입니다.</p></div></details>
-      <details class="qa risk"><summary><span><span class="badge warn">코드 확인</span> <code>__NULL__</code> sentinel이 일반 조회 경로와 키를 공유한다</span></summary><div class="a"><p><code>findBookByIdWithNullCaching</code>과 <code>findBookById</code>는 같은 키 <code>book:{id}</code>를 씁니다. sentinel이 저장된 상태에서 <code>findBookById</code>를 부르면 <code>"__NULL__"</code>을 JSON으로 파싱하려다 <code>IllegalStateException("Book deserialization failed")</code>가 납니다. 한 키 공간에 쓰는 모든 경로가 sentinel을 알아야 합니다.</p></div></details>
+      <details class="qa risk"><summary><span><span class="badge warn">코드 확인</span> <span class="badge good">수정함</span> TTL Jitter가 연속 키에서는 거의 0</span></summary><div class="a"><p>예전엔 <code>"book:1"</code>~<code>"book:5"</code>가 마지막 글자만 달라 hashCode가 1씩 차이 → jitter가 133~137ms로 5ms 안에 몰렸고, 테스트 단언("값이 2개 이상 다름")이 약해 드러나지 않았습니다.</p><p>수정: hash를 SplitMix64 finalizer로 섞은 뒤 나머지를 취해 결정성은 유지하면서 범위 전체로 퍼지게 했고, 테스트가 TTL 차이 5초 초과와 key 100개의 구간 분포를 단언합니다.</p><p>남은 점: jitter는 일괄 적재 헬퍼 <code>cacheBooksWithJitter</code>에만 있고, 실제 조회 경로(<code>findBookById</code>, @Cacheable 10m)는 고정 TTL입니다.</p></div></details>
+      <details class="qa risk"><summary><span><span class="badge warn">코드 확인</span> <span class="badge good">수정함</span> <code>__NULL__</code> sentinel이 일반 조회 경로와 키를 공유한다</span></summary><div class="a"><p><code>findBookByIdWithNullCaching</code>과 <code>findBookById</code>는 같은 키 <code>book:{id}</code>를 씁니다. 예전엔 sentinel이 저장된 상태에서 <code>findBookById</code>를 부르면 <code>"__NULL__"</code>을 JSON으로 파싱하려다 <code>IllegalStateException("Book deserialization failed")</code>가 났습니다.</p><p>수정: <code>findBookById</code>도 sentinel을 먼저 확인해 <code>Optional.empty()</code>(없음 hit, 원본 조회 없음)로 돌려줍니다. 테스트가 sentinel을 남긴 뒤 일반 조회를 호출해 예외 없이 빈 결과와 원본 조회 1회를 확인합니다. 대안(별도 key namespace)의 장단점은 README에 적었습니다.</p></div></details>
       <details class="qa risk"><summary><span><span class="badge warn">코드 확인</span> 쓰기·무효화 경로가 없다</span></summary><div class="a"><p>README 표는 <code>@CachePut</code>/<code>@CacheEvict</code>의 장점을 소개하지만, 이 모듈에는 책을 수정하고 캐시를 갱신/삭제하는 메서드가 하나도 없습니다. 캐시 일관성(쓰기 후 무효화, race)은 검증되지 않습니다(→ <code>labs/cache-patterns</code>, <code>labs/spring-cache-local</code>).</p></div></details>
       <details class="qa risk"><summary><span><span class="badge warn">코드 확인</span> 분산 락의 운영 이슈는 범위 밖</span></summary><div class="a"><ul><li>락 연장(lease renewal) 없음: 원본 조회가 3초를 넘기면 락이 풀려 두 번째 요청도 DB를 칠 수 있음(토큰 덕에 남의 락을 지우진 않음).</li><li>대기는 <code>Thread.sleep</code> 폴링이라 대기 요청마다 스레드를 붙잡음.</li><li>단일 Redis 컨테이너 기준. Redis 장애·복제 지연 시 동작은 다루지 않음.</li></ul></div></details>
-      <details class="qa risk"><summary><span><span class="badge warn">코드 확인</span> README API 표와 실제 사용 범위의 차이</span></summary><div class="a"><p>README의 RedisTemplate API 표에는 List(<code>opsForList</code>), Set(<code>opsForSet</code>)이 있지만 코드에서는 javadoc 주석으로만 언급되고 호출되지 않습니다. 실제 사용은 String, Hash, Sorted Set(<code>RedisBasicCommandTest</code>)뿐입니다.</p></div></details>
+      <details class="qa risk"><summary><span><span class="badge warn">코드 확인</span> <span class="badge good">수정함</span> README API 표와 실제 사용 범위의 차이</span></summary><div class="a"><p>예전 README의 RedisTemplate API 표에는 List(<code>opsForList</code>), Set(<code>opsForSet</code>)이 있었지만 코드에서는 javadoc 주석으로만 언급되고 호출되지 않았습니다. 실제 사용은 String, Hash, Sorted Set(<code>RedisBasicCommandTest</code>)뿐입니다.</p><p>수정: README 표를 실제로 호출하는 API(String·<code>setIfAbsent</code>, Hash, Sorted Set, 삭제)만 남기고, List·Set은 "이 모듈에서는 다루지 않음"으로 한 줄 안내했습니다.</p></div></details>
     </section>
 
     <section id="interview">
@@ -459,7 +464,7 @@ return Optional.empty();</code></pre>
       <details class="qa"><summary>Redis로 분산 락을 어떻게 구현했나? 각 요소의 이유는?</summary><div class="a"><ul><li><code>SET lockKey token NX EX 3</code>: NX로 한 명만 획득(원자적), EX로 소유자가 죽어도 자동 해제.</li><li>UUID 토큰 + Lua(GET 비교 후 DEL): 내 락만 해제. Java에서 GET/DEL을 따로 하면 그 사이에 락이 바뀔 수 있음.</li><li>락 획득 후 double-check: 첫 GET과 락 사이에 다른 요청이 이미 채웠을 수 있음.</li><li>결과: 40 동시 요청에 원본 조회 1회(락 없으면 &gt;1).</li></ul></div></details>
       <details class="qa"><summary>(꼬리) 원본 조회가 락 TTL(3초)보다 오래 걸리면?</summary><div class="a"><ul><li>락이 만료돼 다른 요청이 락을 얻고 DB를 또 조회 → 중복 로드. 토큰 덕분에 먼저 끝난 요청이 새 락을 지우지는 않음.</li><li>대기 요청은 약 1초 후 empty 반환 → "없음"으로 오해 가능(README 인정).</li><li><span class="badge info">일반 지식</span> 대응: 작업 시간보다 넉넉한 TTL, 락 자동 연장(Redisson watchdog), 대기 타임아웃 시 원본 직접 조회 또는 별도 예외/상태 반환, 정합성이 중요한 쓰기 락엔 fencing token.</li></ul></div></details>
       <details class="qa"><summary>@Cacheable(sync = true)로 핫키 문제를 해결할 수 있나?</summary><div class="a"><ul><li>README: 기본 <code>RedisCacheManager</code>는 non-locking → <code>@Cacheable</code>이 분산 락을 대신하지 않음.</li><li><span class="badge info">일반 지식</span> <code>sync = true</code>는 같은 애플리케이션 인스턴스 안에서 같은 키의 동시 로드를 막는 힌트. 서버가 여러 대면 서버 수만큼 로드는 여전히 발생 → 진짜 1회가 필요하면 Redis 락 같은 분산 조정이 필요.</li></ul></div></details>
-      <details class="qa"><summary>TTL Jitter는 왜 하고, 이 구현의 문제는?</summary><div class="a"><ul><li>같은 TTL로 대량 적재하면 같은 순간에 만료 → DB 폭주(Avalanche). TTL을 키마다 다르게.</li><li>이 구현: <code>floorMod(key.hashCode(), maxJitter+1)</code> — 결정적이라 테스트하기 쉽지만, 연속 id는 hashCode가 1씩 달라 jitter가 133~137ms로 몰림.</li><li>개선: <code>ThreadLocalRandom</code> 난수, 또는 해시를 섞는 함수(예: 해시 결과에 믹싱) 사용. 테스트는 분포 폭까지 단언해야 함.</li></ul></div></details>
+      <details class="qa"><summary>TTL Jitter는 왜 하고, 이 구현의 문제는?</summary><div class="a"><ul><li>같은 TTL로 대량 적재하면 같은 순간에 만료 → DB 폭주(Avalanche). TTL을 키마다 다르게.</li><li>예전 구현: <code>floorMod(key.hashCode(), maxJitter+1)</code> — 결정적이라 테스트하기 쉽지만, 연속 id는 hashCode가 1씩 달라 jitter가 133~137ms로 몰림.</li><li>지금 <span class="badge good">수정함</span>: 해시를 SplitMix64 finalizer로 섞어 결정성을 유지하며 분산. 테스트가 분포 폭(차이 5초 초과, 구간 9개 이상)까지 단언. 대안은 <code>ThreadLocalRandom</code> 난수(대신 같은 key의 TTL이 매번 달라지고 테스트에 시드 주입 필요).</li></ul></div></details>
       <details class="qa"><summary>통합 테스트 환경은 어떻게 구성했나?</summary><div class="a"><ul><li><code>RedisAndMySqlContainerTest</code>: <code>redis:7.2.5</code>(GenericContainer) + <code>mysql:8.0.36</code>을 띄우고 <code>@DynamicPropertySource</code>로 매핑 포트 주입.</li><li>매 테스트 전 <code>flushAll</code>로 Redis 비움, 클래스 끝나면 <code>@DirtiesContext(AFTER_CLASS)</code>로 컨텍스트 폐기.</li><li><code>@Testcontainers(disabledWithoutDocker = true)</code>: Docker 없으면 skip.</li><li>원본 지연은 <code>BookOriginService.resetMetrics(Duration)</code>으로 80ms 주입해 동시 miss 창을 넓힘.</li></ul></div></details>
     </section>
 
@@ -472,12 +477,12 @@ return Optional.empty();</code></pre>
         <li><code>src/main/java/dev/deepdive/springcacheredis/config/RedisCacheConfig.java</code><span>JSON value serializer 설정</span></li>
         <li><code>src/main/java/dev/deepdive/springcacheredis/config/JacksonConfig.java</code><span>공용 ObjectMapper Bean</span></li>
         <li><code>src/main/java/dev/deepdive/springcacheredis/book/cache/SpringCacheBookService.java</code><span>@Cacheable 버전</span></li>
-        <li><code>src/main/java/dev/deepdive/springcacheredis/book/cache/RedisTemplateBookCacheService.java</code><span>수동 Cache Aside, Null caching, TTL Jitter</span></li>
+        <li><code>src/main/java/dev/deepdive/springcacheredis/book/cache/RedisTemplateBookCacheService.java</code><span>수동 Cache Aside(sentinel 인식), Null caching, TTL Jitter(해시 믹싱)</span></li>
         <li><code>src/main/java/dev/deepdive/springcacheredis/book/cache/RedisHotKeyBookCacheService.java</code><span>락 없음 vs SET NX 분산 락</span></li>
         <li><code>src/main/java/dev/deepdive/springcacheredis/book/service/BookOriginService.java</code><span>원본 조회 + readCount + 지연 주입</span></li>
         <li><code>src/main/java/dev/deepdive/springcacheredis/learning/RedisTemplateLearningService.java</code><span>opsForValue / opsForHash 학습용</span></li>
         <li><code>src/test/java/dev/deepdive/springcacheredis/book/cache/SpringCacheBookServiceTest.java</code><span>miss/hit, JSON, TTL, empty 미캐싱</span></li>
-        <li><code>src/test/java/dev/deepdive/springcacheredis/book/cache/RedisTemplateBookCacheTest.java</code><span>Cache Aside, Null caching, Jitter</span></li>
+        <li><code>src/test/java/dev/deepdive/springcacheredis/book/cache/RedisTemplateBookCacheTest.java</code><span>Cache Aside, Null caching, sentinel 키 공유, Jitter 분포</span></li>
         <li><code>src/test/java/dev/deepdive/springcacheredis/book/cache/RedisHotKeyLockTest.java</code><span>40스레드 핫키, 락 유무 비교</span></li>
         <li><code>src/test/java/dev/deepdive/springcacheredis/learning/RedisTemplateLearningTest.java</code><span>SET/GET/TTL/SET NX/Hash</span></li>
         <li><code>src/test/java/dev/deepdive/springcacheredis/RedisBasicCommandTest.java</code><span>기본 명령, ZSet, INFO</span></li>

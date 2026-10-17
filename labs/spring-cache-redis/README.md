@@ -10,7 +10,7 @@ MySQL/JPA를 원본 저장소로 두고, Spring Cache 추상화와 `StringRedisT
 | `SpringCacheBookServiceTest` | `@Cacheable`의 cache miss/hit, Redis JSON 저장, 빈 `Optional` 미캐싱 |
 | `RedisTemplateLearningTest` | 문자열, TTL, `SET NX`, Hash를 `StringRedisTemplate`으로 다루는 방법 |
 | `RedisBasicCommandTest` | Redis 기본 명령, sorted set, `INFO` 확인 |
-| `RedisTemplateBookCacheTest` | Cache Aside, Null Caching, TTL Jitter |
+| `RedisTemplateBookCacheTest` | Cache Aside, Null Caching(sentinel을 일반 조회도 인식), TTL Jitter(분산 폭 검증) |
 | `RedisHotKeyLockTest` | 동시 cache miss와 Redis 분산 락 |
 
 ## 어떤 환경에서 실행되나?
@@ -30,14 +30,16 @@ Docker가 없으면 컨테이너 기반 테스트는 skip된다.
 
 `StringRedisTemplate`은 key와 value를 문자열로 직렬화하는 `RedisTemplate`이다. 먼저 Redis 자료형에 맞는 `opsFor...()` API를 고른 뒤 명령을 호출한다.
 
+아래 표는 이 모듈의 코드·테스트에서 실제로 호출하는 API만 정리했다.
+
 | Redis 자료형 | `StringRedisTemplate` API | 대표 Redis 명령 |
 | --- | --- | --- |
-| String | `opsForValue().set()`, `get()` | `SET`, `GET` |
+| String | `opsForValue().set()`, `get()`, `setIfAbsent()` | `SET`, `GET`, `SET NX` |
 | Hash | `opsForHash().put()`, `entries()` | `HSET`, `HGETALL` |
-| List | `opsForList().leftPush()`, `range()` | `LPUSH`, `LRANGE` |
-| Set | `opsForSet().add()`, `members()` | `SADD`, `SMEMBERS` |
 | Sorted Set | `opsForZSet().add()`, `reverseRange()` | `ZADD`, `ZREVRANGE` |
 | 키 삭제 | `delete(key)` | `DEL` |
+
+List(`opsForList()` → `LPUSH`/`LRANGE`)와 Set(`opsForSet()` → `SADD`/`SMEMBERS`)도 같은 방식으로 고르지만 이 모듈에서는 다루지 않는다. (Set으로 선점하는 예시는 `seat-reservation` 모듈 참고)
 
 ## Spring Cache 추상화도 Redis와 함께 사용하나?
 
@@ -402,6 +404,10 @@ sequenceDiagram
     Note over MySQL: MySQL 조회는 처음 한 번
 ```
 
+`__NULL__` sentinel은 Book JSON과 **같은 key**(`book:{id}`)에 저장된다. 그래서 이 key를 읽는 메서드는 모두 sentinel을 먼저 확인해야 한다. 일반 조회인 `findBookById()`도 sentinel을 만나면 JSON으로 파싱하지 않고 `Optional.empty()`(없음 hit)를 돌려준다. 예전에는 `findBookById()`가 sentinel을 JSON으로 읽으려다 `Book deserialization failed`로 실패할 수 있었다. (테스트: `Null_sentinel이_남은_key를_일반_조회해도_JSON_파싱_실패_없이_빈_결과를_돌려준다`)
+
+대안은 sentinel을 `book:null:{id}`처럼 다른 key namespace에 두는 것이다. 그러면 읽는 쪽이 sentinel을 몰라도 안전하지만, 조회 한 번에 key를 두 개 확인해야 하고, 책이 생성될 때 두 key를 모두 정리해야 한다.
+
 ### TTL Jitter는 만료 시점을 어떻게 분산하나?
 
 ```mermaid
@@ -422,12 +428,19 @@ sequenceDiagram
 
     Test->>Service: cacheBooksWithJitter(books, 60초, 10초)
     loop 책마다
-        Service->>Service: key hash로 jitter 계산
+        Service->>Service: key hash를 섞어(SplitMix64) jitter 계산
         Service->>Redis: SET book:id JSON EX 60~70초
     end
     Test->>Redis: TTL book:1 ... book:5 조회
     Redis-->>Test: 서로 다른 TTL
 ```
+
+jitter는 key마다 결정론적이다(같은 key면 항상 같은 jitter). 다만 `key.hashCode()`를 그대로 `floorMod`하면 안 된다. `"book:1"`~`"book:5"`처럼 끝 글자만 다른 key는 hash가 1씩 차이 나서, 10초 범위를 의도해도 jitter가 `133~137ms` 안에 몰린다(만료가 거의 동시에 일어나 jitter 효과가 없음). 그래서 hash를 SplitMix64 finalizer로 섞은 뒤 나머지를 취한다. 같은 다섯 key의 jitter가 약 `0.5~8.9초`로 퍼진다.
+
+테스트 포인트:
+
+- `book:1`~`book:5`의 TTL 차이(최대-최소)가 5초보다 크다
+- 인접한 key 100개의 jitter가 0~10초를 1초 단위로 나눈 구간 중 9개 이상에 들어간다
 
 ### `RedisHotKeyLockTest`에서 락이 없으면 어떻게 되나?
 
