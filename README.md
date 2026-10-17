@@ -46,4 +46,4 @@
 ./gradlew :payment-system-ledger-service:test   # 장부 모듈만
 ```
 
-`payment-system` 테스트는 로컬 MySQL·Kafka가 필요해서 기본 실행(CI 포함)에서는 제외된다. 포함하려면 `-PincludeIntegration`을 붙인다.
+`payment-system` 테스트도 Testcontainers로 MySQL·Kafka를 직접 띄워 기본 실행(CI 포함)에서 돈다. 실제 Toss 테스트 서버를 부르는 `TossPaymentExecutorTest`만 제외되고, `-PincludeIntegration`을 붙이면 포함된다.
