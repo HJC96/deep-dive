@@ -526,6 +526,34 @@ findBookSummary(1L, "en") -> key = 1L
 
 실제 운영에서는 `max(updated_at)` 조회가 가벼워야 하므로 `updated_at` 인덱스를 함께 둔다. 만약 공통코드 그룹 같은 구분 컬럼이 있는 구조라면 `(group_key, updated_at)` 형태의 복합 인덱스를 고려할 수 있다. 이 샘플의 `books` 테이블도 `idx_books_updated_at` 인덱스를 만든다.
 
+테이블 버전 키의 대가(알고 쓰는 트레이드오프):
+
+- 옛 세대 키는 **지워지지 않는다.** 버전이 바뀌면 새 키로 miss가 날 뿐, `{옛 updatedAt, id}` 엔트리는 그대로 남는다. 테스트도 갱신 뒤 `bookNameByTableVersion`에 엔트리가 2개(옛 세대 + 새 세대)인 것을 확인한다.
+- `ConcurrentMapCacheManager`는 TTL·최대 크기·eviction이 없어서, 테이블이 자주 바뀌면 옛 세대가 계속 쌓여 메모리가 늘어난다.
+- 그래서 이 방식은 공통코드처럼 **드물게 바뀌는 작은 테이블**에만 맞고, 실제로 쓸 때는 Caffeine처럼 `expireAfterWrite`/`maximumSize`가 있는 캐시 매니저와 함께 써서 옛 세대가 자연히 빠지게 한다.
+- 조회할 때마다 `max(updatedAt)` 쿼리가 한 번씩 나간다(캐시 hit이어도). 키를 만들려면 버전을 먼저 알아야 하기 때문이다.
+
+## 같은 데이터를 담는 캐시가 여러 개일 때
+
+`BookLookupService`는 같은 책을 세 가지 모양으로 캐싱한다: `bookById`(Book 전체), `bookName`(이름), `bookSummary`(이름으로 만든 요약). 이름을 바꾸는 쓰기가 `bookById`만 갱신하면 나머지 두 캐시에는 옛 이름이 남는다.
+
+그래서 쓰기 메서드는 관련 캐시를 함께 무효화한다.
+
+```java
+@Caching(
+        put = @CachePut(cacheNames = "bookById", key = "#book.id"),
+        evict = @CacheEvict(cacheNames = {"bookName", "bookSummary"}, key = "#book.id")
+)
+public Book updateBook(Book book)
+
+@CacheEvict(cacheNames = {"bookById", "bookName", "bookSummary"}, key = "#id")
+public Book renameBookAndEvictCache(long id, String name)
+```
+
+- `@CacheEvict`/`@CachePut`의 `cacheNames`에 여러 캐시를 나열하면 같은 key로 모두 적용된다.
+- put과 evict를 한 메서드에 함께 걸려면 `@Caching`으로 묶는다.
+- 테스트: `updateBook은_이름을_담은_다른_캐시_bookName_bookSummary도_무효화한다`, `renameBookAndEvictCache는_bookById_bookName_bookSummary를_함께_무효화한다`
+
 ## 한계
 
 로컬 캐시는 서버 하나의 메모리에 의존한다.

@@ -6,6 +6,7 @@ import java.util.NoSuchElementException;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -52,12 +53,18 @@ public class BookLookupService {
         return List.of(1L, 2L);
     }
 
-    @CachePut(cacheNames = "bookById", key = "#book.id")
+    // 같은 책을 다른 모양으로 담는 캐시(bookName, bookSummary)도 함께 무효화해야 이름 변경 후 stale 값이 남지 않는다.
+    // bookById는 결과로 덮어쓰고(CachePut), 나머지는 다음 조회에서 새로 적재되도록 지운다(CacheEvict).
+    @Caching(
+            put = @CachePut(cacheNames = "bookById", key = "#book.id"),
+            evict = @CacheEvict(cacheNames = {"bookName", "bookSummary"}, key = "#book.id")
+    )
     public Book updateBook(Book book) {
         return bookRepository.save(BookEntity.from(book)).toBook();
     }
 
-    @CacheEvict(cacheNames = "bookById", key = "#id")
+    // 이름이 바뀌면 bookById뿐 아니라 이름을 담는 bookName, 이름으로 만든 bookSummary도 stale이 된다.
+    @CacheEvict(cacheNames = {"bookById", "bookName", "bookSummary"}, key = "#id")
     public Book renameBookAndEvictCache(long id, String name) {
         Book before = findBookDirectly(id);
         Book after = new Book(id, name, before.price(), before.updatedAt());
