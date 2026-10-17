@@ -26,6 +26,13 @@ public class QueryCountInterceptor implements HandlerInterceptor {
     /** 요청당 쿼리 수 분포. 여기에 P50·P95 같은 백분위가 붙는다. */
     private static final String QUERIES_PER_REQUEST = "jpa.queries.per_request";
 
+    /**
+     * 매칭된 패턴이 없을 때 쓰는 고정 uri tag. 원시 URI로 폴백하면 패턴 없는 요청마다
+     * 새 시계열이 생겨 패턴 태깅으로 막으려던 카디널리티 폭발이 그대로 돌아온다.
+     * Spring Boot의 {@code http.server.requests}도 같은 경우 {@code UNKNOWN}을 쓴다.
+     */
+    static final String UNKNOWN_URI = "UNKNOWN";
+
     private final MeterRegistry meterRegistry;
 
     public QueryCountInterceptor(MeterRegistry meterRegistry) {
@@ -77,14 +84,14 @@ public class QueryCountInterceptor implements HandlerInterceptor {
     }
 
     /**
-     * 핸들러 매핑이 골라 둔 best-matching 패턴을 꺼낸다. 정적 리소스 등 패턴이 없는
-     * 요청은 원시 URI로 폴백한다.
+     * 핸들러 매핑이 골라 둔 best-matching 패턴을 꺼낸다. 패턴이 없는 요청은 원시 URI가 아니라
+     * 고정값 {@link #UNKNOWN_URI}로 묶는다.
      */
     private String resolveUriPattern(HttpServletRequest request) {
         Object pattern = request.getAttribute(HandlerMapping.BEST_MATCHING_PATTERN_ATTRIBUTE);
         if (pattern instanceof String s && !s.isBlank()) {
             return s;
         }
-        return request.getRequestURI();
+        return UNKNOWN_URI;
     }
 }

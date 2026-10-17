@@ -85,8 +85,10 @@ productService.decreaseStockAndSave(fresh);      // DB version도 0 → 일치 �
 
 이유:
 
-- 읽어 둔 스냅샷의 version(0)과 DB의 version(0)이 일치
-- `saveAndFlush`의 merge가 `UPDATE ... WHERE version = 0`을 실행 → `affected rows = 1` → 성공
+- `saveAndFlush`는 detached 엔티티를 `merge`한다. merge는 먼저 `SELECT`로 현재 행을 읽어 온다
+- 읽어 둔 스냅샷의 version(0)과 방금 읽은 DB의 version(0)이 일치 → 스냅샷 값을 복사
+- flush 때 `UPDATE ... WHERE id = ? AND version = 0` 실행 → `affected rows = 1` → 성공
+- 테스트가 이 호출 동안의 SQL을 세어 `SELECT 1`, `UPDATE 1`을 확인한다 (아래 "SQL로 확인" 참고)
 - 이 대조군이 있어야 케이스 3의 예외가 "낙관적 락 때문"이지 `saveAndFlush` 자체 탓이 아님이 증명됨
 
 ```mermaid
@@ -110,6 +112,8 @@ sequenceDiagram
 
     Test->>Service: decreaseStockAndSave(스냅샷)
     Service->>Service: stock 10 - 1 = 9
+    Service->>DB: merge: SELECT stock = 10, version = 0
+    Service->>Service: 스냅샷 version 0 = DB version 0 → 스냅샷 값 복사
     Service->>DB: UPDATE stock = 9, version = 1 WHERE id = ? AND version = 0
     DB-->>Service: affected rows = 1
 
@@ -122,7 +126,8 @@ sequenceDiagram
 
 ```text
 A가 SELECT(version 0) -> B가 먼저 수정 커밋(version 1) -> A가 옛 스냅샷으로 saveAndFlush
-  -> UPDATE ... WHERE version = 0 -> affected rows = 0 -> ObjectOptimisticLockingFailureException
+  -> merge가 SELECT로 현재 행을 읽음(version 1) -> 스냅샷 version 0과 다름
+  -> UPDATE 없이 그 자리에서 ObjectOptimisticLockingFailureException
 ```
 
 코드 흐름:
@@ -144,10 +149,17 @@ assertThatThrownBy(() -> productService.decreaseStockAndSave(staleA))
 
 이유:
 
-- A의 스냅샷 version(0)과 DB version(1)이 불일치
-- `saveAndFlush`의 merge가 `UPDATE ... WHERE version = 0` 실행 → `affected rows = 0`
-- JPA가 이를 "그 사이 누군가 먼저 수정함"으로 해석해 예외를 던짐
+- `saveAndFlush`는 detached 엔티티를 `merge`하고, merge는 먼저 `SELECT`로 현재 행을 읽어 온다
+- 읽어 온 DB version(1)과 A의 스냅샷 version(0)이 다르다 → Hibernate가 **메모리에서 비교해** `StaleObjectStateException`을 던지고, Spring이 `ObjectOptimisticLockingFailureException`으로 바꾼다
+- 그래서 이 경로에서는 `UPDATE`가 **아예 실행되지 않는다.** 테스트가 이 호출 동안 `SELECT 1`, `UPDATE 0`을 확인한다
 - 먼저 커밋한 쪽(B)이 이기고, 나중 쪽(A)은 실패 → lost update 방지
+
+`UPDATE ... WHERE version = ?`의 영향받은 행 수 0으로 충돌을 잡는 것은 **이미 영속 상태인 엔티티**를 고쳤는데, 읽은 뒤 커밋 전 사이에 다른 트랜잭션이 먼저 커밋한 경우다. 두 경로 모두 결과 예외는 같지만, 이 실험의 detached 스냅샷 저장은 merge의 버전 비교에서 먼저 걸린다.
+
+| 경로 | 충돌을 감지하는 곳 | 실행되는 SQL |
+| --- | --- | --- |
+| detached 엔티티 `save`/`saveAndFlush` (이 실험) | merge가 읽어 온 version과 비교 | `SELECT` 후 예외. `UPDATE` 없음 |
+| 영속 엔티티 수정 후 flush (읽은 뒤 남이 먼저 커밋) | `UPDATE ... WHERE version = ?`의 영향받은 행 수 0 | `UPDATE` 실행 → 0행 → 예외 |
 
 한계:
 
@@ -179,11 +191,33 @@ sequenceDiagram
     Note over DB: B 커밋 성공 → version 1
 
     A->>Service: decreaseStockAndSave(스냅샷 version 0)
-    Service->>DB: UPDATE stock = 9, version = 1 WHERE version = 0
-    DB-->>Service: affected rows = 0
-    Note over Service: ObjectOptimisticLockingFailureException
+    Service->>DB: merge: SELECT stock = 9, version = 1
+    Service->>Service: 스냅샷 version 0 ≠ DB version 1
+    Note over Service: UPDATE 없이 ObjectOptimisticLockingFailureException
 
     Note over DB: B의 수정만 반영 (stock = 9, version = 1)
+```
+
+### SQL로 확인
+
+`application.yml`이 `org.hibernate.SQL`을 debug로 찍으므로 테스트 로그에서 그대로 볼 수 있다. 케이스 3의 `decreaseStockAndSave(staleA)` 구간:
+
+```text
+select p1_0.id, p1_0.name, p1_0.stock, p1_0.version from product p1_0 where p1_0.id=?   -- merge
+(예외. update 로그 없음)
+```
+
+케이스 2의 같은 구간은 `select` 다음에 `update product set name=?, stock=?, version=? where id=? and version=?`(version 바인딩 `0`)가 이어진다.
+
+`OptimisticLockTest`는 로그를 눈으로 보는 대신, 아래 쿼리 모니터링의 `StatementInspector`를 그대로 써서 센다. 테스트 스레드에 `RequestContext`를 직접 심어 두면 HTTP 요청 없이도 그 구간의 SQL이 종류별로 쌓인다.
+
+```java
+RequestContext sql = startSqlCapture();
+assertThatThrownBy(() -> productService.decreaseStockAndSave(staleA))
+        .isInstanceOf(ObjectOptimisticLockingFailureException.class);
+
+assertThat(sql.countOf(QueryType.SELECT)).isEqualTo(1);
+assertThat(sql.countOf(QueryType.UPDATE)).isZero();
 ```
 
 ## 쿼리 카운트 모니터링
@@ -405,7 +439,7 @@ sequenceDiagram
 
 설계 포인트:
 
-- **URI는 원시 경로 대신 패턴으로 태깅** — `/products/42`로 태그를 달면 id 하나하나가 별도 시계열이 되어 카디널리티 폭발. `HandlerMapping.BEST_MATCHING_PATTERN_ATTRIBUTE`에서 `/products/{id}`를 꺼내 쓴다
+- **URI는 원시 경로 대신 패턴으로 태깅** — `/products/42`로 태그를 달면 id 하나하나가 별도 시계열이 되어 카디널리티 폭발. `HandlerMapping.BEST_MATCHING_PATTERN_ATTRIBUTE`에서 `/products/{id}`를 꺼내 쓴다. 패턴이 없는 요청은 원시 URI가 아니라 고정값 `UNKNOWN`으로 묶는다(Spring Boot `http.server.requests`와 같은 규칙). `QueryCountInterceptorTest`가 두 경우를 확인한다
 - **ThreadLocal은 반드시 clear** — 톰캣은 스레드를 풀에서 재사용하므로, 안 지우면 다음 요청이 이전 컨텍스트를 물려받는 누수 발생. `afterCompletion`의 finally에서 지운다
 - **인스펙터는 상태 없음** — EntityManagerFactory당 하나만 만들어져 모든 스레드가 공유하므로 자체 상태를 두지 않고, 요청별 상태는 전부 ThreadLocal 쪽에 둔다
 - **메트릭 기록은 요청 끝에 한 번** — 인스펙터는 ThreadLocal 카운트만 올리고, `MeterRegistry` 기록은 인터셉터가 요청 종료 시점에 모아서 한다
