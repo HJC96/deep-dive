@@ -61,7 +61,7 @@ public class JpaWalletRepository implements WalletRepository {
     @Override
     public void save(List<Wallet> wallets) {
         // 지갑은 Set 에서 와서 순서가 매번 다르다. 동시에 정산하는 트랜잭션들이 행 락을 서로 다른 순서로 잡으면
-        // 교착(deadlock)이 난다. 지갑 id·참조 id 순으로 정렬해 락 순서를 고정한다.
+        // 교착(deadlock)이 난다. 지갑은 id 순, 거래 INSERT 는 idempotency_key 순(JpaWalletTransactionRepository)으로 고정한다.
         List<Wallet> ordered = wallets.stream().sorted(Comparator.comparingLong(Wallet::id)).toList();
         try {
             saveWithOptimisticLockRetry(ordered);
@@ -128,8 +128,7 @@ public class JpaWalletRepository implements WalletRepository {
 
     private List<WalletTransaction> flattenTransactions(List<Wallet> wallets) {
         return wallets.stream()
-                .flatMap(wallet -> wallet.walletTransactions().stream()
-                        .sorted(Comparator.comparingLong(WalletTransaction::referenceId)))
+                .flatMap(wallet -> wallet.walletTransactions().stream())
                 .toList();
     }
 
