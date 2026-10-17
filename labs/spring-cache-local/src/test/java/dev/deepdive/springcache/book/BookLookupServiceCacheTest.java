@@ -118,6 +118,37 @@ class BookLookupServiceCacheTest extends MySQLContainerTest {
     }
 
     @Test
+    void updateBook은_이름을_담은_다른_캐시_bookName_bookSummary도_무효화한다() {
+        assertThat(bookLookupService.findBookNameById(1L)).isEqualTo("Effective Java");
+        assertThat(bookLookupService.findBookSummary(1L, "ko")).isEqualTo("Effective Java summary language=ko");
+
+        bookLookupService.updateBook(new Book(1L, "Effective Java 4th", 48_000));
+
+        assertThat(cacheManager.getCache("bookName").get(1L)).isNull();
+        assertThat(cacheManager.getCache("bookSummary").get(1L)).isNull();
+        assertThat(bookLookupService.findBookNameById(1L)).isEqualTo("Effective Java 4th");
+        assertThat(bookLookupService.findBookSummary(1L, "ko")).isEqualTo("Effective Java 4th summary language=ko");
+    }
+
+    @Test
+    void renameBookAndEvictCache는_bookById_bookName_bookSummary를_함께_무효화한다() {
+        bookLookupService.findBookById(1L);
+        assertThat(bookLookupService.findBookNameById(1L)).isEqualTo("Effective Java");
+        bookLookupService.findBookSummary(1L, "ko");
+        bookLookupService.findBookNameById(2L);
+
+        bookLookupService.renameBookAndEvictCache(1L, "Effective Java Revised");
+
+        assertThat(cacheManager.getCache("bookById").get(1L)).isNull();
+        assertThat(cacheManager.getCache("bookName").get(1L)).isNull();
+        assertThat(cacheManager.getCache("bookSummary").get(1L)).isNull();
+        // 다른 책의 캐시는 건드리지 않는다
+        assertThat(cacheManager.getCache("bookName").get(2L)).isNotNull();
+        assertThat(bookLookupService.findBookNameById(1L)).isEqualTo("Effective Java Revised");
+        assertThat(bookLookupService.findBookSummary(1L, "en")).isEqualTo("Effective Java Revised summary language=en");
+    }
+
+    @Test
     void key를_id만_사용하도록_지정하면_다른_파라미터가_달라도_같은_캐시_값을_사용한다() {
         String korean = bookLookupService.findBookSummary(1L, "ko");
         String english = bookLookupService.findBookSummary(1L, "en");

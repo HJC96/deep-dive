@@ -12,6 +12,9 @@ import org.springframework.stereotype.Service;
  *
  * <p>이중 배정과 1인 1좌석을 모두 막지만, DB 확정을 요청 스레드가 직접 수행하므로
  * 요청 경로와 DB 쓰기가 결합된다. DB가 느려지면 그 지연이 그대로 요청으로 전파된다.
+ *
+ * <p>DB 확정 결과를 그대로 반환한다. DB에 이미 다른 예약이 있으면 거절 상태를, 확정 중 예외가 나면
+ * Redis 선점을 되돌린 뒤 예외를 던진다. (선점만 남고 DB엔 없는 "붕 뜬 좌석"을 만들지 않는다)
  */
 @Service
 public class RedisSeatReservationService {
@@ -33,7 +36,28 @@ public class RedisSeatReservationService {
             return new SeatReservationRequestResult(userId, seatNo, status);
         }
 
-        seatReservationWriter.save(userId, seatNo);
-        return new SeatReservationRequestResult(userId, seatNo, SeatReservationStatus.ACCEPTED);
+        SeatReservationStatus confirmed;
+        try {
+            confirmed = seatReservationWriter.save(userId, seatNo);
+        } catch (RuntimeException e) {
+            // DB 확정 실패(커넥션 타임아웃 등) → 선점을 풀지 않으면 아무도 못 쓰는 좌석이 TTL까지 남는다.
+            seatHoldStore.release(userId, seatNo);
+            throw e;
+        }
+        releaseMismatchedHold(userId, seatNo, confirmed);
+        return new SeatReservationRequestResult(userId, seatNo, confirmed);
+    }
+
+    // Redis 선점은 통과했지만 DB에 이미 다른 예약이 있는 경우(선점 윈도우가 비워진 뒤 등),
+    // DB가 진실이므로 이번 요청이 잘못 잡은 쪽만 되돌린다.
+    private void releaseMismatchedHold(long userId, String seatNo, SeatReservationStatus confirmed) {
+        switch (confirmed) {
+            case ACCEPTED -> {
+            }
+            // 좌석은 다른 사람이 DB에 확정 → 좌석은 잡힌 게 맞으니 사용자만 풀어 다른 좌석을 시도하게 한다.
+            case SEAT_ALREADY_TAKEN -> seatHoldStore.releaseUser(userId);
+            // 사용자는 이미 다른 좌석을 DB에 확정 → 사용자는 그대로 두고 이 좌석만 푼다.
+            case USER_ALREADY_HAS_SEAT -> seatHoldStore.releaseSeat(seatNo);
+        }
     }
 }

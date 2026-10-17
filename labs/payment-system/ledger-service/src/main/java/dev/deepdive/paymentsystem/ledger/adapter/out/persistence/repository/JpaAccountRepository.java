@@ -27,8 +27,8 @@ public class JpaAccountRepository implements AccountRepository {
     public DoubleAccountsForLedger getDoubleAccountsForLedger(FinanceType financeType) {
         return switch (financeType) {
             case PAYMENT_ORDER -> {
-                JpaAccountEntity to = springDataJpaAccountRepository.findByName(REVENUE_ACCOUNT_NAME);
-                JpaAccountEntity from = springDataJpaAccountRepository.findByName(ITEM_BUYER_ACCOUNT_NAME);
+                JpaAccountEntity to = findAccount(REVENUE_ACCOUNT_NAME);
+                JpaAccountEntity from = findAccount(ITEM_BUYER_ACCOUNT_NAME);
 
                 yield new DoubleAccountsForLedger(
                         jpaAccountMapper.mapToDomainEntity(to),
@@ -36,5 +36,13 @@ public class JpaAccountRepository implements AccountRepository {
                 );
             }
         };
+    }
+
+    private JpaAccountEntity findAccount(String name) {
+        JpaAccountEntity account = springDataJpaAccountRepository.findByName(name);
+        if (account == null) {
+            throw new IllegalStateException("장부 계정 (name: " + name + ") 이 없습니다. schema.sql 의 accounts 시딩을 확인하세요.");
+        }
+        return account;
     }
 }

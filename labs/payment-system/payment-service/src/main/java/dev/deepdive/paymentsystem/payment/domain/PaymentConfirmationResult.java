@@ -20,6 +20,8 @@ public class PaymentConfirmationResult {
             case SUCCESS -> "결제 처리에 성공하였습니다.";
             case FAILURE -> "결제 처리에 실패하였습니다.";
             case UNKNOWN -> "결제 처리 중에 알 수 없는 에러가 발생하였습니다.";
+            // 같은 주문에 대한 다른 승인 요청이 진행 중이다. 이 요청은 PSP 를 호출하지 않았다.
+            case EXECUTING -> "결제가 이미 처리 중입니다.";
             default -> throw new IllegalStateException("현재 결제 상태 (status: " + status + ") 는 올바르지 않은 상태입니다.");
         };
     }

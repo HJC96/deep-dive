@@ -40,11 +40,17 @@ dependencies {
     runtimeOnly 'com.mysql:mysql-connector-j'
 
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation "org.testcontainers:testcontainers-junit-jupiter:${rootProject.ext.dependencyVersions.testcontainers}"
+    testImplementation "org.testcontainers:testcontainers-mysql:${rootProject.ext.dependencyVersions.testcontainers}"
+    testImplementation "org.testcontainers:testcontainers-kafka:${rootProject.ext.dependencyVersions.testcontainers}"
+    testImplementation 'org.awaitility:awaitility'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
 test {
-    // 로컬 MySQL이 있어야 도는 통합 테스트는 CI(./gradlew test)에서 제외한다.
+    // 통합 테스트는 Testcontainers(MySQL 8.0.36, apache/kafka 3.8.1)로 스스로 인프라를 띄운다(Docker 필요).
+    // 외부 시스템(Toss 테스트 서버 등)을 실제로 부르는 테스트만 ExternalIntegration 태그로 기본 실행에서 뺀다.
+    // -PincludeIntegration 으로 포함할 수 있다.
     useJUnitPlatform {
         if (!project.hasProperty('includeIntegration')) {
             excludeTags 'ExternalIntegration'

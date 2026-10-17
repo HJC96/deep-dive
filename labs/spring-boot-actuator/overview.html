@@ -1,0 +1,567 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>spring-boot-actuator 한눈에</title>
+<style>
+/* ===== 공통 스타일 (모든 모듈 overview.html에서 동일하게 유지) ===== */
+:root{
+  --bg:#f7f7f5;--surface:#ffffff;--surface-2:#f0efeb;--border:#e2e0da;
+  --text:#1d1d1b;--muted:#6b6a65;--accent:#2f5bd3;--accent-soft:#e6ecfb;
+  --good:#1f8a4c;--good-soft:#e3f4ea;--bad:#c2410c;--bad-soft:#fcebe1;
+  --warn:#a16207;--warn-soft:#fbf3dc;--code-bg:#f3f2ee;
+  --shadow:0 1px 2px rgba(0,0,0,.04),0 4px 16px rgba(0,0,0,.04);
+  --radius:12px;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --sans:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Pretendard","Noto Sans KR","Segoe UI",sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#141413;--surface:#1c1c1a;--surface-2:#252522;--border:#33322e;
+    --text:#ecebe6;--muted:#a09e96;--accent:#7c9cff;--accent-soft:#1f2a47;
+    --good:#4ccf85;--good-soft:#16301f;--bad:#ff8a5c;--bad-soft:#3a1f14;
+    --warn:#e8b84a;--warn-soft:#3a2f12;--code-bg:#22221f;
+    --shadow:none;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#141413;--surface:#1c1c1a;--surface-2:#252522;--border:#33322e;
+  --text:#ecebe6;--muted:#a09e96;--accent:#7c9cff;--accent-soft:#1f2a47;
+  --good:#4ccf85;--good-soft:#16301f;--bad:#ff8a5c;--bad-soft:#3a1f14;
+  --warn:#e8b84a;--warn-soft:#3a2f12;--code-bg:#22221f;
+  --shadow:none;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);line-height:1.65;font-size:15.5px;-webkit-font-smoothing:antialiased}
+a{color:var(--accent)}
+code,.mono{font-family:var(--mono);font-size:.86em;background:var(--code-bg);padding:.1em .35em;border-radius:5px;word-break:break-all}
+pre{background:var(--code-bg);padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.55;margin:10px 0}
+pre code{background:none;padding:0;font-size:inherit;word-break:normal}
+.layout{display:grid;grid-template-columns:220px minmax(0,1fr);gap:40px;max-width:1180px;margin:0 auto;padding:32px 24px 80px}
+@media (max-width:860px){.layout{grid-template-columns:minmax(0,1fr);gap:0;padding:20px 16px 60px}}
+nav.toc{position:sticky;top:24px;align-self:start;font-size:14px}
+nav.toc .home{display:inline-block;margin-bottom:14px;color:var(--muted);text-decoration:none;font-size:13px}
+nav.toc ol{list-style:none;padding:0;margin:0;border-left:2px solid var(--border)}
+nav.toc li a{display:block;padding:5px 0 5px 14px;margin-left:-2px;border-left:2px solid transparent;color:var(--muted);text-decoration:none}
+nav.toc li a.active,nav.toc li a:hover{color:var(--text);border-left-color:var(--accent)}
+@media (max-width:860px){
+  nav.toc{position:static;margin-bottom:18px}
+  nav.toc ol{display:flex;flex-wrap:wrap;gap:6px;border:0}
+  nav.toc li a{padding:4px 10px;margin:0;border:1px solid var(--border);border-radius:999px;font-size:13px}
+  nav.toc li a.active{border-color:var(--accent)}
+}
+header.hero{margin-bottom:28px}
+.eyebrow{font-size:12.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
+h1{font-size:30px;line-height:1.25;margin:6px 0 10px;letter-spacing:-.01em}
+.lead{font-size:17px;color:var(--text);margin:0 0 14px;max-width:62ch}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font-size:12.5px;padding:3px 10px;border-radius:999px;background:var(--surface-2);border:1px solid var(--border);color:var(--muted)}
+section{margin:44px 0 0;scroll-margin-top:20px}
+h2{font-size:21px;margin:0 0 6px;letter-spacing:-.01em}
+h2 .num{color:var(--accent);margin-right:8px;font-variant-numeric:tabular-nums}
+.sub{color:var(--muted);margin:0 0 16px;font-size:14.5px}
+h3{font-size:16.5px;margin:18px 0 6px}
+.card{overflow-wrap:anywhere;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow)}
+.grid{display:grid;gap:12px}
+.grid.c2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.grid.c3{grid-template-columns:repeat(3,minmax(0,1fr))}
+@media (max-width:700px){.grid.c2,.grid.c3{grid-template-columns:minmax(0,1fr)}}
+.tldr .label{font-size:12px;font-weight:700;letter-spacing:.05em;color:var(--muted);text-transform:uppercase;margin-bottom:4px}
+.tldr .card{border-top:3px solid var(--accent)}
+.tldr .card.good{border-top-color:var(--good)}
+.tldr .card.bad{border-top-color:var(--bad)}
+.tldr p{margin:0}
+/* 흐름 다이어그램: 단계 클릭 시 상세 표시 */
+.flow{display:flex;flex-wrap:wrap;align-items:stretch;gap:0;margin:6px 0 10px}
+.flow .step{flex:1 1 140px;min-width:120px;text-align:left;font:inherit;color:inherit;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 12px;cursor:pointer;position:relative;transition:border-color .15s,background .15s}
+.flow .step:hover{border-color:var(--accent)}
+.flow .step[aria-selected="true"]{border-color:var(--accent);background:var(--accent-soft)}
+.flow .step .k{display:block;font-size:11.5px;color:var(--muted);font-weight:600}
+.flow .step .t{display:block;font-weight:600;font-size:14px;line-height:1.35}
+.flow .step.fail{border-style:dashed;border-color:var(--bad)}
+.flow .step.fail[aria-selected="true"]{background:var(--bad-soft)}
+.flow .arrow{display:flex;align-items:center;padding:0 6px;color:var(--muted);font-size:18px}
+@media (max-width:700px){.flow{flex-direction:column}.flow .step{flex:none}.flow .arrow{justify-content:center;padding:2px 0;transform:rotate(90deg)}}
+.flow-detail{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:10px;padding:14px 18px;min-height:64px}
+.flow-detail>div{display:none}
+.flow-detail>div.on{display:block}
+.flow-detail p:first-child{margin-top:0}.flow-detail p:last-child{margin-bottom:0}
+/* 탭 */
+.tabs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.tabs button{font:inherit;font-size:13.5px;padding:6px 12px;border-radius:999px;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{background:var(--text);color:var(--bg);border-color:var(--text)}
+.tabpanel{display:none}.tabpanel.on{display:block}
+.kv{display:grid;grid-template-columns:110px minmax(0,1fr);gap:6px 14px;margin:10px 0 0;font-size:14.5px}
+.kv dt{color:var(--muted);font-weight:600}
+.kv dd{margin:0}
+@media (max-width:520px){.kv{grid-template-columns:1fr}.kv dt{margin-top:6px}}
+/* 표 */
+.tablewrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:top}
+th{background:var(--surface-2);font-weight:600;font-size:13px;color:var(--muted);white-space:nowrap}
+tr:last-child td{border-bottom:0}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+.hl{background:var(--accent-soft)}
+/* 막대 그래프 (값은 --v: 0~1 비율) */
+.bars{display:grid;gap:8px}
+.bar{display:grid;grid-template-columns:150px minmax(0,1fr) 92px;align-items:center;gap:10px;font-size:13.5px}
+.bar .track{height:20px;background:var(--surface-2);border-radius:6px;overflow:hidden}
+.bar .fill{height:100%;width:calc(var(--v) * 100%);background:var(--accent);border-radius:6px;min-width:2px;transition:width .6s ease}
+.bar.good .fill{background:var(--good)}.bar.bad .fill{background:var(--bad)}.bar.warn .fill{background:var(--warn)}
+.bar .val{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--mono);font-size:12.5px}
+@media (max-width:520px){.bar{grid-template-columns:100px minmax(0,1fr) 72px}}
+.source{font-size:12.5px;color:var(--muted);margin-top:10px}
+/* 배지·콜아웃 */
+.badge{display:inline-block;font-size:11.5px;font-weight:700;padding:1px 8px;border-radius:999px;vertical-align:middle}
+.badge.good{background:var(--good-soft);color:var(--good)}
+.badge.bad{background:var(--bad-soft);color:var(--bad)}
+.badge.warn{background:var(--warn-soft);color:var(--warn)}
+.badge.info{background:var(--accent-soft);color:var(--accent)}
+.callout{border-radius:10px;padding:12px 16px;margin:12px 0;font-size:14.5px;border:1px solid var(--border);background:var(--surface)}
+.callout.warn{background:var(--warn-soft);border-color:transparent}
+.callout.bad{background:var(--bad-soft);border-color:transparent}
+.callout.good{background:var(--good-soft);border-color:transparent}
+.callout strong:first-child{margin-right:4px}
+/* 아코디언 (면접 Q&A, 약점) */
+details.qa{background:var(--surface);border:1px solid var(--border);border-radius:10px;margin:8px 0;overflow:hidden}
+details.qa summary{cursor:pointer;padding:12px 16px;font-weight:600;list-style:none;display:flex;gap:10px;align-items:flex-start}
+details.qa summary::-webkit-details-marker{display:none}
+details.qa summary::before{content:"Q";flex:none;width:22px;height:22px;border-radius:6px;background:var(--accent-soft);color:var(--accent);font-size:12px;display:grid;place-items:center;margin-top:1px}
+details.qa.risk summary::before{content:"!";background:var(--bad-soft);color:var(--bad)}
+details.qa[open] summary{border-bottom:1px solid var(--border)}
+details.qa .a{padding:12px 16px 14px 48px;font-size:14.5px}
+details.qa .a p{margin:0 0 8px}details.qa .a ul{margin:0;padding-left:18px}
+.qa-tools{display:flex;gap:8px;margin-bottom:8px}
+.qa-tools button,.theme-toggle{font:inherit;font-size:13px;padding:5px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer}
+.theme-toggle{position:fixed;right:16px;bottom:16px;z-index:5;box-shadow:var(--shadow)}
+/* 파일 지도 */
+ul.files{list-style:none;padding:0;margin:0;display:grid;gap:6px}
+ul.files li{display:grid;grid-template-columns:minmax(0,1fr);gap:2px;padding:9px 12px;background:var(--surface);border:1px solid var(--border);border-radius:9px}
+ul.files li code{background:none;padding:0;font-size:12.5px}
+ul.files li span{color:var(--muted);font-size:13.5px}
+footer{margin-top:56px;padding-top:18px;border-top:1px solid var(--border);color:var(--muted);font-size:13px}
+ul.plain{margin:6px 0;padding-left:20px}ul.plain li{margin:3px 0}
+</style>
+</head>
+<body>
+<button class="theme-toggle" type="button" aria-label="테마 전환">◐ 테마</button>
+<div class="layout">
+  <nav class="toc" aria-label="목차">
+    <a class="home" href="../index.html">← 전체 모듈</a>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin:0 0 14px"><a class="chip" style="text-decoration:none" href="../changes.html#m-spring-boot-actuator">개선 내역</a><a class="chip" style="text-decoration:none" href="../interview.html#m-spring-boot-actuator">질문 모음</a></div>
+    <ol>
+      <li><a href="#tldr">한눈에</a></li>
+      <li><a href="#flow">흐름</a></li>
+      <li><a href="#cases">비교·핵심 구현</a></li>
+      <li><a href="#results">결과·수치</a></li>
+      <li><a href="#limits">한계·약점</a></li>
+      <li><a href="#interview">면접 Q&amp;A</a></li>
+      <li><a href="#files">파일 지도</a></li>
+    </ol>
+  </nav>
+  <main>
+    <header class="hero">
+      <div class="eyebrow">deep-dive · labs/spring-boot-actuator</div>
+      <h1>Spring Boot Actuator — 상태·버전·횟수·현재값·시간을 관측하는 13단계</h1>
+      <p class="lead">운영 중인 앱이 살아 있는지, 어떤 빌드가 떠 있는지, 무엇이 몇 번 일어났고 얼마나 느린지 모르면 장애에 대응할 수 없습니다. 이 모듈은 Postman 폴더 0~12를 따라 Health·Info·Counter·Gauge·Timer 3종·Percentile·HTTP 메트릭·커스텀 엔드포인트를 각각 가장 작은 예제로 만들어 <code>/actuator</code> 응답으로 확인합니다.</p>
+      <div class="chips"><span class="chip">Java 21</span><span class="chip">Spring Boot 3.4.1</span><span class="chip">Micrometer</span><span class="chip">AOP (@Timed/@Counted)</span><span class="chip">App :8080 · Actuator :9090</span><span class="chip">Postman 컬렉션</span></div>
+    </header>
+
+    <section id="tldr" class="tldr">
+      <h2><span class="num">01</span>한눈에</h2>
+      <p class="sub">30초 요약</p>
+      <div class="grid c3">
+        <div class="card bad"><div class="label">문제</div><p>로그만으로는 “지금 트래픽을 받아도 되나”, “어느 버전이 떠 있나”, “p99가 얼마나 느린가”에 답할 수 없습니다.</p></div>
+        <div class="card"><div class="label">접근</div><p>관리 포트 9090에 health·info·metrics·features만 노출. 섹션마다 앱 API를 호출 → <code>/actuator/metrics/{name}?tag=k:v</code>로 값 변화를 관찰(README + Postman). 대표 동작은 <code>ActuatorEndpointTest</code>·<code>CustomMetricsTest</code>가 HTTP로 검증.</p></div>
+        <div class="card good"><div class="label">결론</div><p>질문에 맞는 타입을 고르는 것이 핵심: <b>상태</b>=Health, <b>버전</b>=Info, <b>횟수</b>=Counter, <b>현재 개수</b>=Gauge, <b>시간</b>=Timer, <b>꼬리 지연</b>=Percentile. 태그는 값 종류가 적은 것만.</p></div>
+      </div>
+    </section>
+
+    <section id="flow">
+      <h2><span class="num">02</span>흐름</h2>
+      <p class="sub">단계를 클릭하면 상세 설명이 나옵니다. 메트릭이 만들어져 조회되기까지.</p>
+      <div class="flow" data-flow>
+        <button class="step" data-target="ac-f1"><span class="k">STEP 1</span><span class="t">앱 API 호출 (:8080)</span></button>
+        <span class="arrow">→</span>
+        <button class="step" data-target="ac-f2"><span class="k">STEP 2</span><span class="t">코드/AOP가 meter 기록</span></button>
+        <span class="arrow">→</span>
+        <button class="step" data-target="ac-f3"><span class="k">STEP 3</span><span class="t">MeterRegistry + 공통 태그</span></button>
+        <span class="arrow">→</span>
+        <button class="step" data-target="ac-f4"><span class="k">STEP 4</span><span class="t">/actuator/metrics 조회 (:9090)</span></button>
+        <span class="arrow">→</span>
+        <button class="step fail" data-target="ac-f5"><span class="k">상태 이상</span><span class="t">Health DOWN → 503</span></button>
+      </div>
+      <div class="flow-detail">
+        <div id="ac-f1"><p>예: <code>POST /notifications/email</code>, <code>POST /files/convert</code>, <code>GET /contents/search?keyword=...</code>. Spring MVC 요청은 자동으로 <code>http.server.requests</code> Timer에도 기록됩니다(섹션 11).</p></div>
+        <div id="ac-f2"><p>직접 기록: <code>Counter.increment()</code>, <code>Timer.record(() -&gt; ...)</code>, <code>Timer.Sample.stop(timer)</code>. AOP 기록: <code>@Counted</code>/<code>@Timed</code> — <code>MetricsAspectConfig</code>의 <code>CountedAspect</code>·<code>TimedAspect</code> 빈 + <code>spring-boot-starter-aop</code>가 있어야 동작. Gauge는 기록하지 않고 조회 시점에 <code>List::size</code>를 호출합니다.</p></div>
+        <div id="ac-f3"><p>모든 meter에 공통 태그가 붙습니다: 설정 <code>management.metrics.tags</code>(application=actuator-lab, environment=local, region=kr) + 코드 <code>MetricsTagConfig</code>의 <code>MeterFilter.commonTags(hostname)</code>.</p></div>
+        <div id="ac-f4"><p><code>GET :9090/actuator/metrics/app.notification.sent?tag=channel:email</code> → <code>measurements</code>(COUNT / TOTAL_TIME / MAX / VALUE)와 <code>availableTags</code>. Timer 평균 = TOTAL_TIME / COUNT. 필터는 <code>availableTags</code>에 보이는 값 기준.</p></div>
+        <div id="ac-f5"><p><code>POST /partners/system/down</code> → <code>PartnerSystemHealthIndicator</code>가 <code>Health.down()</code> 반환 → <code>/actuator/health/partnerSystem</code> body <code>status: DOWN</code>, HTTP <b>503</b>(기본 매핑). 컴포넌트 id <code>partnerSystem</code>은 빈 이름에서 <code>HealthIndicator</code>를 뗀 것.</p></div>
+      </div>
+    </section>
+
+    <section id="cases">
+      <h2><span class="num">03</span>비교·핵심 구현</h2>
+      <p class="sub">먼저 “무엇을 알고 싶은가”로 타입을 고르고, 아래 13개 섹션 지도와 탭에서 코드를 봅니다.</p>
+      <h3>어떤 걸 쓰나 — README “선택 기준”</h3>
+      <div class="grid c3">
+        <div class="card"><span class="badge good">Health</span><p style="margin:6px 0 0"><b>정상/비정상인가?</b><br>외부 시스템 연결, 트래픽 수용 가능 여부. DOWN이면 503.</p></div>
+        <div class="card"><span class="badge info">Info</span><p style="margin:6px 0 0"><b>어떤 버전이 떠 있나?</b><br>build/git/커스텀 release 정보.</p></div>
+        <div class="card"><span class="badge info">Counter</span><p style="margin:6px 0 0"><b>몇 번 일어났나?</b><br>단조 증가 누적. 발송 성공 수, 요청 수.</p></div>
+        <div class="card"><span class="badge warn">Gauge</span><p style="margin:6px 0 0"><b>지금 몇 개인가?</b><br>오르내리는 현재값. 대기열 크기.</p></div>
+        <div class="card"><span class="badge info">Timer</span><p style="margin:6px 0 0"><b>얼마나 걸렸나?</b><br>COUNT + TOTAL_TIME + MAX. record / Sample / @Timed.</p></div>
+        <div class="card"><span class="badge bad">Percentile</span><p style="margin:6px 0 0"><b>느린 꼬리는?</b><br>p50 중앙값, p95, p99(tail latency). 평균이 숨기는 지연.</p></div>
+        <div class="card"><span class="badge info">Tag</span><p style="margin:6px 0 0"><b>조건별로 나눠 보기</b><br>channel=email, result=fail. 값 종류가 적어야 함.</p></div>
+        <div class="card"><span class="badge info">Common Tags</span><p style="margin:6px 0 0"><b>앱/환경/인스턴스 식별</b><br>모든 metric에 application·environment·region·hostname.</p></div>
+        <div class="card"><span class="badge warn">Custom Endpoint</span><p style="margin:6px 0 0"><b>운영용 조작 창구</b><br>@Endpoint로 기능 토글 읽기/쓰기/삭제. 인증 필요.</p></div>
+      </div>
+
+      <h3>13개 섹션 지도 (README 0~12 = Postman 폴더)</h3>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th class="num">#</th><th>섹션</th><th>무엇을 / 메트릭</th><th>코드</th><th>언제 쓰나</th></tr></thead>
+          <tbody>
+            <tr><td class="num">0</td><td>Basic Actuator</td><td><code>/actuator</code> 링크 목록</td><td>application.yml exposure</td><td>노출 endpoint 확인 (목차)</td></tr>
+            <tr><td class="num">1</td><td>Health</td><td><code>/actuator/health/partnerSystem</code></td><td>PartnerSystemHealthIndicator</td><td>외부 의존 상태, LB/오케스트레이터 판단</td></tr>
+            <tr><td class="num">2</td><td>Info</td><td><code>release</code>, <code>build</code>, <code>git</code>, <code>app</code>, <code>team</code></td><td>ReleaseInfoContributor, build.gradle 태스크</td><td>배포된 빌드 식별</td></tr>
+            <tr><td class="num">3</td><td>Metrics Basic</td><td><code>jvm.memory.used</code>, <code>jvm.gc.pause</code>, <code>process.cpu.usage</code> 등</td><td>없음 (자동 binder)</td><td>JVM·CPU 추세</td></tr>
+            <tr><td class="num">4</td><td>Counter &amp; Tags</td><td><code>app.notification.sent</code>, <code>app.notification.requested</code></td><td>NotificationService</td><td>성공 횟수 / 호출 횟수</td></tr>
+            <tr><td class="num">5</td><td>Common Tags</td><td>모든 metric의 공통 태그</td><td>MetricsTagConfig, yml</td><td>인스턴스·환경 구분</td></tr>
+            <tr><td class="num">6</td><td>Gauge</td><td><code>app.notification.pending.size</code></td><td>PendingNotificationManager</td><td>큐 길이 같은 현재값</td></tr>
+            <tr><td class="num">7</td><td>Timer.record</td><td><code>app.file.conversion.time</code></td><td>FileProcessingService (2초)</td><td>특정 코드 블록 측정</td></tr>
+            <tr><td class="num">8</td><td>Timer.Sample</td><td><code>app.document.validation.time{result}</code></td><td>DocumentValidationService (350/600ms)</td><td>시작·종료가 떨어져 있거나 결과별 태그</td></tr>
+            <tr><td class="num">9</td><td>@Timed</td><td><code>app.report.generation.time</code></td><td>ReportService (750ms)</td><td>메서드 전체 시간, 코드 침투 최소</td></tr>
+            <tr><td class="num">10</td><td>Percentile</td><td><code>app.content.search.time.percentile{phi}</code></td><td>ContentSearchService (120/450/900ms)</td><td>tail latency (p95/p99)</td></tr>
+            <tr><td class="num">11</td><td>HTTP Metrics</td><td><code>http.server.requests</code></td><td>없음 (자동)</td><td>API별 요청 수·지연·상태 코드</td></tr>
+            <tr><td class="num">12</td><td>Custom Endpoint</td><td><code>/actuator/features</code></td><td>FeatureToggleEndpoint</td><td>운영 도구(기능 토글)</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 style="margin-top:22px">섹션별 핵심 코드</h3>
+      <div data-tabs>
+        <div class="tabs" role="tablist">
+          <button role="tab" data-target="ac-t1">0–2 Health·Info</button>
+          <button role="tab" data-target="ac-t2">4–5 Counter·Tags</button>
+          <button role="tab" data-target="ac-t3">6 Gauge</button>
+          <button role="tab" data-target="ac-t4">7–9 Timer 3종</button>
+          <button role="tab" data-target="ac-t5">10 Percentile</button>
+          <button role="tab" data-target="ac-t6">3·11 자동 수집</button>
+          <button role="tab" data-target="ac-t7">12 Endpoint</button>
+        </div>
+        <div class="tabpanel card" id="ac-t1">
+          <h3>Health · Info <span class="badge good">상태 · 버전</span></h3>
+          <pre><code>// PartnerSystemHealthIndicator
+if (partnerSystem.isAvailable()) {
+    return Health.up()
+            .withDetail("system", "partner-notification-gateway")
+            // ...
+            .build();
+}
+// DOWN을 반환하면 health endpoint의 HTTP status도 기본적으로 503으로 내려간다.
+return Health.down()
+        .withDetail("message", "Partner system is unavailable")
+        .build();
+
+// ReleaseInfoContributor
+builder.withDetail("release", new ReleaseInfo(
+        "backend-platform",
+        LocalDate.of(2026, 6, 29).toString(),
+        "#actuator-lab",
+        activeProfiles()
+));</code></pre>
+          <dl class="kv">
+            <dt>설정</dt><dd><code>management.server.port: 9090</code>(앱 8080과 분리), <code>show-details/show-components: always</code>, <code>management.info.env.enabled: true</code>(→ yml의 <code>info.app.*</code>, <code>info.team</code> 노출), <code>git.mode: simple</code>.</dd>
+            <dt>build/git</dt><dd>Boot 플러그인 대신 <code>build.gradle</code>의 커스텀 태스크 <code>generateBuildInfo</code>(META-INF/build-info.properties), <code>generateGitProperties</code>(git rev-parse로 git.properties)를 <code>processResources</code> 전에 실행.</dd>
+            <dt>포인트</dt><dd>Health는 “지금 트래픽을 받을 수 있나”, Info는 “어떤 빌드인가”. Health는 상태, Metrics는 추세.</dd>
+          </dl>
+        </div>
+        <div class="tabpanel card" id="ac-t2">
+          <h3>Counter · @Counted · Tags <span class="badge info">횟수</span></h3>
+          <pre><code>// NotificationService 생성자 — 태그 없는 "전체" counter는 두지 않는다
+this.emailNotificationCounter = sentCounter(meterRegistry, "email");
+this.smsNotificationCounter = sentCounter(meterRegistry, "sms");
+this.otherNotificationCounter = sentCounter(meterRegistry, "other"); // 나머지 channel 값
+
+private static Counter sentCounter(MeterRegistry meterRegistry, String channel) {
+    return Counter.builder("app.notification.sent")
+            .tag("channel", channel)
+            .tag("region", "kr")
+            .register(meterRegistry);
+}
+
+@Counted(value = "app.notification.requested", description = "알림 발송 요청 횟수")
+public NotificationReceipt send(String channel, String recipient, String message) {
+    NotificationReceipt receipt = new NotificationReceipt(channel, recipient, message, "SENT");
+    counterFor(channel).increment(); // email / sms / other 중 하나만
+    return receipt;
+}
+
+// MetricsTagConfig
+return MeterFilter.commonTags(List.of(Tag.of("hostname", hostname())));</code></pre>
+          <dl class="kv">
+            <dt>Counter vs @Counted</dt><dd>Counter: 성공한 경우만 코드에서 직접 증가. @Counted: 메서드 호출 횟수를 AOP로 자동 기록.</dd>
+            <dt>필터</dt><dd><code>?tag=channel:email</code>, 복수 태그 <code>?tag=channel:email&amp;tag=region:kr</code>. 필터 없이 조회하면 같은 이름의 시계열을 <b>모두 더한</b> 값 — 그래서 전체 합계용 태그 없는 counter를 따로 두면 이중 집계된다.</dd>
+            <dt>좋은/나쁜 태그</dt><dd>좋음: application, environment, region, hostname. 나쁨: userId, email, requestId, 전체 URL — 값 종류가 무한히 늘면 카디널리티 폭발.</dd>
+          </dl>
+        </div>
+        <div class="tabpanel card" id="ac-t3">
+          <h3>Gauge — 값을 저장하지 않고 조회 시점에 읽음 <span class="badge warn">현재값</span></h3>
+          <pre><code>// PendingNotificationManager
+private final List&lt;String&gt; pendingNotifications = Collections.synchronizedList(new ArrayList&lt;&gt;());
+
+public PendingNotificationManager(MeterRegistry meterRegistry) {
+    // Gauge는 값을 저장하지 않고 actuator 조회 시점에 List::size를 호출한다.
+    Gauge.builder("app.notification.pending.size", pendingNotifications, List::size)
+            .description("현재 발송 대기 중인 알림 수")
+            .register(meterRegistry);
+}</code></pre>
+          <dl class="kv">
+            <dt>흐름</dt><dd>enqueue 2번 → <code>VALUE 2</code> → dequeue → <code>VALUE 1</code> (README 요청 순서표의 기대값).</dd>
+            <dt>Counter와 차이</dt><dd>Counter: “몇 번 발생했나”(누적, 줄지 않음). Gauge: “지금 몇 개인가”(오르내림).</dd>
+          </dl>
+        </div>
+        <div class="tabpanel card" id="ac-t4">
+          <h3>Timer.record · Timer.Sample · @Timed <span class="badge info">시간</span></h3>
+          <pre><code>// 7. Timer.record — 특정 블록 (FileProcessingService)
+return fileConversionTimer.record(() -&gt; doConvert(fileName, format)); // 내부 sleep(2_000)
+
+// 8. Timer.Sample — 시작/종료 분리, 결과별 태그 (DocumentValidationService)
+Timer.Sample sample = Timer.start(meterRegistry);
+String result = "error";              // 예외로 끝나면 이 값이 tag가 된다
+try {
+    boolean passed = callExternalValidator(documentType, valid); // 350/600ms
+    result = passed ? "success" : "fail"; // 실제 결과를 본 뒤 결정
+    return new DocumentValidationResult(documentType, passed, result);
+} finally {
+    Timer timer = Timer.builder("app.document.validation.time")
+            .tag("result", result)
+            .register(meterRegistry);
+    sample.stop(timer);
+}
+
+// 9. @Timed — 메서드 전체 (ReportService)
+@Timed(value = "app.report.generation.time", description = "리포트 생성 작업 소요 시간")
+public ReportResult generate(String reportType) { sleep(750); /* ... */ }</code></pre>
+          <div class="tablewrap">
+            <table>
+              <thead><tr><th>방식</th><th>쓰임 (README)</th><th>주의</th></tr></thead>
+              <tbody>
+                <tr><td><code>Timer.record</code></td><td>특정 코드 블록 측정</td><td>람다 안 코드만 측정</td></tr>
+                <tr><td><code>Timer.Sample</code></td><td>결과 기반 태그, 시작/종료 위치가 다름</td><td><code>try/finally</code>로 <code>stop()</code> 보장, 예외면 <code>result=error</code></td></tr>
+                <tr><td><code>@Timed</code></td><td>메서드 전체 시간</td><td>TimedAspect 빈 + AOP 필요, 프록시 경유 호출만</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="tabpanel card" id="ac-t5">
+          <h3>Percentile — 평균이 숨기는 느린 꼬리 <span class="badge bad">tail latency</span></h3>
+          <pre><code>@Timed(
+        value = "app.content.search.time",
+        description = "콘텐츠 검색 API 응답 시간",
+        percentiles = {0.5, 0.95, 0.99}
+)
+public ContentSearchResult search(String keyword) {
+    sleep(delayFor(keyword));
+    // ...
+}
+
+private long delayFor(String keyword) {
+    return switch (keyword.length() % 3) {
+        case 0 -&gt; 120;
+        case 1 -&gt; 450;
+        default -&gt; 900;
+    };
+}</code></pre>
+          <dl class="kv">
+            <dt>조회</dt><dd><code>app.content.search.time.percentile?tag=phi:0.95</code> — 별도 metric 이름에 <code>phi</code> 태그로 분위수가 나뉩니다. <b>phi 없이 조회하면 세 분위수 값의 합</b>(실측 약 2.35)이 나와 지연 시간으로 읽을 수 없습니다.</dd>
+            <dt>지연 예</dt><dd>키워드 길이 % 3 기준(코드 상수): <code>actuator</code>(8자) → 900ms, <code>observability</code>(13자) → 450ms.</dd>
+            <dt>의미</dt><dd>p50 중앙값, p95 = 95% 요청이 이 시간 이하, p99 = 느린 꼬리 구간.</dd>
+          </dl>
+        </div>
+        <div class="tabpanel card" id="ac-t6">
+          <h3>자동 수집 — 코드 없이 생기는 메트릭 <span class="badge good">무료</span></h3>
+          <div class="grid c2">
+            <div>
+              <p><b>3. Metrics Basic</b> (Micrometer binder)</p>
+              <ul class="plain"><li><code>jvm.memory.used</code> (area: heap/nonheap)</li><li><code>jvm.gc.pause</code>, <code>jvm.threads.live</code></li><li><code>system.cpu.usage</code>, <code>process.cpu.usage</code>, <code>process.uptime</code></li></ul>
+            </div>
+            <div>
+              <p><b>11. HTTP Metrics</b></p>
+              <ul class="plain"><li><code>http.server.requests</code> Timer</li><li>기본 태그: <code>method</code>, <code>status</code>, <code>uri</code>, <code>outcome</code>, <code>exception</code></li><li>예: <code>?tag=uri:/files/convert</code>, <code>?tag=status:404</code></li></ul>
+            </div>
+          </div>
+          <p style="margin:8px 0 0;font-size:14px">앱 API를 호출해야 값이 생깁니다. 체크리스트: “metric 이름이 없음 → 관련 App API 호출 여부”, “MAX가 갑자기 낮음 → Micrometer time window 리셋 가능성”.</p>
+        </div>
+        <div class="tabpanel card" id="ac-t7">
+          <h3>Custom Endpoint — @Endpoint(id = "features") <span class="badge warn">인증 필요</span></h3>
+          <pre><code>@Component
+@Endpoint(id = "features")
+public class FeatureToggleEndpoint {
+    private final Map&lt;String, Boolean&gt; toggles = new ConcurrentHashMap&lt;&gt;();
+
+    @ReadOperation                       // GET /actuator/features
+    public Map&lt;String, Boolean&gt; features() { return toggles; }
+
+    @ReadOperation                       // GET /actuator/features/{name}
+    public Map&lt;String, Object&gt; feature(@Selector String name) { ... }
+
+    @WriteOperation                      // POST /actuator/features/{name}  body {"enabled": true}
+    public Map&lt;String, Object&gt; setFeature(@Selector String name, Boolean enabled) { ... }
+
+    @DeleteOperation                     // DELETE /actuator/features/{name}
+    public Map&lt;String, Object&gt; removeFeature(@Selector String name) { ... }
+}</code></pre>
+          <dl class="kv">
+            <dt>노출 조건</dt><dd>id는 소문자/숫자, <code>exposure.include</code>에도 <code>features</code>를 넣어야 보임(코드 주석).</dd>
+            <dt>주의</dt><dd>README: “운영용 custom endpoint는 인증/인가와 노출 범위 제어 필요.” 이 모듈에는 보안 설정이 없습니다.</dd>
+          </dl>
+        </div>
+      </div>
+    </section>
+
+    <section id="results">
+      <h2><span class="num">04</span>결과·수치</h2>
+      <p class="sub">Timer 평균 막대는 README의 예시 응답으로 계산했습니다. 아래 표의 값은 <code>CustomMetricsTest</code>가 호출 전후 차이로 검증한 것과 README 예시를 함께 적었습니다.</p>
+      <div class="card">
+        <h3 style="margin-top:0">Timer 평균 = TOTAL_TIME / COUNT</h3>
+        <div class="bars">
+          <div class="bar bad" style="--v:1"><span>Timer.record (2회)</span><div class="track"><div class="fill"></div></div><span class="val">2.0 s</span></div>
+          <div class="bar warn" style="--v:.62"><span>HTTP (5회)</span><div class="track"><div class="fill"></div></div><span class="val">1.24 s</span></div>
+          <div class="bar" style="--v:.375"><span>@Timed (2회)</span><div class="track"><div class="fill"></div></div><span class="val">0.75 s</span></div>
+          <div class="bar good" style="--v:.2375"><span>Timer.Sample (2회)</span><div class="track"><div class="fill"></div></div><span class="val">0.475 s</span></div>
+        </div>
+        <div class="source">출처: README 예시 응답 — Timer.record COUNT 2 / TOTAL 4.0 / MAX 2.0, HTTP COUNT 5 / TOTAL 6.2 / MAX 2.0, @Timed COUNT 2 / TOTAL 1.5 / MAX 0.75, Timer.Sample COUNT 2 / TOTAL 0.95 / MAX 0.6. 평균은 이 값들로 계산.</div>
+      </div>
+      <div class="tablewrap" style="margin-top:12px">
+        <table>
+          <thead><tr><th>metric</th><th>README 예시 값</th><th>근거 · 테스트 검증</th></tr></thead>
+          <tbody>
+            <tr><td><code>app.notification.sent</code></td><td>COUNT 3.0 (email 2, sms 1)</td><td>send·email·sms 3회 호출 후. <span class="badge good">테스트</span> 3.0 — 예전 구조(태그 없는 counter 병행)에서는 <b>6.0</b>이었음</td></tr>
+            <tr><td><code>app.notification.pending.size</code></td><td>VALUE 2.0</td><td>enqueue 2회. <span class="badge good">테스트</span> +2 → dequeue 후 +1</td></tr>
+            <tr><td><code>app.file.conversion.time</code></td><td>MAX 2.0 s</td><td><code>sleep(2_000)</code>. <span class="badge good">테스트</span> COUNT +1, TOTAL_TIME +2.0 s 이상</td></tr>
+            <tr><td><code>app.document.validation.time</code></td><td>TOTAL 0.95 s, MAX 0.6 s</td><td>success 350ms + fail 600ms = 950ms. <span class="badge good">테스트</span> result=success/fail/error 각 COUNT +1</td></tr>
+            <tr><td><code>app.report.generation.time</code></td><td>TOTAL 1.5 s, MAX 0.75 s</td><td><code>sleep(750)</code> × 2. <span class="badge good">테스트</span> 1회 호출에 COUNT +1, TOTAL_TIME +0.75 s 이상</td></tr>
+            <tr><td><code>app.content.search.time.percentile</code></td><td><code>?tag=phi:0.95</code> VALUE ≈ 0.92</td><td>actuator(900ms) + observability(450ms) 후. <span class="badge good">테스트</span> phi 0.5 ≈ 0.44~0.50, phi 0.95/0.99 ≈ 0.92, 필터 없음 = 세 값의 합(≈ 2.35)</td></tr>
+            <tr><td><code>http.server.requests</code></td><td>COUNT 5, TOTAL 6.2, MAX 2.0</td><td>MAX 2.0은 파일 변환(2초)과 일치</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="source">출처: README 예시 응답 / 코드 sleep 상수 / <code>CustomMetricsTest</code> 실측. percentile 값은 히스토그램 버킷 근삿값이라 실행마다 조금 다릅니다. <code>http.server.requests</code>는 테스트로 검증하지 않았습니다.</div>
+    </section>
+
+    <section id="limits">
+      <h2><span class="num">05</span>한계·약점</h2>
+      <p class="sub">README가 스스로 밝힌 한계와, 코드에서 확인되는 약점.</p>
+      <details id="lim-1" class="qa risk"><summary><span><span class="badge bad">코드</span> 테스트가 contextLoads 하나뿐 <span class="badge good">수정함</span></span></summary><div class="a"><p><b>어떻게 고쳤나</b>: 앱·관리 포트를 랜덤으로 띄우는 <code>@SpringBootTest(RANDOM_PORT, management.server.port=0)</code> + <code>TestRestTemplate</code>로 <code>ActuatorEndpointTest</code>(health DOWN → 503, info의 app/team/build/release, features 쓰기·읽기·삭제)와 <code>CustomMetricsTest</code>(Counter·tag 필터, Gauge, Timer.record, @Timed, Timer.Sample result tag, percentile)를 추가했습니다. metric은 컨텍스트 안에서 누적되므로 호출 전후 차이로 검증합니다.</p><p>원래 <code>ActuatorLabApplicationTest</code>는 컨텍스트가 뜨는지만 봤습니다. Health 503, 메트릭 값, 태그 필터, 커스텀 엔드포인트 동작은 모두 Postman/curl(<code>scripts/curl-actuator.sh</code>)로 수동 확인하는 구조입니다.</p></div></details>
+      <details id="lim-2" class="qa risk"><summary><span><span class="badge good">README 수정함</span> 로컬 절대경로 하드코딩</span></summary><div class="a"><p>README “실행”이 개인 PC의 절대경로로 이동하는 줄로 시작하던 것을 지웠습니다. 프로젝트 루트에서 <code>./gradlew :spring-boot-actuator:run</code>이면 됩니다.</p></div></details>
+      <details id="lim-3" class="qa risk"><summary><span><span class="badge warn">README-코드 불일치</span> “현재 설정”에 info 블록 누락 <span class="badge good">수정함</span></span></summary><div class="a"><p><b>어떻게 고쳤나</b>: README “현재 설정” yml에 <code>info</code> 블록을 넣고 설정 표에 <code>info.app.*</code>, <code>info.team</code> 행을 추가했습니다.</p><p>원래 README “설정” 섹션의 yml에는 <code>info.app.*</code>, <code>info.team</code>이 없지만 실제 <code>application.yml</code>에는 있습니다(섹션 2에서 따로 보여 줌). 설정 표의 “<code>/actuator/info</code>에 app, team 표시”는 이 블록 덕분입니다.</p></div></details>
+      <details id="lim-4" class="qa risk"><summary><span><span class="badge bad">코드</span> 같은 이름에 태그 없는 Counter + 태그 있는 Counter — 이중 집계 확인 <span class="badge good">수정함</span></span></summary><div class="a"><p><b>테스트로 확인</b>: 예전 코드로 send(email)·email·sms 3회 후 필터 없는 <code>app.notification.sent</code> COUNT는 <b>6.0</b>이었습니다(email 필터 2.0). README 예시 3.0은 틀린 값이었습니다.</p><p><b>어떻게 고쳤나</b>: 태그 없는 counter를 없애고 모든 시계열이 <code>channel</code>(email/sms/other)·<code>region</code> 태그를 갖게 했습니다. 정해지지 않은 channel 값은 <code>other</code>로 묶어 카디널리티도 막습니다. 이제 같은 3회 후 필터 없는 COUNT가 3.0이고 <code>CustomMetricsTest</code>가 이를 검증합니다.</p><p>원래 구조: <code>app.notification.sent</code>는 태그 없는 meter 1개와 channel=email/sms meter 2개로 등록되고, email 발송 시 <b>두 meter가 모두</b> 증가했습니다. 또 Prometheus 같은 레지스트리는 같은 이름에 태그 키 집합이 다른 meter를 허용하지 않는 경우가 있어 운영에선 “전체”를 별도 meter로 두기보다 태그 합산으로 구합니다.</p></div></details>
+      <details id="lim-5" class="qa risk"><summary><span><span class="badge warn">README</span> Percentile 예시 VALUE 0.45 — 틀린 값 확인 <span class="badge good">수정함</span></span></summary><div class="a"><p><b>테스트로 확인</b>: actuator(900ms)·observability(450ms) 2회 후 phi 0.5 ≈ 0.44~0.50, phi 0.95·0.99 ≈ 0.92, 필터 없는 조회 ≈ 2.35(= 세 값의 합). README의 “필터 없음 0.45”는 어떤 조회와도 맞지 않았습니다.</p><p><b>어떻게 고쳤나</b>: README 예시를 <code>?tag=phi:0.95</code> 조회(≈ 0.92)로 바꾸고 phi별 실측 표와 “필터 없는 VALUE는 합이라 해석 불가” 설명, 키워드별 지연 계산을 넣었습니다.</p><p>원래 README 예시는 필터 없는 <code>app.content.search.time.percentile</code> 조회에 VALUE 0.45를 보여 주지만, 필터가 없으면 phi 0.5/0.95/0.99 값이 함께 집계되고, 기본 키워드 <code>actuator</code>(8자)는 900ms 경로입니다. 실제 값은 다를 수 있습니다(코드 분석 추정, 실행 검증 안 됨). 분위수는 <code>?tag=phi:0.95</code>처럼 하나씩 보는 것이 정확합니다.</p></div></details>
+      <details id="lim-6" class="qa risk"><summary><span><span class="badge bad">코드</span> Timer.Sample의 result 태그는 작업 전에 이미 정해짐 <span class="badge good">수정함</span></span></summary><div class="a"><p><b>어떻게 고쳤나</b>: <code>result</code> 초깃값을 <code>error</code>로 두고, 외부 검증 호출이 정상으로 끝난 뒤 돌려받은 값으로 <code>success</code>/<code>fail</code>을 정합니다. 예외(문서 종류가 비어 있음)로 끝나면 <code>result=error</code>로 시간이 기록되는 것을 <code>CustomMetricsTest</code>가 검증합니다.</p><p>원래 README는 “결과를 본 뒤 tag 결정”이라고 하지만 코드는 <code>valid</code> 파라미터로 작업 <b>전에</b> <code>result</code>를 정합니다. 작업 중 예외(InterruptedException → IllegalStateException)가 나도 success/fail 태그로 기록됩니다. 진짜 결과 기반이라면 예외 시 <code>result=error</code> 같은 분기가 필요합니다.</p></div></details>
+      <details id="lim-7" class="qa risk"><summary><span><span class="badge warn">README</span> 보안 · 운영 주의</span></summary><div class="a"><ul><li>커스텀 엔드포인트는 인증/인가 필요(README). 현재 <code>features</code>는 보안 없이 쓰기/삭제 가능, 토글은 메모리에만 저장(재시작 시 사라짐).</li><li><code>show-details: always</code>는 내부 정보를 노출합니다 — 관리 포트를 외부에 열지 않는 전제.</li><li><span class="badge info">일반 지식</span> partnerSystem 같은 외부 의존을 liveness 프로브에 포함하면 외부 장애 때 앱이 재시작 루프에 빠질 수 있어, 보통 readiness에만 반영합니다.</li><li><span class="badge info">일반 지식</span> <code>percentiles</code>는 인스턴스 안에서 계산되어 여러 인스턴스 간 합산이 불가 — 집계가 필요하면 histogram 발행.</li></ul></div></details>
+    </section>
+
+    <section id="interview">
+      <h2><span class="num">06</span>면접 Q&amp;A</h2>
+      <p class="sub">질문을 먼저 읽고 스스로 답해 본 뒤 펼쳐 보세요.</p>
+      <div class="qa-tools"><button type="button" data-qa="open">모두 펼치기</button><button type="button" data-qa="close">모두 접기</button></div>
+      <details id="iv-1" class="qa"><summary>Health와 Metrics는 어떻게 다른가요?</summary><div class="a"><p>Health는 지금 정상/비정상(UP/DOWN)인지 — 상태. Metrics는 시간에 따른 수치 — 추세. Health DOWN이면 HTTP 503을 내려 로드밸런서나 오케스트레이터가 트래픽을 빼거나 재시작 판단을 할 수 있습니다. 이 모듈은 <code>PartnerSystemHealthIndicator</code>로 외부 게이트웨이 상태를 반영합니다.</p></div></details>
+      <details id="iv-2" class="qa"><summary>Counter와 Gauge는 언제 각각 쓰나요?</summary><div class="a"><p>Counter는 “몇 번 일어났나” — 단조 증가(발송 성공 수). Gauge는 “지금 몇 개인가” — 오르내림(대기열 크기). Gauge는 값을 저장하지 않고 조회 시점에 함수(<code>List::size</code>)를 호출합니다. <span class="badge info">일반 지식</span> Gauge는 대상 객체를 약한 참조로 잡아 GC되면 값이 사라질 수 있으므로 오래 사는 객체에 등록합니다.</p></div></details>
+      <details id="iv-3" class="qa"><summary>Timer.record, Timer.Sample, @Timed의 차이는?</summary><div class="a"><ul><li><b>record</b>: 람다로 감싼 특정 블록만 측정.</li><li><b>Sample</b>: <code>start</code>와 <code>stop</code>을 분리 — 시작/끝 위치가 다르거나 결과에 따라 태그(<code>result=success|fail|error</code>)를 붙일 때. <code>finally</code>로 stop 보장.</li><li><b>@Timed</b>: 메서드 전체를 AOP로 — 코드 침투가 가장 적지만 TimedAspect 빈이 필요하고 프록시를 거친 호출만 측정.</li></ul></div></details>
+      <details id="iv-4" class="qa"><summary>@Timed/@Counted가 동작하지 않는다면 무엇을 확인하나요?</summary><div class="a"><p>① <code>TimedAspect</code>/<code>CountedAspect</code> 빈 등록(이 모듈은 <code>MetricsAspectConfig</code>) ② <code>spring-boot-starter-aop</code> 의존성 ③ 같은 클래스 내부 호출이 아닌지(프록시 기반이라 self-invocation은 측정 안 됨, 일반 지식) ④ 해당 API를 실제로 호출했는지(호출 전에는 metric 이름이 없음).</p></div></details>
+      <details id="iv-5" class="qa"><summary>메트릭 태그를 설계할 때 주의할 점은?</summary><div class="a"><p>태그 값 조합마다 시계열이 생기므로 값 종류가 적은 것만 씁니다(channel, region, result, status). userId·email·requestId·전체 URL은 카디널리티 폭발. 공통 식별은 common tags(application, environment, region, hostname)로 모든 meter에 한 번에 붙입니다.</p></div></details>
+      <details id="iv-6" class="qa"><summary>평균 응답시간 대신 p95/p99를 보는 이유는?</summary><div class="a"><p>평균은 소수의 매우 느린 요청을 가립니다. p99는 “100명 중 가장 느린 1명”의 경험 — 사용자 체감과 SLO는 꼬리 지연이 좌우합니다. 이 모듈은 키워드 길이로 120/450/900ms를 섞어 분위수 차이를 관찰합니다. <span class="badge info">일반 지식</span> 여러 인스턴스를 합치려면 클라이언트 percentile 대신 histogram 버킷을 발행해 서버에서 계산합니다.</p></div></details>
+      <details id="iv-7" class="qa"><summary>Actuator를 별도 포트(9090)로 분리하는 이유는?</summary><div class="a"><p>앱 트래픽(8080)과 운영 엔드포인트를 네트워크 수준에서 분리해, 관리 포트는 내부망·모니터링 시스템에만 열 수 있습니다. 노출도 <code>exposure.include</code>로 health·info·metrics·features만 화이트리스트.</p></div></details>
+      <details id="iv-8" class="qa"><summary>/actuator/info에 git·빌드 정보는 어떻게 넣었나요?</summary><div class="a"><p>Actuator는 classpath의 <code>META-INF/build-info.properties</code>와 <code>git.properties</code>를 읽습니다. 이 모듈은 <code>build.gradle</code>에 커스텀 태스크 <code>generateBuildInfo</code>, <code>generateGitProperties</code>를 만들어 <code>processResources</code> 전에 생성합니다. 추가로 <code>InfoContributor</code>(ReleaseInfoContributor)로 release 블록을 붙입니다. <span class="badge info">일반 지식</span> 보통은 Boot Gradle 플러그인의 <code>springBoot { buildInfo() }</code>와 git-properties 플러그인을 씁니다.</p></div></details>
+      <details id="iv-9" class="qa"><summary>커스텀 Actuator 엔드포인트는 어떻게 만드나요?</summary><div class="a"><p><code>@Endpoint(id = "features")</code> 빈에 <code>@ReadOperation</code>(GET), <code>@WriteOperation</code>(POST), <code>@DeleteOperation</code>(DELETE)을 붙이고, 경로 변수는 <code>@Selector</code>, body 키는 메서드 파라미터로 매핑됩니다. <code>exposure.include</code>에 id를 추가해야 노출되며, 운영에선 인증/인가가 필수입니다.</p></div></details>
+    </section>
+
+    <section id="files">
+      <h2><span class="num">07</span>파일 지도</h2>
+      <p class="sub">코드를 다시 볼 때 여기서부터. (경로는 <code>labs/spring-boot-actuator/</code> 기준)</p>
+      <ul class="files">
+        <li><code>src/main/resources/application.yml</code><span>관리 포트 9090, 노출 목록, 공통 태그, info.app/team</span></li>
+        <li><code>build.gradle</code><span>generateBuildInfo / generateGitProperties 커스텀 태스크</span></li>
+        <li><code>src/main/java/dev/deepdive/actuator/health/PartnerSystemHealthIndicator.java</code><span>1. Health (DOWN → 503)</span></li>
+        <li><code>src/main/java/dev/deepdive/actuator/partner/PartnerSystemSimulator.java</code><span>외부 시스템 상태 시뮬레이터(메모리) — PartnerSystemController가 up/down</span></li>
+        <li><code>src/main/java/dev/deepdive/actuator/info/ReleaseInfoContributor.java</code><span>2. Info release 블록</span></li>
+        <li><code>src/main/java/dev/deepdive/actuator/notification/NotificationService.java</code><span>4. Counter + @Counted + 태그</span></li>
+        <li><code>src/main/java/dev/deepdive/actuator/config/MetricsTagConfig.java</code><span>5. hostname 공통 태그</span></li>
+        <li><code>src/main/java/dev/deepdive/actuator/notification/PendingNotificationManager.java</code><span>6. Gauge</span></li>
+        <li><code>src/main/java/dev/deepdive/actuator/file/FileProcessingService.java</code><span>7. Timer.record (2초)</span></li>
+        <li><code>src/main/java/dev/deepdive/actuator/document/DocumentValidationService.java</code><span>8. Timer.Sample + result 태그</span></li>
+        <li><code>src/main/java/dev/deepdive/actuator/report/ReportService.java</code><span>9. @Timed (750ms)</span></li>
+        <li><code>src/main/java/dev/deepdive/actuator/content/ContentSearchService.java</code><span>10. @Timed percentiles</span></li>
+        <li><code>src/main/java/dev/deepdive/actuator/config/MetricsAspectConfig.java</code><span>CountedAspect·TimedAspect 빈</span></li>
+        <li><code>src/main/java/dev/deepdive/actuator/endpoint/FeatureToggleEndpoint.java</code><span>12. 커스텀 엔드포인트</span></li>
+        <li><code>spring-boot-actuator.postman_collection.json</code><span>섹션 0~12 요청 모음</span></li>
+        <li><code>scripts/curl-actuator.sh</code><span>Postman 대신 터미널로 확인</span></li>
+        <li><code>src/test/java/dev/deepdive/actuator/ActuatorLabApplicationTest.java</code><span>contextLoads</span></li>
+        <li><code>src/test/java/dev/deepdive/actuator/ActuatorEndpointTest.java</code><span>health DOWN → 503, info, features endpoint</span></li>
+        <li><code>src/test/java/dev/deepdive/actuator/CustomMetricsTest.java</code><span>Counter·Gauge·Timer·percentile 값 검증</span></li>
+      </ul>
+    </section>
+
+    <footer>README와 소스 코드를 근거로 정리한 문서입니다. 수치는 README에 기록된 값이며, 테스트로 검증되지 않은 값은 그렇게 표기했습니다.</footer>
+  </main>
+</div>
+<script>
+/* ===== 공통 스크립트 (모든 모듈 overview.html에서 동일하게 유지) ===== */
+(function(){
+  var root=document.documentElement;
+  try{var saved=localStorage.getItem('deepdive-theme');if(saved)root.setAttribute('data-theme',saved);}catch(e){}
+  var tt=document.querySelector('.theme-toggle');
+  if(tt)tt.addEventListener('click',function(){
+    var cur=root.getAttribute('data-theme');
+    if(!cur)cur=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';
+    var next=cur==='dark'?'light':'dark';root.setAttribute('data-theme',next);
+    try{localStorage.setItem('deepdive-theme',next);}catch(e){}
+  });
+  document.querySelectorAll('[data-flow]').forEach(function(flow){
+    var steps=flow.querySelectorAll('.step');var detail=flow.nextElementSibling;
+    function show(btn){
+      steps.forEach(function(s){s.setAttribute('aria-selected',s===btn?'true':'false');});
+      if(detail)detail.querySelectorAll(':scope>div').forEach(function(d){d.classList.toggle('on',d.id===btn.dataset.target);});
+    }
+    steps.forEach(function(s){s.addEventListener('click',function(){show(s);});});
+    if(steps[0])show(steps[0]);
+  });
+  document.querySelectorAll('[data-tabs]').forEach(function(box){
+    var btns=box.querySelectorAll(':scope>.tabs>button');
+    function show(btn){
+      btns.forEach(function(b){b.setAttribute('aria-selected',b===btn?'true':'false');});
+      box.querySelectorAll(':scope>.tabpanel').forEach(function(p){p.classList.toggle('on',p.id===btn.dataset.target);});
+    }
+    btns.forEach(function(b){b.addEventListener('click',function(){show(b);});});
+    if(btns[0])show(btns[0]);
+  });
+  document.querySelectorAll('[data-qa]').forEach(function(b){
+    b.addEventListener('click',function(){
+      var sec=b.closest('section');var open=b.dataset.qa==='open';
+      sec.querySelectorAll('details.qa').forEach(function(d){d.open=open;});
+    });
+  });
+  var links=document.querySelectorAll('nav.toc a[href^="#"]');
+  if('IntersectionObserver' in window){
+    var io=new IntersectionObserver(function(es){es.forEach(function(e){
+      if(e.isIntersecting){links.forEach(function(l){l.classList.toggle('active',l.getAttribute('href')==='#'+e.target.id);});}
+    });},{rootMargin:'-20% 0px -70% 0px'});
+    document.querySelectorAll('main section[id]').forEach(function(s){io.observe(s);});
+  }
+  function openHash(){
+    var id='';try{id=decodeURIComponent(location.hash.slice(1));}catch(e){}
+    if(!id)return;var el=document.getElementById(id);if(!el)return;
+    var d=el.tagName==='DETAILS'?el:el.closest('details');if(d)d.open=true;
+    var p=el.closest('.tabpanel');
+    if(p&&!p.classList.contains('on')){var b=p.parentElement.querySelector(':scope>.tabs>button[data-target="'+p.id+'"]');if(b)b.click();}
+    setTimeout(function(){el.scrollIntoView({block:'start'});},0);
+  }
+  window.addEventListener('hashchange',openHash);openHash();
+})();
+</script>
+</body>
+</html>

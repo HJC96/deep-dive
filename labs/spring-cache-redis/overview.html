@@ -1,0 +1,552 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>spring-cache-redis 한눈에</title>
+<style>
+/* ===== 공통 스타일 (모든 모듈 overview.html에서 동일하게 유지) ===== */
+:root{
+  --bg:#f7f7f5;--surface:#ffffff;--surface-2:#f0efeb;--border:#e2e0da;
+  --text:#1d1d1b;--muted:#6b6a65;--accent:#2f5bd3;--accent-soft:#e6ecfb;
+  --good:#1f8a4c;--good-soft:#e3f4ea;--bad:#c2410c;--bad-soft:#fcebe1;
+  --warn:#a16207;--warn-soft:#fbf3dc;--code-bg:#f3f2ee;
+  --shadow:0 1px 2px rgba(0,0,0,.04),0 4px 16px rgba(0,0,0,.04);
+  --radius:12px;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --sans:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Pretendard","Noto Sans KR","Segoe UI",sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#141413;--surface:#1c1c1a;--surface-2:#252522;--border:#33322e;
+    --text:#ecebe6;--muted:#a09e96;--accent:#7c9cff;--accent-soft:#1f2a47;
+    --good:#4ccf85;--good-soft:#16301f;--bad:#ff8a5c;--bad-soft:#3a1f14;
+    --warn:#e8b84a;--warn-soft:#3a2f12;--code-bg:#22221f;
+    --shadow:none;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#141413;--surface:#1c1c1a;--surface-2:#252522;--border:#33322e;
+  --text:#ecebe6;--muted:#a09e96;--accent:#7c9cff;--accent-soft:#1f2a47;
+  --good:#4ccf85;--good-soft:#16301f;--bad:#ff8a5c;--bad-soft:#3a1f14;
+  --warn:#e8b84a;--warn-soft:#3a2f12;--code-bg:#22221f;
+  --shadow:none;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);line-height:1.65;font-size:15.5px;-webkit-font-smoothing:antialiased}
+a{color:var(--accent)}
+code,.mono{font-family:var(--mono);font-size:.86em;background:var(--code-bg);padding:.1em .35em;border-radius:5px;word-break:break-all}
+pre{background:var(--code-bg);padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.55;margin:10px 0}
+pre code{background:none;padding:0;font-size:inherit;word-break:normal}
+.layout{display:grid;grid-template-columns:220px minmax(0,1fr);gap:40px;max-width:1180px;margin:0 auto;padding:32px 24px 80px}
+@media (max-width:860px){.layout{grid-template-columns:minmax(0,1fr);gap:0;padding:20px 16px 60px}}
+nav.toc{position:sticky;top:24px;align-self:start;font-size:14px}
+nav.toc .home{display:inline-block;margin-bottom:14px;color:var(--muted);text-decoration:none;font-size:13px}
+nav.toc ol{list-style:none;padding:0;margin:0;border-left:2px solid var(--border)}
+nav.toc li a{display:block;padding:5px 0 5px 14px;margin-left:-2px;border-left:2px solid transparent;color:var(--muted);text-decoration:none}
+nav.toc li a.active,nav.toc li a:hover{color:var(--text);border-left-color:var(--accent)}
+@media (max-width:860px){
+  nav.toc{position:static;margin-bottom:18px}
+  nav.toc ol{display:flex;flex-wrap:wrap;gap:6px;border:0}
+  nav.toc li a{padding:4px 10px;margin:0;border:1px solid var(--border);border-radius:999px;font-size:13px}
+  nav.toc li a.active{border-color:var(--accent)}
+}
+header.hero{margin-bottom:28px}
+.eyebrow{font-size:12.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
+h1{font-size:30px;line-height:1.25;margin:6px 0 10px;letter-spacing:-.01em}
+.lead{font-size:17px;color:var(--text);margin:0 0 14px;max-width:62ch}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font-size:12.5px;padding:3px 10px;border-radius:999px;background:var(--surface-2);border:1px solid var(--border);color:var(--muted)}
+section{margin:44px 0 0;scroll-margin-top:20px}
+h2{font-size:21px;margin:0 0 6px;letter-spacing:-.01em}
+h2 .num{color:var(--accent);margin-right:8px;font-variant-numeric:tabular-nums}
+.sub{color:var(--muted);margin:0 0 16px;font-size:14.5px}
+h3{font-size:16.5px;margin:18px 0 6px}
+.card{overflow-wrap:anywhere;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow)}
+.grid{display:grid;gap:12px}
+.grid.c2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.grid.c3{grid-template-columns:repeat(3,minmax(0,1fr))}
+@media (max-width:700px){.grid.c2,.grid.c3{grid-template-columns:minmax(0,1fr)}}
+.tldr .label{font-size:12px;font-weight:700;letter-spacing:.05em;color:var(--muted);text-transform:uppercase;margin-bottom:4px}
+.tldr .card{border-top:3px solid var(--accent)}
+.tldr .card.good{border-top-color:var(--good)}
+.tldr .card.bad{border-top-color:var(--bad)}
+.tldr p{margin:0}
+/* 흐름 다이어그램: 단계 클릭 시 상세 표시 */
+.flow{display:flex;flex-wrap:wrap;align-items:stretch;gap:0;margin:6px 0 10px}
+.flow .step{flex:1 1 140px;min-width:120px;text-align:left;font:inherit;color:inherit;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 12px;cursor:pointer;position:relative;transition:border-color .15s,background .15s}
+.flow .step:hover{border-color:var(--accent)}
+.flow .step[aria-selected="true"]{border-color:var(--accent);background:var(--accent-soft)}
+.flow .step .k{display:block;font-size:11.5px;color:var(--muted);font-weight:600}
+.flow .step .t{display:block;font-weight:600;font-size:14px;line-height:1.35}
+.flow .step.fail{border-style:dashed;border-color:var(--bad)}
+.flow .step.fail[aria-selected="true"]{background:var(--bad-soft)}
+.flow .arrow{display:flex;align-items:center;padding:0 6px;color:var(--muted);font-size:18px}
+@media (max-width:700px){.flow{flex-direction:column}.flow .step{flex:none}.flow .arrow{justify-content:center;padding:2px 0;transform:rotate(90deg)}}
+.flow-detail{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:10px;padding:14px 18px;min-height:64px}
+.flow-detail>div{display:none}
+.flow-detail>div.on{display:block}
+.flow-detail p:first-child{margin-top:0}.flow-detail p:last-child{margin-bottom:0}
+/* 탭 */
+.tabs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.tabs button{font:inherit;font-size:13.5px;padding:6px 12px;border-radius:999px;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{background:var(--text);color:var(--bg);border-color:var(--text)}
+.tabpanel{display:none}.tabpanel.on{display:block}
+.kv{display:grid;grid-template-columns:110px minmax(0,1fr);gap:6px 14px;margin:10px 0 0;font-size:14.5px}
+.kv dt{color:var(--muted);font-weight:600}
+.kv dd{margin:0}
+@media (max-width:520px){.kv{grid-template-columns:1fr}.kv dt{margin-top:6px}}
+/* 표 */
+.tablewrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:top}
+th{background:var(--surface-2);font-weight:600;font-size:13px;color:var(--muted);white-space:nowrap}
+tr:last-child td{border-bottom:0}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+.hl{background:var(--accent-soft)}
+/* 막대 그래프 (값은 --v: 0~1 비율) */
+.bars{display:grid;gap:8px}
+.bar{display:grid;grid-template-columns:150px minmax(0,1fr) 92px;align-items:center;gap:10px;font-size:13.5px}
+.bar .track{height:20px;background:var(--surface-2);border-radius:6px;overflow:hidden}
+.bar .fill{height:100%;width:calc(var(--v) * 100%);background:var(--accent);border-radius:6px;min-width:2px;transition:width .6s ease}
+.bar.good .fill{background:var(--good)}.bar.bad .fill{background:var(--bad)}.bar.warn .fill{background:var(--warn)}
+.bar .val{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--mono);font-size:12.5px}
+@media (max-width:520px){.bar{grid-template-columns:100px minmax(0,1fr) 72px}}
+.source{font-size:12.5px;color:var(--muted);margin-top:10px}
+/* 배지·콜아웃 */
+.badge{display:inline-block;font-size:11.5px;font-weight:700;padding:1px 8px;border-radius:999px;vertical-align:middle}
+.badge.good{background:var(--good-soft);color:var(--good)}
+.badge.bad{background:var(--bad-soft);color:var(--bad)}
+.badge.warn{background:var(--warn-soft);color:var(--warn)}
+.badge.info{background:var(--accent-soft);color:var(--accent)}
+.callout{border-radius:10px;padding:12px 16px;margin:12px 0;font-size:14.5px;border:1px solid var(--border);background:var(--surface)}
+.callout.warn{background:var(--warn-soft);border-color:transparent}
+.callout.bad{background:var(--bad-soft);border-color:transparent}
+.callout.good{background:var(--good-soft);border-color:transparent}
+.callout strong:first-child{margin-right:4px}
+/* 아코디언 (면접 Q&A, 약점) */
+details.qa{background:var(--surface);border:1px solid var(--border);border-radius:10px;margin:8px 0;overflow:hidden}
+details.qa summary{cursor:pointer;padding:12px 16px;font-weight:600;list-style:none;display:flex;gap:10px;align-items:flex-start}
+details.qa summary::-webkit-details-marker{display:none}
+details.qa summary::before{content:"Q";flex:none;width:22px;height:22px;border-radius:6px;background:var(--accent-soft);color:var(--accent);font-size:12px;display:grid;place-items:center;margin-top:1px}
+details.qa.risk summary::before{content:"!";background:var(--bad-soft);color:var(--bad)}
+details.qa[open] summary{border-bottom:1px solid var(--border)}
+details.qa .a{padding:12px 16px 14px 48px;font-size:14.5px}
+details.qa .a p{margin:0 0 8px}details.qa .a ul{margin:0;padding-left:18px}
+.qa-tools{display:flex;gap:8px;margin-bottom:8px}
+.qa-tools button,.theme-toggle{font:inherit;font-size:13px;padding:5px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer}
+.theme-toggle{position:fixed;right:16px;bottom:16px;z-index:5;box-shadow:var(--shadow)}
+/* 파일 지도 */
+ul.files{list-style:none;padding:0;margin:0;display:grid;gap:6px}
+ul.files li{display:grid;grid-template-columns:minmax(0,1fr);gap:2px;padding:9px 12px;background:var(--surface);border:1px solid var(--border);border-radius:9px}
+ul.files li code{background:none;padding:0;font-size:12.5px}
+ul.files li span{color:var(--muted);font-size:13.5px}
+footer{margin-top:56px;padding-top:18px;border-top:1px solid var(--border);color:var(--muted);font-size:13px}
+ul.plain{margin:6px 0;padding-left:20px}ul.plain li{margin:3px 0}
+</style>
+</head>
+<body>
+<button class="theme-toggle" type="button" aria-label="테마 전환">◐ 테마</button>
+<div class="layout">
+  <nav class="toc" aria-label="목차">
+    <a class="home" href="../index.html">← 전체 모듈</a>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin:0 0 14px"><a class="chip" style="text-decoration:none" href="../changes.html#m-spring-cache-redis">개선 내역</a><a class="chip" style="text-decoration:none" href="../interview.html#m-spring-cache-redis">질문 모음</a></div>
+    <ol>
+      <li><a href="#tldr">한눈에</a></li>
+      <li><a href="#flow">흐름</a></li>
+      <li><a href="#cases">비교·핵심 구현</a></li>
+      <li><a href="#results">결과·수치</a></li>
+      <li><a href="#limits">한계·약점</a></li>
+      <li><a href="#interview">면접 Q&amp;A</a></li>
+      <li><a href="#files">파일 지도</a></li>
+    </ol>
+  </nav>
+  <main>
+    <header class="hero">
+      <div class="eyebrow">deep-dive · labs/spring-cache-redis</div>
+      <h1>Spring Cache + Redis — @Cacheable과 RedisTemplate 직접 구현, 그리고 핫키 분산 락</h1>
+      <p class="lead">로컬 캐시는 서버마다 따로라서, 여러 서버가 같은 캐시를 보려면 Redis 같은 공용 캐시가 필요합니다. 하지만 Redis로 옮기면 <strong>직렬화</strong>, <strong>없는 키 반복 조회</strong>, <strong>동시 만료</strong>, <strong>핫키 동시 miss</strong>를 직접 고민해야 합니다. 이 모듈은 MySQL/JPA를 원본으로 두고 <code>@Cacheable</code>(RedisCacheManager)과 <code>StringRedisTemplate</code> 직접 구현을 비교하며, Null caching · TTL Jitter · <code>SET NX</code> + Lua 분산 락을 Testcontainers로 검증합니다.</p>
+      <div class="chips"><span class="chip">Java 21</span><span class="chip">Spring Boot 3.4.1</span><span class="chip">Spring Data Redis</span><span class="chip">Redis 7.2.5</span><span class="chip">MySQL 8.0.36 · JPA</span><span class="chip">Testcontainers</span><span class="chip">Jackson JSON</span></div>
+    </header>
+
+    <section id="tldr" class="tldr">
+      <h2><span class="num">01</span>한눈에</h2>
+      <p class="sub">30초 요약</p>
+      <div class="grid c3">
+        <div class="card bad"><div class="label">문제</div><p>공용 캐시에도 함정이 있습니다. 없는 id는 캐시에 안 남아 <strong>매번 DB로 관통</strong>, 인기 키가 비어 있는 순간 <strong>40개 요청이 동시에 DB 조회</strong>, 같은 TTL로 넣으면 <strong>동시에 만료</strong>.</p></div>
+        <div class="card"><div class="label">접근</div><p>세 서비스를 비교: <code>SpringCacheBookService</code>(@Cacheable), <code>RedisTemplateBookCacheService</code>(수동 Cache Aside · <code>__NULL__</code> sentinel · TTL Jitter), <code>RedisHotKeyBookCacheService</code>(락 없음 vs <code>SET NX</code> 락 + double-check). <code>BookOriginService.readCount</code>로 원본 조회 횟수를 셈.</p></div>
+        <div class="card good"><div class="label">결론</div><p>일반 메서드 결과 캐싱은 Spring Cache로 단순하게, <code>SET NX</code>·Lua·sentinel·jitter처럼 <strong>Redis 고유 기능이 필요하면 RedisTemplate</strong>. 기본 <code>RedisCacheManager</code>는 non-locking이라 <code>@Cacheable</code>이 분산 락을 대신하지 않습니다.</p></div>
+      </div>
+    </section>
+
+    <section id="flow">
+      <h2><span class="num">02</span>흐름</h2>
+      <p class="sub">이 모듈의 핵심인 <code>findWithDistributedLock()</code>. 단계를 클릭하면 코드가 무엇을 하는지 나옵니다.</p>
+      <div class="flow" data-flow>
+        <button class="step" data-target="scr-f1"><span class="k">STEP 1</span><span class="t">GET hot-book:{id}</span></button>
+        <span class="arrow">→</span>
+        <button class="step" data-target="scr-f2"><span class="k">STEP 2 · miss</span><span class="t">SET lock NX EX 3 (UUID)</span></button>
+        <span class="arrow">→</span>
+        <button class="step" data-target="scr-f3"><span class="k">STEP 3 · 락 획득</span><span class="t">double-check → DB → SET 10분</span></button>
+        <span class="arrow">→</span>
+        <button class="step" data-target="scr-f4"><span class="k">STEP 4 · finally</span><span class="t">Lua로 내 락만 DEL</span></button>
+        <span class="arrow">→</span>
+        <button class="step fail" data-target="scr-f5"><span class="k">락 실패</span><span class="t">10ms × 100회 폴링</span></button>
+      </div>
+      <div class="flow-detail">
+        <div id="scr-f1"><p>캐시가 있으면 락 없이 바로 역직렬화해 반환. <strong>모든 요청에 락을 거는 게 아니라 miss일 때만</strong> 락을 시도합니다.</p></div>
+        <div id="scr-f2"><p>락 키 <code>hot-book:{id}:lock</code>, 요청마다 <code>UUID</code> 토큰. <code>setIfAbsent(lockKey, token, 3초)</code> = <code>SET NX EX</code>라 Redis가 원자적으로 처리해 <strong>한 요청만 true</strong>. 3초 TTL은 락 소유 앱이 죽어도 락이 영원히 남지 않게 하는 안전장치.</p></div>
+        <div id="scr-f3"><p>첫 GET과 락 획득 사이에 다른 요청이 캐시를 채웠을 수 있으니 <strong>한 번 더 GET</strong>(Double-Checked Locking). 그래도 없을 때만 MySQL 조회, 책이 있으면 10분 TTL로 저장. 없는 책은 저장하지 않음(negative caching 안 함).</p></div>
+        <div id="scr-f4"><p><code>if redis.call('GET', KEYS[1]) == ARGV[1] then return redis.call('DEL', KEYS[1]) end return 0</code> — 토큰 비교와 삭제를 Redis 안에서 원자적으로. 작업이 3초를 넘어 락이 만료되고 다른 요청이 새 락을 잡았다면 토큰이 달라 <strong>남의 락을 지우지 않습니다</strong>.</p></div>
+        <div id="scr-f5"><p>락을 못 얻은 요청은 DB를 치지 않고 10ms마다 캐시를 확인(sleep만 합쳐 약 1초). 끝까지 안 채워지면 <code>Optional.empty()</code> — 코드 주석: "책이 없음"뿐 아니라 "대기 시간 안에 캐시가 안 채워짐"일 수도 있다.</p></div>
+      </div>
+      <div class="grid">
+        <div class="card"><h3 style="margin-top:0">락 없음 <span class="badge bad">readCount &gt; 1</span></h3><svg viewBox="0 0 520 232" role="img" aria-label="락 없이 핫키 동시 miss" style="width:100%;max-width:640px;height:auto;display:block;margin:6px auto 10px;font-family:var(--sans)"><title>락 없이 핫키 동시 miss</title><defs><marker id="scr-nolock-m-text" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" style="fill:var(--text)"/></marker><marker id="scr-nolock-m-muted" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" style="fill:var(--muted)"/></marker><marker id="scr-nolock-m-good" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" style="fill:var(--good)"/></marker><marker id="scr-nolock-m-bad" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" style="fill:var(--bad)"/></marker><marker id="scr-nolock-m-accent" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" style="fill:var(--accent)"/></marker></defs><rect x="14.0" y="8" width="96" height="28" rx="7" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1"/><text x="62.0" y="27" text-anchor="middle" style="fill:var(--text);font-size:12.5px;font-weight:700">요청 ×40</text><line x1="62.0" y1="36" x2="62.0" y2="226" style="stroke:var(--border);stroke-width:1.5;stroke-dasharray:3 4"/><rect x="218.0" y="8" width="84" height="28" rx="7" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1"/><text x="260.0" y="27" text-anchor="middle" style="fill:var(--text);font-size:12.5px;font-weight:700">Redis</text><line x1="260.0" y1="36" x2="260.0" y2="226" style="stroke:var(--border);stroke-width:1.5;stroke-dasharray:3 4"/><rect x="416.0" y="8" width="84" height="28" rx="7" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1"/><text x="458.0" y="27" text-anchor="middle" style="fill:var(--text);font-size:12.5px;font-weight:700">MySQL</text><line x1="458.0" y1="36" x2="458.0" y2="226" style="stroke:var(--border);stroke-width:1.5;stroke-dasharray:3 4"/><line x1="66.0" y1="76" x2="254.0" y2="76" style="stroke:var(--text);stroke-width:1.6;" marker-end="url(#scr-nolock-m-text)"/><text x="161.0" y="71" text-anchor="middle" style="fill:var(--text);font-size:12.5px">GET hot-book:1</text><line x1="256.0" y1="108" x2="68.0" y2="108" style="stroke:var(--muted);stroke-width:1.6;stroke-dasharray:5 4;" marker-end="url(#scr-nolock-m-muted)"/><text x="161.0" y="103" text-anchor="middle" style="fill:var(--muted);font-size:12.5px">miss (여러 요청)</text><line x1="66.0" y1="140" x2="452.0" y2="140" style="stroke:var(--bad);stroke-width:1.6;" marker-end="url(#scr-nolock-m-bad)"/><text x="260.0" y="135" text-anchor="middle" style="fill:var(--bad);font-size:12.5px;font-weight:600">SELECT (80ms) ×N</text><line x1="66.0" y1="172" x2="254.0" y2="172" style="stroke:var(--text);stroke-width:1.6;" marker-end="url(#scr-nolock-m-text)"/><text x="161.0" y="167" text-anchor="middle" style="fill:var(--text);font-size:12.5px">SET ×N (덮어쓰기)</text><rect x="8" y="188" width="504" height="22" rx="6" style="fill:var(--bad-soft)"/><text x="260.0" y="203" text-anchor="middle" style="fill:var(--bad);font-size:12px;font-weight:600">readCount &gt; 1</text></svg></div>
+        <div class="card"><h3 style="margin-top:0">분산 락 + double-check <span class="badge good">readCount == 1</span></h3><svg viewBox="0 0 560 550" role="img" aria-label="분산 락 + double-check 흐름" style="width:100%;max-width:680px;height:auto;display:block;margin:6px auto 10px;font-family:var(--sans)"><title>분산 락 + double-check 흐름</title><defs><marker id="scr-lock-m-text" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" style="fill:var(--text)"/></marker><marker id="scr-lock-m-muted" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" style="fill:var(--muted)"/></marker><marker id="scr-lock-m-good" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" style="fill:var(--good)"/></marker><marker id="scr-lock-m-bad" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" style="fill:var(--bad)"/></marker><marker id="scr-lock-m-accent" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" style="fill:var(--accent)"/></marker></defs><rect x="14.0" y="8" width="96" height="28" rx="7" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1"/><text x="62.0" y="27" text-anchor="middle" style="fill:var(--text);font-size:12.5px;font-weight:700">T1(승자)</text><line x1="62.0" y1="36" x2="62.0" y2="544" style="stroke:var(--border);stroke-width:1.5;stroke-dasharray:3 4"/><rect x="152.83333333333334" y="8" width="109" height="28" rx="7" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1"/><text x="207.33333333333334" y="27" text-anchor="middle" style="fill:var(--text);font-size:12.5px;font-weight:700">T2..T40</text><line x1="207.33333333333334" y1="36" x2="207.33333333333334" y2="544" style="stroke:var(--border);stroke-width:1.5;stroke-dasharray:3 4"/><rect x="310.6666666666667" y="8" width="84" height="28" rx="7" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1"/><text x="352.6666666666667" y="27" text-anchor="middle" style="fill:var(--text);font-size:12.5px;font-weight:700">Redis</text><line x1="352.6666666666667" y1="36" x2="352.6666666666667" y2="544" style="stroke:var(--border);stroke-width:1.5;stroke-dasharray:3 4"/><rect x="456.0" y="8" width="84" height="28" rx="7" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1"/><text x="498.0" y="27" text-anchor="middle" style="fill:var(--text);font-size:12.5px;font-weight:700">MySQL</text><line x1="498.0" y1="36" x2="498.0" y2="544" style="stroke:var(--border);stroke-width:1.5;stroke-dasharray:3 4"/><line x1="66.0" y1="76" x2="346.6666666666667" y2="76" style="stroke:var(--text);stroke-width:1.6;" marker-end="url(#scr-lock-m-text)"/><text x="207.33333333333334" y="71" text-anchor="middle" style="fill:var(--text);font-size:12.5px">GET → miss</text><line x1="211.33333333333334" y1="108" x2="346.6666666666667" y2="108" style="stroke:var(--text);stroke-width:1.6;" marker-end="url(#scr-lock-m-text)"/><text x="280.0" y="103" text-anchor="middle" style="fill:var(--text);font-size:12.5px">GET → miss</text><line x1="66.0" y1="140" x2="346.6666666666667" y2="140" style="stroke:var(--text);stroke-width:1.6;" marker-end="url(#scr-lock-m-text)"/><text x="207.33333333333334" y="135" text-anchor="middle" style="fill:var(--text);font-size:12.5px">SET lock NX EX 3</text><line x1="348.6666666666667" y1="172" x2="68.0" y2="172" style="stroke:var(--good);stroke-width:1.6;stroke-dasharray:5 4;" marker-end="url(#scr-lock-m-good)"/><text x="207.33333333333334" y="167" text-anchor="middle" style="fill:var(--good);font-size:12.5px;font-weight:600">OK</text><line x1="211.33333333333334" y1="204" x2="346.6666666666667" y2="204" style="stroke:var(--text);stroke-width:1.6;" marker-end="url(#scr-lock-m-text)"/><text x="280.0" y="199" text-anchor="middle" style="fill:var(--text);font-size:12.5px">SET lock NX EX 3</text><line x1="348.6666666666667" y1="236" x2="213.33333333333334" y2="236" style="stroke:var(--bad);stroke-width:1.6;stroke-dasharray:5 4;" marker-end="url(#scr-lock-m-bad)"/><text x="280.0" y="231" text-anchor="middle" style="fill:var(--bad);font-size:12.5px;font-weight:600">실패</text><line x1="66.0" y1="268" x2="346.6666666666667" y2="268" style="stroke:var(--text);stroke-width:1.6;" marker-end="url(#scr-lock-m-text)"/><text x="207.33333333333334" y="263" text-anchor="middle" style="fill:var(--text);font-size:12.5px">GET (double-check)</text><line x1="66.0" y1="300" x2="492.0" y2="300" style="stroke:var(--text);stroke-width:1.6;" marker-end="url(#scr-lock-m-text)"/><text x="280.0" y="295" text-anchor="middle" style="fill:var(--text);font-size:12.5px">SELECT (80ms)</text><line x1="494.0" y1="332" x2="68.0" y2="332" style="stroke:var(--muted);stroke-width:1.6;stroke-dasharray:5 4;" marker-end="url(#scr-lock-m-muted)"/><text x="280.0" y="327" text-anchor="middle" style="fill:var(--muted);font-size:12.5px">Book</text><line x1="66.0" y1="364" x2="346.6666666666667" y2="364" style="stroke:var(--text);stroke-width:1.6;" marker-end="url(#scr-lock-m-text)"/><text x="207.33333333333334" y="359" text-anchor="middle" style="fill:var(--text);font-size:12.5px">SET hot-book:1 10m</text><line x1="66.0" y1="396" x2="346.6666666666667" y2="396" style="stroke:var(--text);stroke-width:1.6;" marker-end="url(#scr-lock-m-text)"/><text x="207.33333333333334" y="391" text-anchor="middle" style="fill:var(--text);font-size:12.5px">Lua: 내 토큰이면 DEL</text><rect x="8" y="412" width="544" height="22" rx="6" style="fill:var(--surface-2)"/><text x="280.0" y="427" text-anchor="middle" style="fill:var(--muted);font-size:12px;font-weight:600">T2..T40: 10ms마다 GET 폴링 (최대 100회)</text><line x1="211.33333333333334" y1="458" x2="346.6666666666667" y2="458" style="stroke:var(--text);stroke-width:1.6;" marker-end="url(#scr-lock-m-text)"/><text x="280.0" y="453" text-anchor="middle" style="fill:var(--text);font-size:12.5px">GET hot-book:1</text><line x1="348.6666666666667" y1="490" x2="213.33333333333334" y2="490" style="stroke:var(--good);stroke-width:1.6;stroke-dasharray:5 4;" marker-end="url(#scr-lock-m-good)"/><text x="280.0" y="485" text-anchor="middle" style="fill:var(--good);font-size:12.5px;font-weight:600">Book JSON</text><rect x="8" y="506" width="544" height="22" rx="6" style="fill:var(--good-soft)"/><text x="280.0" y="521" text-anchor="middle" style="fill:var(--good);font-size:12px;font-weight:600">readCount == 1</text></svg></div>
+      </div>
+      <p class="source">테스트 조건: <code>RedisHotKeyLockTest</code> — 40스레드를 <code>CountDownLatch</code>로 동시에 출발, 원본 조회에 80ms 지연(<code>resetMetrics(Duration.ofMillis(80))</code>).</p>
+    </section>
+
+    <section id="cases">
+      <h2><span class="num">03</span>비교·핵심 구현</h2>
+      <p class="sub">탭을 눌러 케이스별로 봅니다. 코드는 실제 파일에서 발췌했습니다.</p>
+      <div data-tabs>
+        <div class="tabs" role="tablist">
+          <button role="tab" data-target="scr-t-sc">@Cacheable + Redis</button>
+          <button role="tab" data-target="scr-t-ser">JSON 직렬화 설정</button>
+          <button role="tab" data-target="scr-t-rt">RedisTemplate Cache Aside</button>
+          <button role="tab" data-target="scr-t-null">Null caching</button>
+          <button role="tab" data-target="scr-t-jit">TTL Jitter</button>
+          <button role="tab" data-target="scr-t-lock">분산 락 코드</button>
+          <button role="tab" data-target="scr-t-pick">어느 쪽을 쓰나</button>
+        </div>
+
+        <div class="tabpanel card" id="scr-t-sc">
+          <h3>SpringCacheBookService — 메서드 본문엔 원본 조회만</h3>
+          <svg viewBox="0 0 560 452" role="img" aria-label="@Cacheable + RedisCacheManager 흐름" style="width:100%;max-width:680px;height:auto;display:block;margin:6px auto 10px;font-family:var(--sans)"><title>@Cacheable + RedisCacheManager 흐름</title><defs><marker id="scr-cacheable-m-text" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" style="fill:var(--text)"/></marker><marker id="scr-cacheable-m-muted" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" style="fill:var(--muted)"/></marker><marker id="scr-cacheable-m-good" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" style="fill:var(--good)"/></marker><marker id="scr-cacheable-m-bad" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" style="fill:var(--bad)"/></marker><marker id="scr-cacheable-m-accent" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" style="fill:var(--accent)"/></marker></defs><rect x="20.0" y="8" width="84" height="28" rx="7" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1"/><text x="62.0" y="27" text-anchor="middle" style="fill:var(--text);font-size:12.5px;font-weight:700">Test</text><line x1="62.0" y1="36" x2="62.0" y2="446" style="stroke:var(--border);stroke-width:1.5;stroke-dasharray:3 4"/><rect x="159.33333333333334" y="8" width="96" height="28" rx="7" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1"/><text x="207.33333333333334" y="27" text-anchor="middle" style="fill:var(--text);font-size:12.5px;font-weight:700">캐시 프록시</text><line x1="207.33333333333334" y1="36" x2="207.33333333333334" y2="446" style="stroke:var(--border);stroke-width:1.5;stroke-dasharray:3 4"/><rect x="310.6666666666667" y="8" width="84" height="28" rx="7" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1"/><text x="352.6666666666667" y="27" text-anchor="middle" style="fill:var(--text);font-size:12.5px;font-weight:700">Redis</text><line x1="352.6666666666667" y1="36" x2="352.6666666666667" y2="446" style="stroke:var(--border);stroke-width:1.5;stroke-dasharray:3 4"/><rect x="450.0" y="8" width="96" height="28" rx="7" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1"/><text x="498.0" y="27" text-anchor="middle" style="fill:var(--text);font-size:12.5px;font-weight:700">Origin</text><line x1="498.0" y1="36" x2="498.0" y2="446" style="stroke:var(--border);stroke-width:1.5;stroke-dasharray:3 4"/><rect x="8" y="60" width="544" height="22" rx="6" style="fill:var(--surface-2)"/><text x="280.0" y="75" text-anchor="middle" style="fill:var(--muted);font-size:12px;font-weight:600">첫 호출: cache miss</text><line x1="66.0" y1="106" x2="201.33333333333334" y2="106" style="stroke:var(--text);stroke-width:1.6;" marker-end="url(#scr-cacheable-m-text)"/><text x="134.66666666666669" y="101" text-anchor="middle" style="fill:var(--text);font-size:12.5px">findBookById(1L)</text><line x1="211.33333333333334" y1="138" x2="346.6666666666667" y2="138" style="stroke:var(--text);stroke-width:1.6;" marker-end="url(#scr-cacheable-m-text)"/><text x="280.0" y="133" text-anchor="middle" style="fill:var(--text);font-size:12.5px">GET ...::books::1</text><line x1="348.6666666666667" y1="170" x2="213.33333333333334" y2="170" style="stroke:var(--muted);stroke-width:1.6;stroke-dasharray:5 4;" marker-end="url(#scr-cacheable-m-muted)"/><text x="280.0" y="165" text-anchor="middle" style="fill:var(--muted);font-size:12.5px">miss</text><line x1="211.33333333333334" y1="202" x2="492.0" y2="202" style="stroke:var(--text);stroke-width:1.6;" marker-end="url(#scr-cacheable-m-text)"/><text x="352.6666666666667" y="197" text-anchor="middle" style="fill:var(--text);font-size:12.5px">본문 실행 → findById</text><line x1="494.0" y1="234" x2="213.33333333333334" y2="234" style="stroke:var(--muted);stroke-width:1.6;stroke-dasharray:5 4;" marker-end="url(#scr-cacheable-m-muted)"/><text x="352.6666666666667" y="229" text-anchor="middle" style="fill:var(--muted);font-size:12.5px">Optional&lt;Book&gt;</text><line x1="211.33333333333334" y1="266" x2="346.6666666666667" y2="266" style="stroke:var(--text);stroke-width:1.6;" marker-end="url(#scr-cacheable-m-text)"/><text x="280.0" y="261" text-anchor="middle" style="fill:var(--text);font-size:12.5px">SET JSON (TTL 10m)</text><rect x="8" y="282" width="544" height="22" rx="6" style="fill:var(--surface-2)"/><text x="280.0" y="297" text-anchor="middle" style="fill:var(--muted);font-size:12px;font-weight:600">두 번째 호출: cache hit</text><line x1="66.0" y1="328" x2="201.33333333333334" y2="328" style="stroke:var(--text);stroke-width:1.6;" marker-end="url(#scr-cacheable-m-text)"/><text x="134.66666666666669" y="323" text-anchor="middle" style="fill:var(--text);font-size:12.5px">findBookById(1L)</text><line x1="211.33333333333334" y1="360" x2="346.6666666666667" y2="360" style="stroke:var(--text);stroke-width:1.6;" marker-end="url(#scr-cacheable-m-text)"/><text x="280.0" y="355" text-anchor="middle" style="fill:var(--text);font-size:12.5px">GET</text><line x1="348.6666666666667" y1="392" x2="213.33333333333334" y2="392" style="stroke:var(--good);stroke-width:1.6;stroke-dasharray:5 4;" marker-end="url(#scr-cacheable-m-good)"/><text x="280.0" y="387" text-anchor="middle" style="fill:var(--good);font-size:12.5px;font-weight:600">Book JSON</text><rect x="8" y="408" width="544" height="22" rx="6" style="fill:var(--good-soft)"/><text x="280.0" y="423" text-anchor="middle" style="fill:var(--good);font-size:12px;font-weight:600">본문 미실행 → readCount 1 유지</text></svg>
+<pre><code>@Cacheable(
+        cacheNames = RedisCacheConfig.BOOKS_CACHE,
+        key = "#id",
+        unless = "#result == null"
+)
+public Optional&lt;Book&gt; findBookById(long id) {
+    return bookOriginService.findById(id);
+}</code></pre>
+<pre><code># application.yml
+spring:
+  cache:
+    type: redis
+    redis:
+      time-to-live: 10m
+      cache-null-values: false
+      use-key-prefix: true
+      key-prefix: "deep-dive:spring-cache-redis::"</code></pre>
+          <dl class="kv">
+            <dt>Redis 키</dt><dd><code>deep-dive:spring-cache-redis::books::1</code>, 값은 <code>{"@class":"…Book","id":1,"name":"Effective Java"}</code>, TTL 최대 10분.</dd>
+            <dt>Optional</dt><dd>값이 있으면 <code>Book</code>을 꺼내 저장, hit 때 다시 <code>Optional</code>로 감쌈. <code>Optional.empty()</code>의 내부 값은 null이라 <code>unless</code>로 저장 안 함.</dd>
+            <dt>결과</dt><dd><code>SpringCacheBookServiceTest</code>: 2회 호출에 <code>readCount</code> 1, Redis에 JSON 저장, TTL 1~600초. 없는 999L은 2회 호출에 <code>readCount</code> 2, 키 없음.</dd>
+            <dt>코드</dt><dd><code>src/main/java/dev/deepdive/springcacheredis/book/cache/SpringCacheBookService.java</code>, <code>src/main/resources/application.yml</code></dd>
+          </dl>
+        </div>
+
+        <div class="tabpanel card" id="scr-t-ser">
+          <h3>RedisCacheConfig — value serializer만 JSON으로 교체</h3>
+<pre><code>GenericJackson2JsonRedisSerializer jsonSerializer =
+        GenericJackson2JsonRedisSerializer.builder()
+                // 공용 ObjectMapper를 직접 변경하지 않도록 Redis 캐시 전용 복사본을 사용한다.
+                .objectMapper(objectMapper.copy())
+                // ... JSON에 실제 클래스 정보도 기록한다.
+                .defaultTyping(true)
+                .build();
+
+SerializationPair&lt;Object&gt; jsonSerialization =
+        SerializationPair.fromSerializer(jsonSerializer);
+
+return builder -&gt; builder.cacheDefaults(
+        builder.cacheDefaults().serializeValuesWith(jsonSerialization)
+);</code></pre>
+          <dl class="kv">
+            <dt>왜</dt><dd><code>RedisCacheManager</code>는 값을 Object로 다루므로 <code>@class</code> 타입 정보가 있어야 조회 때 <code>LinkedHashMap</code>이 아니라 <code>Book</code>으로 복원됩니다. 캐스팅이 아니라 직렬화/역직렬화.</dd>
+            <dt>설계</dt><dd><code>RedisCacheManagerBuilderCustomizer</code>로 Boot의 기본 설정(TTL, null 정책, key prefix)은 유지하고 value 직렬화만 바꿈.</dd>
+            <dt>코드</dt><dd><code>src/main/java/dev/deepdive/springcacheredis/config/RedisCacheConfig.java</code>, <code>src/main/java/dev/deepdive/springcacheredis/config/JacksonConfig.java</code></dd>
+          </dl>
+        </div>
+
+        <div class="tabpanel card" id="scr-t-rt">
+          <h3>RedisTemplateBookCacheService.findBookById — 수동 Cache Aside</h3>
+<pre><code>String key = "book:" + id;
+String cached = redisTemplate.opsForValue().get(key);
+if (cached != null) {
+    return Optional.of(objectMapper.readValue(cached, Book.class));
+}
+
+Optional&lt;Book&gt; loaded = bookOriginService.findById(id);
+if (loaded.isPresent()) {
+    redisTemplate.opsForValue().set(
+            key,
+            objectMapper.writeValueAsString(loaded.get()),
+            Duration.ofMinutes(10)
+    );
+}
+return loaded;</code></pre>
+          <dl class="kv">
+            <dt>차이</dt><dd>@Cacheable이 숨기던 GET/SET, JSON 변환(<code>ObjectMapper</code>), TTL을 서비스가 직접 씁니다. 대신 key·value·TTL을 세밀하게 제어 가능.</dd>
+            <dt>결과</dt><dd>2회 조회에 <code>readCount</code> 1, <code>book:1</code>에 <code>"id":1</code>, <code>"name":"Effective Java"</code> JSON.</dd>
+          </dl>
+        </div>
+
+        <div class="tabpanel card" id="scr-t-null">
+          <h3>Null caching — 없는 데이터도 30초 캐싱</h3>
+          <svg viewBox="0 0 520 358" role="img" aria-label="Null caching 흐름" style="width:100%;max-width:640px;height:auto;display:block;margin:6px auto 10px;font-family:var(--sans)"><title>Null caching 흐름</title><defs><marker id="scr-null-m-text" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" style="fill:var(--text)"/></marker><marker id="scr-null-m-muted" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" style="fill:var(--muted)"/></marker><marker id="scr-null-m-good" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" style="fill:var(--good)"/></marker><marker id="scr-null-m-bad" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" style="fill:var(--bad)"/></marker><marker id="scr-null-m-accent" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" style="fill:var(--accent)"/></marker></defs><rect x="7.5" y="8" width="109" height="28" rx="7" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1"/><text x="62.0" y="27" text-anchor="middle" style="fill:var(--text);font-size:12.5px;font-weight:700">Service</text><line x1="62.0" y1="36" x2="62.0" y2="352" style="stroke:var(--border);stroke-width:1.5;stroke-dasharray:3 4"/><rect x="218.0" y="8" width="84" height="28" rx="7" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1"/><text x="260.0" y="27" text-anchor="middle" style="fill:var(--text);font-size:12.5px;font-weight:700">Redis</text><line x1="260.0" y1="36" x2="260.0" y2="352" style="stroke:var(--border);stroke-width:1.5;stroke-dasharray:3 4"/><rect x="416.0" y="8" width="84" height="28" rx="7" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1"/><text x="458.0" y="27" text-anchor="middle" style="fill:var(--text);font-size:12.5px;font-weight:700">MySQL</text><line x1="458.0" y1="36" x2="458.0" y2="352" style="stroke:var(--border);stroke-width:1.5;stroke-dasharray:3 4"/><rect x="8" y="60" width="504" height="22" rx="6" style="fill:var(--surface-2)"/><text x="260.0" y="75" text-anchor="middle" style="fill:var(--muted);font-size:12px;font-weight:600">첫 조회: 없는 id 999</text><line x1="66.0" y1="106" x2="254.0" y2="106" style="stroke:var(--text);stroke-width:1.6;" marker-end="url(#scr-null-m-text)"/><text x="161.0" y="101" text-anchor="middle" style="fill:var(--text);font-size:12.5px">GET book:999</text><line x1="256.0" y1="138" x2="68.0" y2="138" style="stroke:var(--muted);stroke-width:1.6;stroke-dasharray:5 4;" marker-end="url(#scr-null-m-muted)"/><text x="161.0" y="133" text-anchor="middle" style="fill:var(--muted);font-size:12.5px">miss</text><line x1="66.0" y1="170" x2="452.0" y2="170" style="stroke:var(--text);stroke-width:1.6;" marker-end="url(#scr-null-m-text)"/><text x="260.0" y="165" text-anchor="middle" style="fill:var(--text);font-size:12.5px">findById(999)</text><line x1="454.0" y1="202" x2="68.0" y2="202" style="stroke:var(--muted);stroke-width:1.6;stroke-dasharray:5 4;" marker-end="url(#scr-null-m-muted)"/><text x="260.0" y="197" text-anchor="middle" style="fill:var(--muted);font-size:12.5px">empty</text><line x1="66.0" y1="234" x2="254.0" y2="234" style="stroke:var(--text);stroke-width:1.6;" marker-end="url(#scr-null-m-text)"/><text x="161.0" y="229" text-anchor="middle" style="fill:var(--text);font-size:12.5px">SET &quot;__NULL__&quot; EX 30</text><rect x="8" y="250" width="504" height="22" rx="6" style="fill:var(--surface-2)"/><text x="260.0" y="265" text-anchor="middle" style="fill:var(--muted);font-size:12px;font-weight:600">이후 19번: Redis에서 끝</text><line x1="66.0" y1="296" x2="254.0" y2="296" style="stroke:var(--text);stroke-width:1.6;" marker-end="url(#scr-null-m-text)"/><text x="161.0" y="291" text-anchor="middle" style="fill:var(--text);font-size:12.5px">GET book:999</text><line x1="256.0" y1="328" x2="68.0" y2="328" style="stroke:var(--good);stroke-width:1.6;stroke-dasharray:5 4;" marker-end="url(#scr-null-m-good)"/><text x="161.0" y="323" text-anchor="middle" style="fill:var(--good);font-size:12.5px;font-weight:600">&quot;__NULL__&quot; → empty</text></svg>
+<pre><code>if ("__NULL__".equals(cached)) {
+    return Optional.empty();
+}
+// ...
+} else {
+    redisTemplate.opsForValue().set(key, "__NULL__", Duration.ofSeconds(30));
+}</code></pre>
+          <dl class="kv">
+            <dt>왜 짧게</dt><dd>나중에 그 id의 책이 실제로 생기면 sentinel이 새 값을 가립니다. 정상 값(10분)보다 훨씬 짧은 30초.</dd>
+            <dt>결과</dt><dd>999L을 20회 조회해도 <code>readCount</code> 1, 값 <code>"__NULL__"</code>, TTL 1~30초.</dd>
+            <dt>비교</dt><dd>@Cacheable 쪽은 <code>cache-null-values: false</code> + <code>unless</code>라 없는 id는 매번 원본 조회(2회 → 2).</dd>
+            <dt>키 공유</dt><dd><span class="badge good">수정함</span> sentinel은 Book JSON과 같은 key(<code>book:{id}</code>)에 저장되므로, 일반 조회 <code>findBookById</code>도 sentinel을 먼저 확인해 <code>Optional.empty()</code>(없음 hit)로 돌려줍니다. 예전엔 JSON으로 파싱하려다 예외가 났습니다.</dd>
+          </dl>
+        </div>
+
+        <div class="tabpanel card" id="scr-t-jit">
+          <h3>TTL Jitter — cacheBooksWithJitter</h3>
+<pre><code>for (Book book : books) {
+    String key = "book:" + book.id();
+    Duration ttl = baseTtl;
+    if (!maxJitter.isZero() &amp;&amp; !maxJitter.isNegative()) {
+        ttl = baseTtl.plusMillis(jitterMillis(key, maxJitter.toMillis()));
+    }
+    redisTemplate.opsForValue().set(key, objectMapper.writeValueAsString(book), ttl);
+}
+
+// hash를 SplitMix64 finalizer로 섞은 뒤 나머지 → 인접 key도 범위 전체로 흩어짐
+static long jitterMillis(String key, long maxJitterMillis) {
+    return Math.floorMod(mix(key.hashCode()), maxJitterMillis + 1);
+}</code></pre>
+          <dl class="kv">
+            <dt>어떻게</dt><dd>key의 <code>hashCode</code>를 섞어(SplitMix64) 0~maxJitter ms를 결정적으로 더함(같은 key면 항상 같은 jitter). 테스트는 base 60초, jitter 10초.</dd>
+            <dt>결과</dt><dd><code>RedisTemplateBookCacheTest</code>: 5개 키 TTL이 모두 50~70초 범위, 서로 다른 값 2개 이상, <b>최대-최소 차이 5초 초과</b>. 인접 key 100개의 jitter가 1초 단위 구간 9개 이상에 퍼지는지도 확인.</dd>
+            <dt>함정 <span class="badge good">수정함</span></dt><dd>예전엔 <code>key.hashCode()</code>를 그대로 나머지 연산해서, 연속 id <code>"book:1"</code>~<code>"book:5"</code>의 jitter가 133~137ms로 1ms씩만 달랐습니다(분산 효과 거의 없음). 테스트도 "값이 2개 이상 다름"만 봐서 드러나지 않았습니다.</dd>
+          </dl>
+        </div>
+
+        <div class="tabpanel card" id="scr-t-lock">
+          <h3>RedisHotKeyBookCacheService.findWithDistributedLock (발췌)</h3>
+<pre><code>String lockKey = "hot-book:" + id + ":lock";
+String token = UUID.randomUUID().toString();
+
+if (Boolean.TRUE.equals(
+        redisTemplate.opsForValue().setIfAbsent(lockKey, token, Duration.ofSeconds(3)))) {
+    try {
+        String doubleChecked = redisTemplate.opsForValue().get(key);
+        if (doubleChecked != null) {
+            return Optional.of(objectMapper.readValue(doubleChecked, Book.class));
+        }
+        Optional&lt;Book&gt; loaded = bookOriginService.findById(id);
+        // ... 있으면 SET key JSON 10분
+        return loaded;
+    } finally {
+        redisTemplate.execute(
+                new DefaultRedisScript&lt;&gt;(
+                        """
+                        if redis.call('GET', KEYS[1]) == ARGV[1] then
+                            return redis.call('DEL', KEYS[1])
+                        end
+                        return 0
+                        """,
+                        Long.class
+                ),
+                List.of(lockKey),
+                token
+        );
+    }
+}
+
+for (int i = 0; i &lt; 100; i++) {
+    Thread.sleep(Duration.ofMillis(10).toMillis());
+    String cachedAfterWaiting = redisTemplate.opsForValue().get(key);
+    if (cachedAfterWaiting != null) {
+        return Optional.of(objectMapper.readValue(cachedAfterWaiting, Book.class));
+    }
+}
+// 주의: 여기서 empty는 "책이 없음"뿐 아니라 "대기 시간 안에 캐시가 안 채워짐"일 수도 있다.
+return Optional.empty();</code></pre>
+          <dl class="kv">
+            <dt>비교 대상</dt><dd><code>findWithoutLock</code>: 같은 키(<code>hot-book:{id}</code>)로 GET → miss면 바로 원본 조회 → SET. 동시 miss가 모두 DB로.</dd>
+            <dt>코드</dt><dd><code>src/main/java/dev/deepdive/springcacheredis/book/cache/RedisHotKeyBookCacheService.java</code></dd>
+          </dl>
+        </div>
+
+        <div class="tabpanel card" id="scr-t-pick">
+          <h3>Spring Cache vs RedisTemplate (README 표)</h3>
+          <div class="tablewrap"><table>
+            <thead><tr><th>상황</th><th>주로 선택</th><th>이유</th></tr></thead>
+            <tbody>
+              <tr><td>일반적인 메서드 결과 캐싱</td><td>Spring Cache</td><td><code>@Cacheable</code>, <code>@CachePut</code>, <code>@CacheEvict</code>로 반복 코드 감소</td></tr>
+              <tr><td>Redis String 직접 GET/SET</td><td>RedisTemplate</td><td>key, value, TTL을 코드에서 세밀하게 제어</td></tr>
+              <tr><td>Hash, Set, ZSet 사용</td><td>RedisTemplate</td><td>Spring Cache는 Redis 자료구조 API를 추상화하지 않음</td></tr>
+              <tr><td>Null sentinel, TTL Jitter</td><td>RedisTemplate</td><td>값과 TTL에 별도 정책 필요</td></tr>
+              <tr class="hl"><td><code>SET NX</code>, Lua, 분산 락</td><td>RedisTemplate</td><td>Redis의 원자적 명령과 스크립트를 직접 사용</td></tr>
+            </tbody>
+          </table></div>
+          <p>README: 두 방식은 함께 씁니다. 일반 조회는 Spring Cache로 단순화하고, Redis 고유 기능이 필요할 때 RedisTemplate. 학습용으로 <code>RedisTemplateLearningService</code>/<code>RedisBasicCommandTest</code>가 <code>SET</code>/<code>GET</code>/<code>DEL</code>, TTL(<code>getExpire</code>: -1 만료 없음, -2 키 없음), <code>SET NX</code>, Hash, ZSet 랭킹, <code>INFO stats</code>를 다룹니다.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="results">
+      <h2><span class="num">04</span>결과·수치</h2>
+      <p class="sub">성능(ms, TPS) 측정은 없습니다. <code>BookOriginService.readCount()</code> 등 테스트가 단언하는 값을 봅니다.</p>
+      <div class="callout warn"><strong>측정 수치 없음.</strong> 아래 막대는 테스트 단언값이거나, 표기한 경우 코드로 계산한 값입니다. Docker가 없으면 이 테스트들은 skip됩니다(<code>disabledWithoutDocker = true</code>).</div>
+      <div class="grid c2">
+        <div class="card">
+          <h3 style="margin-top:0">원본(MySQL) 조회 횟수</h3>
+          <div class="bars">
+            <div class="bar good" style="--v:.05"><span>@Cacheable 2회</span><div class="track"><div class="fill"></div></div><span class="val">1</span></div>
+            <div class="bar bad" style="--v:.1"><span>@Cacheable 없는 id 2회</span><div class="track"><div class="fill"></div></div><span class="val">2</span></div>
+            <div class="bar good" style="--v:.05"><span>Template 2회</span><div class="track"><div class="fill"></div></div><span class="val">1</span></div>
+            <div class="bar good" style="--v:.05"><span>Null caching 20회</span><div class="track"><div class="fill"></div></div><span class="val">1</span></div>
+          </div>
+          <div class="source">테스트 단언값: <code>SpringCacheBookServiceTest</code>, <code>RedisTemplateBookCacheTest</code> (막대 길이 기준: 20)</div>
+        </div>
+        <div class="card">
+          <h3 style="margin-top:0">핫키 40 동시 요청 · 원본 조회</h3>
+          <div class="tablewrap"><table>
+            <thead><tr><th>방식</th><th class="num">readCount 단언</th><th>결과</th></tr></thead>
+            <tbody>
+              <tr><td><code>findWithoutLock</code></td><td class="num">&gt; 1</td><td>40개 모두 같은 책</td></tr>
+              <tr class="hl"><td><code>findWithDistributedLock</code></td><td class="num">== 1</td><td>40개 모두 같은 책</td></tr>
+            </tbody>
+          </table></div>
+          <div class="source">테스트 단언값: <code>RedisHotKeyLockTest</code>. 락 없음의 정확한 횟수는 실행마다 달라 단언하지 않음(최대 40).</div>
+        </div>
+      </div>
+      <div class="card" style="margin-top:12px">
+        <h3 style="margin-top:0">TTL Jitter — 테스트 입력의 실제 jitter (코드로 계산한 값) <span class="badge good">수정함</span></h3>
+        <p class="sub">base 60초 + <code>floorMod(mix("book:N".hashCode()), 10001)</code> ms. 막대 길이 = jitter / 최대 10,000ms.</p>
+        <div class="bars">
+          <div class="bar good" style="--v:.0483"><span>book:1</span><div class="track"><div class="fill"></div></div><span class="val">+483 ms</span></div>
+          <div class="bar good" style="--v:.886"><span>book:2</span><div class="track"><div class="fill"></div></div><span class="val">+8,860 ms</span></div>
+          <div class="bar good" style="--v:.7524"><span>book:3</span><div class="track"><div class="fill"></div></div><span class="val">+7,524 ms</span></div>
+          <div class="bar good" style="--v:.8673"><span>book:4</span><div class="track"><div class="fill"></div></div><span class="val">+8,673 ms</span></div>
+          <div class="bar good" style="--v:.0533"><span>book:5</span><div class="track"><div class="fill"></div></div><span class="val">+533 ms</span></div>
+        </div>
+        <div class="source">출처: <code>String.hashCode</code> + SplitMix64 finalizer로 직접 계산(측정 아님). 예전 구현(<code>floorMod(hashCode, 10001)</code>)은 같은 다섯 key가 +133~137ms로 5ms 안에 몰렸습니다. 지금은 약 0.5~8.9초로 퍼지고, 테스트가 TTL 차이 5초 초과를 단언합니다.</div>
+      </div>
+    </section>
+
+    <section id="limits">
+      <h2><span class="num">05</span>한계·약점</h2>
+      <p class="sub"><span class="badge info">README 인정</span> 문서·주석이 스스로 밝힌 한계, <span class="badge warn">코드 확인</span> 코드를 읽어 보면 드러나는 약점.</p>
+      <details id="lim-1" class="qa risk"><summary><span><span class="badge info">README 인정</span> 대기 요청의 empty는 "없음"과 "시간 초과"를 구분하지 못한다</span></summary><div class="a"><p>대기 루프는 sleep만 약 1초(10ms × 100), 락 TTL은 3초. 원본 조회가 대기보다 오래 걸리면 대기 요청은 캐시가 곧 채워지더라도 먼저 <code>Optional.empty()</code>를 받습니다. 호출자는 "책이 없다"로 오해할 수 있습니다(코드 주석도 인정).</p></div></details>
+      <details id="lim-2" class="qa risk"><summary><span><span class="badge info">README 인정</span> 락 경로는 없는 책을 캐싱하지 않는다</span></summary><div class="a"><p><code>findWithDistributedLock</code>은 Negative Caching을 하지 않아, 없는 id를 반복 조회하면 매번 락을 잡고 원본을 다시 확인합니다. Null sentinel은 <code>findBookByIdWithNullCaching</code>에만 있습니다.</p></div></details>
+      <details id="lim-3" class="qa risk"><summary><span><span class="badge info">README 인정</span> @Cacheable은 분산 락이 아니다</span></summary><div class="a"><p>"기본 <code>RedisCacheManager</code>는 non-locking이므로 <code>@Cacheable</code>이 분산 락을 대신하지는 않는다." Spring Cache 경로에는 stampede 방어가 없습니다.</p></div></details>
+      <details id="lim-4" class="qa risk"><summary><span><span class="badge warn">코드 확인</span> <span class="badge good">수정함</span> TTL Jitter가 연속 키에서는 거의 0</span></summary><div class="a"><p>예전엔 <code>"book:1"</code>~<code>"book:5"</code>가 마지막 글자만 달라 hashCode가 1씩 차이 → jitter가 133~137ms로 5ms 안에 몰렸고, 테스트 단언("값이 2개 이상 다름")이 약해 드러나지 않았습니다.</p><p>수정: hash를 SplitMix64 finalizer로 섞은 뒤 나머지를 취해 결정성은 유지하면서 범위 전체로 퍼지게 했고, 테스트가 TTL 차이 5초 초과와 key 100개의 구간 분포를 단언합니다.</p><p>남은 점: jitter는 일괄 적재 헬퍼 <code>cacheBooksWithJitter</code>에만 있고, 실제 조회 경로(<code>findBookById</code>, @Cacheable 10m)는 고정 TTL입니다.</p></div></details>
+      <details id="lim-5" class="qa risk"><summary><span><span class="badge warn">코드 확인</span> <span class="badge good">수정함</span> <code>__NULL__</code> sentinel이 일반 조회 경로와 키를 공유한다</span></summary><div class="a"><p><code>findBookByIdWithNullCaching</code>과 <code>findBookById</code>는 같은 키 <code>book:{id}</code>를 씁니다. 예전엔 sentinel이 저장된 상태에서 <code>findBookById</code>를 부르면 <code>"__NULL__"</code>을 JSON으로 파싱하려다 <code>IllegalStateException("Book deserialization failed")</code>가 났습니다.</p><p>수정: <code>findBookById</code>도 sentinel을 먼저 확인해 <code>Optional.empty()</code>(없음 hit, 원본 조회 없음)로 돌려줍니다. 테스트가 sentinel을 남긴 뒤 일반 조회를 호출해 예외 없이 빈 결과와 원본 조회 1회를 확인합니다. 대안(별도 key namespace)의 장단점은 README에 적었습니다.</p></div></details>
+      <details id="lim-6" class="qa risk"><summary><span><span class="badge warn">코드 확인</span> 쓰기·무효화 경로가 없다</span></summary><div class="a"><p>README 표는 <code>@CachePut</code>/<code>@CacheEvict</code>의 장점을 소개하지만, 이 모듈에는 책을 수정하고 캐시를 갱신/삭제하는 메서드가 하나도 없습니다. 캐시 일관성(쓰기 후 무효화, race)은 검증되지 않습니다(→ <code>labs/cache-patterns</code>, <code>labs/spring-cache-local</code>).</p></div></details>
+      <details id="lim-7" class="qa risk"><summary><span><span class="badge warn">코드 확인</span> 분산 락의 운영 이슈는 범위 밖</span></summary><div class="a"><ul><li>락 연장(lease renewal) 없음: 원본 조회가 3초를 넘기면 락이 풀려 두 번째 요청도 DB를 칠 수 있음(토큰 덕에 남의 락을 지우진 않음).</li><li>대기는 <code>Thread.sleep</code> 폴링이라 대기 요청마다 스레드를 붙잡음.</li><li>단일 Redis 컨테이너 기준. Redis 장애·복제 지연 시 동작은 다루지 않음.</li></ul></div></details>
+      <details id="lim-8" class="qa risk"><summary><span><span class="badge warn">코드 확인</span> <span class="badge good">수정함</span> README API 표와 실제 사용 범위의 차이</span></summary><div class="a"><p>예전 README의 RedisTemplate API 표에는 List(<code>opsForList</code>), Set(<code>opsForSet</code>)이 있었지만 코드에서는 javadoc 주석으로만 언급되고 호출되지 않았습니다. 실제 사용은 String, Hash, Sorted Set(<code>RedisBasicCommandTest</code>)뿐입니다.</p><p>수정: README 표를 실제로 호출하는 API(String·<code>setIfAbsent</code>, Hash, Sorted Set, 삭제)만 남기고, List·Set은 "이 모듈에서는 다루지 않음"으로 한 줄 안내했습니다.</p></div></details>
+    </section>
+
+    <section id="interview">
+      <h2><span class="num">06</span>면접 Q&amp;A</h2>
+      <p class="sub">질문을 먼저 읽고 스스로 답해 본 뒤 펼쳐 보세요. <span class="badge info">일반 지식</span>은 이 레포 밖의 널리 알려진 내용입니다.</p>
+      <div class="qa-tools"><button type="button" data-qa="open">모두 펼치기</button><button type="button" data-qa="close">모두 접기</button></div>
+      <details id="iv-1" class="qa"><summary>Spring Cache(@Cacheable)와 RedisTemplate은 언제 각각 쓰나?</summary><div class="a"><ul><li>일반 메서드 결과 캐싱 → Spring Cache: 본문엔 원본 조회만 남고 GET/SET·직렬화는 <code>RedisCacheManager</code>가.</li><li>Redis 자료구조(Hash/ZSet), null sentinel, TTL jitter, <code>SET NX</code>/Lua 락 → RedisTemplate.</li><li>둘을 섞어 쓰는 게 README의 결론. 단, 같은 키 공간을 공유하면 값 형식 규칙을 맞춰야 함(sentinel 약점 참고).</li></ul></div></details>
+      <details id="iv-2" class="qa"><summary>Redis 캐시 값은 어떻게 직렬화했고, 왜 @class가 들어가나?</summary><div class="a"><ul><li><code>GenericJackson2JsonRedisSerializer</code> + <code>defaultTyping(true)</code>를 <code>SerializationPair</code>로 감싸 <code>cacheDefaults().serializeValuesWith</code>에 연결. ObjectMapper는 <code>copy()</code>해서 공용 설정 오염 방지.</li><li>CacheManager는 값을 Object로 다뤄서 타입 정보 없이는 <code>LinkedHashMap</code>으로 복원됨.</li><li><span class="badge info">일반 지식</span> JDK 직렬화 대비 사람이 읽을 수 있고 언어 중립적. 대신 <code>@class</code>에 패키지·클래스명이 박혀 리팩터링(이동·이름 변경) 시 기존 캐시 역직렬화가 깨질 수 있어 배포 시 캐시 버전 prefix를 바꾸기도 함.</li></ul></div></details>
+      <details id="iv-3" class="qa"><summary>@Cacheable에서 Optional.empty()는 왜 캐싱되지 않나?</summary><div class="a"><ul><li>Spring Cache는 <code>Optional</code>을 풀어 내부 값을 다루고, empty의 내부 값은 null. <code>unless = "#result == null"</code> + <code>cache-null-values: false</code>로 저장하지 않음.</li><li>결과: 없는 id는 매번 원본 조회(테스트: 2회 → readCount 2). 관통을 막으려면 RedisTemplate의 <code>__NULL__</code> 30초 sentinel처럼 별도 정책 필요.</li></ul></div></details>
+      <details id="iv-4" class="qa"><summary>Null caching에서 TTL을 짧게(30초) 두는 이유는?</summary><div class="a"><ul><li>나중에 그 id 데이터가 생성되면 sentinel이 새 값을 가림 → 정상 값(10분)보다 짧게.</li><li>테스트: 20회 조회에 원본 1회, TTL 1~30초.</li><li><span class="badge info">일반 지식</span> 생성 시점에 해당 키를 evict하면 TTL에만 의존하지 않아도 됨. 대량 랜덤 키 공격엔 Bloom filter/입력 검증 병행.</li></ul></div></details>
+      <details id="iv-5" class="qa"><summary>Redis로 분산 락을 어떻게 구현했나? 각 요소의 이유는?</summary><div class="a"><ul><li><code>SET lockKey token NX EX 3</code>: NX로 한 명만 획득(원자적), EX로 소유자가 죽어도 자동 해제.</li><li>UUID 토큰 + Lua(GET 비교 후 DEL): 내 락만 해제. Java에서 GET/DEL을 따로 하면 그 사이에 락이 바뀔 수 있음.</li><li>락 획득 후 double-check: 첫 GET과 락 사이에 다른 요청이 이미 채웠을 수 있음.</li><li>결과: 40 동시 요청에 원본 조회 1회(락 없으면 &gt;1).</li></ul></div></details>
+      <details id="iv-6" class="qa"><summary>(꼬리) 원본 조회가 락 TTL(3초)보다 오래 걸리면?</summary><div class="a"><ul><li>락이 만료돼 다른 요청이 락을 얻고 DB를 또 조회 → 중복 로드. 토큰 덕분에 먼저 끝난 요청이 새 락을 지우지는 않음.</li><li>대기 요청은 약 1초 후 empty 반환 → "없음"으로 오해 가능(README 인정).</li><li><span class="badge info">일반 지식</span> 대응: 작업 시간보다 넉넉한 TTL, 락 자동 연장(Redisson watchdog), 대기 타임아웃 시 원본 직접 조회 또는 별도 예외/상태 반환, 정합성이 중요한 쓰기 락엔 fencing token.</li></ul></div></details>
+      <details id="iv-7" class="qa"><summary>@Cacheable(sync = true)로 핫키 문제를 해결할 수 있나?</summary><div class="a"><ul><li>README: 기본 <code>RedisCacheManager</code>는 non-locking → <code>@Cacheable</code>이 분산 락을 대신하지 않음.</li><li><span class="badge info">일반 지식</span> <code>sync = true</code>는 같은 애플리케이션 인스턴스 안에서 같은 키의 동시 로드를 막는 힌트. 서버가 여러 대면 서버 수만큼 로드는 여전히 발생 → 진짜 1회가 필요하면 Redis 락 같은 분산 조정이 필요.</li></ul></div></details>
+      <details id="iv-8" class="qa"><summary>TTL Jitter는 왜 하고, 이 구현의 문제는?</summary><div class="a"><ul><li>같은 TTL로 대량 적재하면 같은 순간에 만료 → DB 폭주(Avalanche). TTL을 키마다 다르게.</li><li>예전 구현: <code>floorMod(key.hashCode(), maxJitter+1)</code> — 결정적이라 테스트하기 쉽지만, 연속 id는 hashCode가 1씩 달라 jitter가 133~137ms로 몰림.</li><li>지금 <span class="badge good">수정함</span>: 해시를 SplitMix64 finalizer로 섞어 결정성을 유지하며 분산. 테스트가 분포 폭(차이 5초 초과, 구간 9개 이상)까지 단언. 대안은 <code>ThreadLocalRandom</code> 난수(대신 같은 key의 TTL이 매번 달라지고 테스트에 시드 주입 필요).</li></ul></div></details>
+      <details id="iv-9" class="qa"><summary>통합 테스트 환경은 어떻게 구성했나?</summary><div class="a"><ul><li><code>RedisAndMySqlContainerTest</code>: <code>redis:7.2.5</code>(GenericContainer) + <code>mysql:8.0.36</code>을 띄우고 <code>@DynamicPropertySource</code>로 매핑 포트 주입.</li><li>매 테스트 전 <code>flushAll</code>로 Redis 비움, 클래스 끝나면 <code>@DirtiesContext(AFTER_CLASS)</code>로 컨텍스트 폐기.</li><li><code>@Testcontainers(disabledWithoutDocker = true)</code>: Docker 없으면 skip.</li><li>원본 지연은 <code>BookOriginService.resetMetrics(Duration)</code>으로 80ms 주입해 동시 miss 창을 넓힘.</li></ul></div></details>
+    </section>
+
+    <section id="files">
+      <h2><span class="num">07</span>파일 지도</h2>
+      <p class="sub">경로는 <code>labs/spring-cache-redis/</code> 기준. 코드를 다시 볼 때 여기서부터.</p>
+      <ul class="files">
+        <li><code>README.md</code><span>테스트 목록, API↔명령 표, Spring Cache vs RedisTemplate, 시퀀스 다이어그램</span></li>
+        <li><code>src/main/resources/application.yml</code><span>TTL 10m, null 미캐싱, key prefix</span></li>
+        <li><code>src/main/java/dev/deepdive/springcacheredis/config/RedisCacheConfig.java</code><span>JSON value serializer 설정</span></li>
+        <li><code>src/main/java/dev/deepdive/springcacheredis/config/JacksonConfig.java</code><span>공용 ObjectMapper Bean</span></li>
+        <li><code>src/main/java/dev/deepdive/springcacheredis/book/cache/SpringCacheBookService.java</code><span>@Cacheable 버전</span></li>
+        <li><code>src/main/java/dev/deepdive/springcacheredis/book/cache/RedisTemplateBookCacheService.java</code><span>수동 Cache Aside(sentinel 인식), Null caching, TTL Jitter(해시 믹싱)</span></li>
+        <li><code>src/main/java/dev/deepdive/springcacheredis/book/cache/RedisHotKeyBookCacheService.java</code><span>락 없음 vs SET NX 분산 락</span></li>
+        <li><code>src/main/java/dev/deepdive/springcacheredis/book/service/BookOriginService.java</code><span>원본 조회 + readCount + 지연 주입</span></li>
+        <li><code>src/main/java/dev/deepdive/springcacheredis/learning/RedisTemplateLearningService.java</code><span>opsForValue / opsForHash 학습용</span></li>
+        <li><code>src/test/java/dev/deepdive/springcacheredis/book/cache/SpringCacheBookServiceTest.java</code><span>miss/hit, JSON, TTL, empty 미캐싱</span></li>
+        <li><code>src/test/java/dev/deepdive/springcacheredis/book/cache/RedisTemplateBookCacheTest.java</code><span>Cache Aside, Null caching, sentinel 키 공유, Jitter 분포</span></li>
+        <li><code>src/test/java/dev/deepdive/springcacheredis/book/cache/RedisHotKeyLockTest.java</code><span>40스레드 핫키, 락 유무 비교</span></li>
+        <li><code>src/test/java/dev/deepdive/springcacheredis/learning/RedisTemplateLearningTest.java</code><span>SET/GET/TTL/SET NX/Hash</span></li>
+        <li><code>src/test/java/dev/deepdive/springcacheredis/RedisBasicCommandTest.java</code><span>기본 명령, ZSet, INFO</span></li>
+        <li><code>src/test/java/dev/deepdive/springcacheredis/support/RedisAndMySqlContainerTest.java</code><span>Redis·MySQL Testcontainers 베이스</span></li>
+      </ul>
+    </section>
+
+    <footer>README와 소스 코드를 근거로 정리한 문서입니다. 이 모듈에는 성능 측정값이 없으며, 숫자는 테스트 단언값 또는 코드로 계산한 값(표기함)입니다.</footer>
+  </main>
+</div>
+<script>
+/* ===== 공통 스크립트 (모든 모듈 overview.html에서 동일하게 유지) ===== */
+(function(){
+  var root=document.documentElement;
+  try{var saved=localStorage.getItem('deepdive-theme');if(saved)root.setAttribute('data-theme',saved);}catch(e){}
+  var tt=document.querySelector('.theme-toggle');
+  if(tt)tt.addEventListener('click',function(){
+    var cur=root.getAttribute('data-theme');
+    if(!cur)cur=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';
+    var next=cur==='dark'?'light':'dark';root.setAttribute('data-theme',next);
+    try{localStorage.setItem('deepdive-theme',next);}catch(e){}
+  });
+  document.querySelectorAll('[data-flow]').forEach(function(flow){
+    var steps=flow.querySelectorAll('.step');var detail=flow.nextElementSibling;
+    function show(btn){
+      steps.forEach(function(s){s.setAttribute('aria-selected',s===btn?'true':'false');});
+      if(detail)detail.querySelectorAll(':scope>div').forEach(function(d){d.classList.toggle('on',d.id===btn.dataset.target);});
+    }
+    steps.forEach(function(s){s.addEventListener('click',function(){show(s);});});
+    if(steps[0])show(steps[0]);
+  });
+  document.querySelectorAll('[data-tabs]').forEach(function(box){
+    var btns=box.querySelectorAll(':scope>.tabs>button');
+    function show(btn){
+      btns.forEach(function(b){b.setAttribute('aria-selected',b===btn?'true':'false');});
+      box.querySelectorAll(':scope>.tabpanel').forEach(function(p){p.classList.toggle('on',p.id===btn.dataset.target);});
+    }
+    btns.forEach(function(b){b.addEventListener('click',function(){show(b);});});
+    if(btns[0])show(btns[0]);
+  });
+  document.querySelectorAll('[data-qa]').forEach(function(b){
+    b.addEventListener('click',function(){
+      var sec=b.closest('section');var open=b.dataset.qa==='open';
+      sec.querySelectorAll('details.qa').forEach(function(d){d.open=open;});
+    });
+  });
+  var links=document.querySelectorAll('nav.toc a[href^="#"]');
+  if('IntersectionObserver' in window){
+    var io=new IntersectionObserver(function(es){es.forEach(function(e){
+      if(e.isIntersecting){links.forEach(function(l){l.classList.toggle('active',l.getAttribute('href')==='#'+e.target.id);});}
+    });},{rootMargin:'-20% 0px -70% 0px'});
+    document.querySelectorAll('main section[id]').forEach(function(s){io.observe(s);});
+  }
+  function openHash(){
+    var id='';try{id=decodeURIComponent(location.hash.slice(1));}catch(e){}
+    if(!id)return;var el=document.getElementById(id);if(!el)return;
+    var d=el.tagName==='DETAILS'?el:el.closest('details');if(d)d.open=true;
+    var p=el.closest('.tabpanel');
+    if(p&&!p.classList.contains('on')){var b=p.parentElement.querySelector(':scope>.tabs>button[data-target="'+p.id+'"]');if(b)b.click();}
+    setTimeout(function(){el.scrollIntoView({block:'start'});},0);
+  }
+  window.addEventListener('hashchange',openHash);openHash();
+})();
+</script>
+</body>
+</html>

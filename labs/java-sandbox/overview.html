@@ -1,0 +1,690 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>java-sandbox 한눈에</title>
+<style>
+/* ===== 공통 스타일 (모든 모듈 overview.html에서 동일하게 유지) ===== */
+:root{
+  --bg:#f7f7f5;--surface:#ffffff;--surface-2:#f0efeb;--border:#e2e0da;
+  --text:#1d1d1b;--muted:#6b6a65;--accent:#2f5bd3;--accent-soft:#e6ecfb;
+  --good:#1f8a4c;--good-soft:#e3f4ea;--bad:#c2410c;--bad-soft:#fcebe1;
+  --warn:#a16207;--warn-soft:#fbf3dc;--code-bg:#f3f2ee;
+  --shadow:0 1px 2px rgba(0,0,0,.04),0 4px 16px rgba(0,0,0,.04);
+  --radius:12px;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --sans:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Pretendard","Noto Sans KR","Segoe UI",sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#141413;--surface:#1c1c1a;--surface-2:#252522;--border:#33322e;
+    --text:#ecebe6;--muted:#a09e96;--accent:#7c9cff;--accent-soft:#1f2a47;
+    --good:#4ccf85;--good-soft:#16301f;--bad:#ff8a5c;--bad-soft:#3a1f14;
+    --warn:#e8b84a;--warn-soft:#3a2f12;--code-bg:#22221f;
+    --shadow:none;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#141413;--surface:#1c1c1a;--surface-2:#252522;--border:#33322e;
+  --text:#ecebe6;--muted:#a09e96;--accent:#7c9cff;--accent-soft:#1f2a47;
+  --good:#4ccf85;--good-soft:#16301f;--bad:#ff8a5c;--bad-soft:#3a1f14;
+  --warn:#e8b84a;--warn-soft:#3a2f12;--code-bg:#22221f;
+  --shadow:none;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);line-height:1.65;font-size:15.5px;-webkit-font-smoothing:antialiased}
+a{color:var(--accent)}
+code,.mono{font-family:var(--mono);font-size:.86em;background:var(--code-bg);padding:.1em .35em;border-radius:5px;word-break:break-all}
+pre{background:var(--code-bg);padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.55;margin:10px 0}
+pre code{background:none;padding:0;font-size:inherit;word-break:normal}
+.layout{display:grid;grid-template-columns:220px minmax(0,1fr);gap:40px;max-width:1180px;margin:0 auto;padding:32px 24px 80px}
+@media (max-width:860px){.layout{grid-template-columns:minmax(0,1fr);gap:0;padding:20px 16px 60px}}
+nav.toc{position:sticky;top:24px;align-self:start;font-size:14px}
+nav.toc .home{display:inline-block;margin-bottom:14px;color:var(--muted);text-decoration:none;font-size:13px}
+nav.toc ol{list-style:none;padding:0;margin:0;border-left:2px solid var(--border)}
+nav.toc li a{display:block;padding:5px 0 5px 14px;margin-left:-2px;border-left:2px solid transparent;color:var(--muted);text-decoration:none}
+nav.toc li a.active,nav.toc li a:hover{color:var(--text);border-left-color:var(--accent)}
+@media (max-width:860px){
+  nav.toc{position:static;margin-bottom:18px}
+  nav.toc ol{display:flex;flex-wrap:wrap;gap:6px;border:0}
+  nav.toc li a{padding:4px 10px;margin:0;border:1px solid var(--border);border-radius:999px;font-size:13px}
+  nav.toc li a.active{border-color:var(--accent)}
+}
+header.hero{margin-bottom:28px}
+.eyebrow{font-size:12.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
+h1{font-size:30px;line-height:1.25;margin:6px 0 10px;letter-spacing:-.01em}
+.lead{font-size:17px;color:var(--text);margin:0 0 14px;max-width:62ch}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font-size:12.5px;padding:3px 10px;border-radius:999px;background:var(--surface-2);border:1px solid var(--border);color:var(--muted)}
+section{margin:44px 0 0;scroll-margin-top:20px}
+h2{font-size:21px;margin:0 0 6px;letter-spacing:-.01em}
+h2 .num{color:var(--accent);margin-right:8px;font-variant-numeric:tabular-nums}
+.sub{color:var(--muted);margin:0 0 16px;font-size:14.5px}
+h3{font-size:16.5px;margin:18px 0 6px}
+.card{overflow-wrap:anywhere;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow)}
+.grid{display:grid;gap:12px}
+.grid.c2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.grid.c3{grid-template-columns:repeat(3,minmax(0,1fr))}
+@media (max-width:700px){.grid.c2,.grid.c3{grid-template-columns:minmax(0,1fr)}}
+.tldr .label{font-size:12px;font-weight:700;letter-spacing:.05em;color:var(--muted);text-transform:uppercase;margin-bottom:4px}
+.tldr .card{border-top:3px solid var(--accent)}
+.tldr .card.good{border-top-color:var(--good)}
+.tldr .card.bad{border-top-color:var(--bad)}
+.tldr p{margin:0}
+/* 흐름 다이어그램: 단계 클릭 시 상세 표시 */
+.flow{display:flex;flex-wrap:wrap;align-items:stretch;gap:0;margin:6px 0 10px}
+.flow .step{flex:1 1 140px;min-width:120px;text-align:left;font:inherit;color:inherit;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 12px;cursor:pointer;position:relative;transition:border-color .15s,background .15s}
+.flow .step:hover{border-color:var(--accent)}
+.flow .step[aria-selected="true"]{border-color:var(--accent);background:var(--accent-soft)}
+.flow .step .k{display:block;font-size:11.5px;color:var(--muted);font-weight:600}
+.flow .step .t{display:block;font-weight:600;font-size:14px;line-height:1.35}
+.flow .step.fail{border-style:dashed;border-color:var(--bad)}
+.flow .step.fail[aria-selected="true"]{background:var(--bad-soft)}
+.flow .arrow{display:flex;align-items:center;padding:0 6px;color:var(--muted);font-size:18px}
+@media (max-width:700px){.flow{flex-direction:column}.flow .step{flex:none}.flow .arrow{justify-content:center;padding:2px 0;transform:rotate(90deg)}}
+.flow-detail{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:10px;padding:14px 18px;min-height:64px}
+.flow-detail>div{display:none}
+.flow-detail>div.on{display:block}
+.flow-detail p:first-child{margin-top:0}.flow-detail p:last-child{margin-bottom:0}
+/* 탭 */
+.tabs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.tabs button{font:inherit;font-size:13.5px;padding:6px 12px;border-radius:999px;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{background:var(--text);color:var(--bg);border-color:var(--text)}
+.tabpanel{display:none}.tabpanel.on{display:block}
+.kv{display:grid;grid-template-columns:110px minmax(0,1fr);gap:6px 14px;margin:10px 0 0;font-size:14.5px}
+.kv dt{color:var(--muted);font-weight:600}
+.kv dd{margin:0}
+@media (max-width:520px){.kv{grid-template-columns:1fr}.kv dt{margin-top:6px}}
+/* 표 */
+.tablewrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:top}
+th{background:var(--surface-2);font-weight:600;font-size:13px;color:var(--muted);white-space:nowrap}
+tr:last-child td{border-bottom:0}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+.hl{background:var(--accent-soft)}
+/* 막대 그래프 (값은 --v: 0~1 비율) */
+.bars{display:grid;gap:8px}
+.bar{display:grid;grid-template-columns:150px minmax(0,1fr) 92px;align-items:center;gap:10px;font-size:13.5px}
+.bar .track{height:20px;background:var(--surface-2);border-radius:6px;overflow:hidden}
+.bar .fill{height:100%;width:calc(var(--v) * 100%);background:var(--accent);border-radius:6px;min-width:2px;transition:width .6s ease}
+.bar.good .fill{background:var(--good)}.bar.bad .fill{background:var(--bad)}.bar.warn .fill{background:var(--warn)}
+.bar .val{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--mono);font-size:12.5px}
+@media (max-width:520px){.bar{grid-template-columns:100px minmax(0,1fr) 72px}}
+.source{font-size:12.5px;color:var(--muted);margin-top:10px}
+/* 배지·콜아웃 */
+.badge{display:inline-block;font-size:11.5px;font-weight:700;padding:1px 8px;border-radius:999px;vertical-align:middle}
+.badge.good{background:var(--good-soft);color:var(--good)}
+.badge.bad{background:var(--bad-soft);color:var(--bad)}
+.badge.warn{background:var(--warn-soft);color:var(--warn)}
+.badge.info{background:var(--accent-soft);color:var(--accent)}
+.callout{border-radius:10px;padding:12px 16px;margin:12px 0;font-size:14.5px;border:1px solid var(--border);background:var(--surface)}
+.callout.warn{background:var(--warn-soft);border-color:transparent}
+.callout.bad{background:var(--bad-soft);border-color:transparent}
+.callout.good{background:var(--good-soft);border-color:transparent}
+.callout strong:first-child{margin-right:4px}
+/* 아코디언 (면접 Q&A, 약점) */
+details.qa{background:var(--surface);border:1px solid var(--border);border-radius:10px;margin:8px 0;overflow:hidden}
+details.qa summary{cursor:pointer;padding:12px 16px;font-weight:600;list-style:none;display:flex;gap:10px;align-items:flex-start}
+details.qa summary::-webkit-details-marker{display:none}
+details.qa summary::before{content:"Q";flex:none;width:22px;height:22px;border-radius:6px;background:var(--accent-soft);color:var(--accent);font-size:12px;display:grid;place-items:center;margin-top:1px}
+details.qa.risk summary::before{content:"!";background:var(--bad-soft);color:var(--bad)}
+details.qa[open] summary{border-bottom:1px solid var(--border)}
+details.qa .a{padding:12px 16px 14px 48px;font-size:14.5px}
+details.qa .a p{margin:0 0 8px}details.qa .a ul{margin:0;padding-left:18px}
+.qa-tools{display:flex;gap:8px;margin-bottom:8px}
+.qa-tools button,.theme-toggle{font:inherit;font-size:13px;padding:5px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer}
+.theme-toggle{position:fixed;right:16px;bottom:16px;z-index:5;box-shadow:var(--shadow)}
+/* 파일 지도 */
+ul.files{list-style:none;padding:0;margin:0;display:grid;gap:6px}
+ul.files li{display:grid;grid-template-columns:minmax(0,1fr);gap:2px;padding:9px 12px;background:var(--surface);border:1px solid var(--border);border-radius:9px}
+ul.files li code{background:none;padding:0;font-size:12.5px}
+ul.files li span{color:var(--muted);font-size:13.5px}
+footer{margin-top:56px;padding-top:18px;border-top:1px solid var(--border);color:var(--muted);font-size:13px}
+ul.plain{margin:6px 0;padding-left:20px}ul.plain li{margin:3px 0}
+</style>
+</head>
+<body>
+<button class="theme-toggle" type="button" aria-label="테마 전환">◐ 테마</button>
+<div class="layout">
+  <nav class="toc" aria-label="목차">
+    <a class="home" href="../index.html">← 전체 모듈</a>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin:0 0 14px"><a class="chip" style="text-decoration:none" href="../changes.html#m-java-sandbox">개선 내역</a><a class="chip" style="text-decoration:none" href="../interview.html#m-java-sandbox">질문 모음</a></div>
+    <ol>
+      <li><a href="#tldr">한눈에</a></li>
+      <li><a href="#flow">흐름</a></li>
+      <li><a href="#cases">비교·핵심 구현</a></li>
+      <li><a href="#results">결과·수치</a></li>
+      <li><a href="#limits">한계·약점</a></li>
+      <li><a href="#interview">면접 Q&amp;A</a></li>
+      <li><a href="#files">파일 지도</a></li>
+    </ol>
+  </nav>
+  <main>
+    <header class="hero">
+      <div class="eyebrow">deep-dive · labs/java-sandbox</div>
+      <h1>Java 샌드박스 — AES Provider 반복 등록을 JMH로 재고, 언어 기능을 테스트로 확인</h1>
+      <p class="lead">메인 실험은 "AES 암호화할 때마다 <code>Security.addProvider(new BouncyCastleProvider())</code>를 부르면 얼마나 느린가"를 JMH로 측정하고, <code>-prof gc</code>/<code>-prof stack</code>으로 원인까지 확인한 것입니다. 결과에 반전이 있습니다: 빠른 쪽(1회 등록)이 8스레드에서 거의 확장되지 않았습니다. 그 밖에 제네릭·가변인자·컬렉션 팩토리·record·리플렉션·싱글턴·파사드를 작은 테스트로 정리해 두었습니다.</p>
+      <div class="chips"><span class="chip">Java 21</span><span class="chip">JMH 1.37</span><span class="chip">me.champeau.jmh 0.7.2</span><span class="chip">BouncyCastle bcprov-jdk18on 1.78.1</span><span class="chip">JUnit 5 · AssertJ</span></div>
+    </header>
+
+    <section id="tldr" class="tldr">
+      <h2><span class="num">01</span>한눈에</h2>
+      <p class="sub">30초 요약 (AES 실험)</p>
+      <div class="grid c3">
+        <div class="card bad"><div class="label">문제</div><p>레거시 유틸이 <code>encrypt()</code>마다 <code>new BouncyCastleProvider()</code>를 만들어 등록을 시도. 알고리즘·키·IV·평문은 같고 <b>Provider 반복 등록 여부만</b> 다릅니다.</p></div>
+        <div class="card"><div class="label">접근</div><p><code>AesUtilBefore</code>(매번 등록, static) vs <code>AesUtilAfter</code>(Provider 생성자 주입). JMH Throughput, 워밍업 3×1s, 측정 5×1s, fork 1, 1스레드·8스레드. 원인은 gc·stack 프로파일러로 확인.</p></div>
+        <div class="card good"><div class="label">결론</div><p>1스레드 약 <b>1,526배</b> 차이(README 18코어 실측). repeated는 op당 약 2.85MB 할당이 범인. 반전: once는 8스레드에서 ×1.4만 확장 — 공유 Provider의 <code>synchronized getService</code>에서 줄을 섬(암달의 법칙).</p></div>
+      </div>
+      <div class="callout"><strong>한 줄 암기:</strong> "무거운 객체를 매 호출 만들지 말고 한 번 만들어 주입하라" + "병목은 느려 보이는 쪽이 아니라 <b>직렬 구간 비중이 큰 쪽</b>에서 터진다. 추측하지 말고 프로파일러로 확인하라."</div>
+    </section>
+
+    <section id="flow">
+      <h2><span class="num">02</span>흐름</h2>
+      <p class="sub">단계를 클릭하면 상세 설명이 나옵니다. <code>encrypt()</code> 한 번이 거치는 경로를 두 방식으로 비교합니다.</p>
+
+      <h3>① Before — 매 호출 Provider 생성·등록 (repeated)</h3>
+      <div class="flow" data-flow>
+        <button class="step fail" data-target="f-b-new"><span class="k">STEP 1</span><span class="t">new BouncyCastleProvider()</span></button>
+        <span class="arrow">→</span>
+        <button class="step" data-target="f-b-add"><span class="k">STEP 2</span><span class="t">Security.addProvider</span></button>
+        <span class="arrow">→</span>
+        <button class="step" data-target="f-b-get"><span class="k">STEP 3</span><span class="t">Cipher.getInstance(T, "BC")</span></button>
+        <span class="arrow">→</span>
+        <button class="step" data-target="f-b-enc"><span class="k">STEP 4</span><span class="t">init + doFinal</span></button>
+      </div>
+      <div class="flow-detail">
+        <div id="f-b-new"><p><b>비용의 본체.</b> gc 프로파일상 repeated는 op당 <b>2,848,583 B</b>(약 2.85MB)를 할당, once(4,032 B)의 약 707배. README 설명: 생성자가 BC 지원 알고리즘 수백 개를 내부 맵에 등록하기 때문. 이 할당은 스레드마다 따로 일어나므로 <b>병렬화가 잘 됩니다</b>.</p></div>
+        <div id="f-b-add"><p>JVM 전역 <code>java.security.Security</code>의 Provider 목록에 등록을 <em>시도</em>. 같은 이름이 이미 있으면 추가되지 않고 -1을 반환합니다 — <code>ProviderRegistrationTest</code>로 확인. README도 "초점은 실제 추가 횟수가 아니라 매 호출 생성·등록을 <b>시도하는</b> 경로의 비용"이라고 적습니다.</p></div>
+        <div id="f-b-get"><p>이름 <code>"BC"</code>로 Provider를 찾습니다. 그래서 <b>방금 만든 인스턴스가 아니라 이미 등록된 BC 인스턴스</b>가 쓰입니다 — <span class="badge good">테스트로 확인</span> <code>ProviderRegistrationTest</code>: <code>cipher.getProvider()</code>가 등록된 인스턴스와 <code>isSameAs</code>, 방금 만든 것과는 다름. 즉 repeated도 once와 같은 공유 인스턴스의 <code>getService</code>를 거칩니다.</p></div>
+        <div id="f-b-enc"><p><code>cipher.init(ENCRYPT_MODE, SecretKeySpec, IvParameterSpec)</code> → <code>doFinal(plainText)</code>. 이 부분은 After와 동일. 변환: <code>AES/CBC/PKCS7Padding</code>.</p></div>
+      </div>
+
+      <h3>② After — Provider 1회 준비 후 주입 (once), 8스레드일 때의 병목</h3>
+      <div class="flow" data-flow>
+        <button class="step" data-target="f-a-setup"><span class="k">준비 1회</span><span class="t">@Setup에서 Provider 등록·주입</span></button>
+        <span class="arrow">→</span>
+        <button class="step" data-target="f-a-get"><span class="k">STEP 1</span><span class="t">Cipher.getInstance(T, provider)</span></button>
+        <span class="arrow">→</span>
+        <button class="step fail" data-target="f-a-block"><span class="k">8스레드</span><span class="t">getService에서 BLOCKED 51%</span></button>
+        <span class="arrow">→</span>
+        <button class="step" data-target="f-a-enc"><span class="k">STEP 2</span><span class="t">init + doFinal</span></button>
+      </div>
+      <div class="flow-detail">
+        <div id="f-a-setup"><p>벤치마크의 <code>@State(Scope.Benchmark) CryptoInput.setUp()</code>이 <code>Security.getProvider("BC")</code>를 찾고 없으면 한 번 등록한 뒤 <code>new AesUtilAfter(provider)</code>. 측정 루프 밖이라 이 비용은 집계되지 않습니다.</p></div>
+        <div id="f-a-get"><p>Provider <b>객체</b>를 직접 넘기므로 이름 조회가 없습니다. 내부적으로 BC의 <code>Provider.getService()</code>가 불립니다.</p></div>
+        <div id="f-a-block"><p>stack 프로파일(8스레드 once): <b>51% BLOCKED</b>, 그중 <b>99.9%</b>가 <code>BouncyCastleProvider.getService</code>. README 해석: getService는 이중 검사 락인데 <b>null 결과를 캐시하지 않아</b>, <code>Cipher.getInstance</code>가 조회하는 이름 변형 중 매칭 안 되는 키(예: <code>AES/CBC</code>)는 매번 <code>synchronized(this)</code>에 다시 들어갑니다. Provider가 하나뿐이라 8스레드가 같은 모니터에 줄을 섭니다.</p></div>
+        <div id="f-a-enc"><p>암호화 본 연산은 Before와 동일. once는 일 자체가 적어서 위의 직렬 구간 비중이 커지고, 그래서 스레드를 늘려도 ×1.4밖에 안 늘어납니다.</p></div>
+      </div>
+
+      <svg viewBox="0 0 640 200" role="img" aria-label="8개 스레드가 하나의 synchronized getService 앞에 줄을 서는 모습" style="width:100%;height:auto;display:block;margin:10px 0 4px">
+        <text x="10" y="20" style="fill:var(--muted);font-size:12px;font-weight:600">8스레드 once: 공유 Provider 1개의 synchronized getService</text>
+        <g style="font-size:12px">
+          <rect x="10" y="40" width="70" height="24" rx="5" style="fill:var(--good-soft);stroke:var(--good)"/><text x="45" y="57" text-anchor="middle" style="fill:var(--text)">T1 실행</text>
+          <rect x="10" y="70" width="70" height="24" rx="5" style="fill:var(--bad-soft);stroke:var(--bad)"/><text x="45" y="87" text-anchor="middle" style="fill:var(--text)">T2 대기</text>
+          <rect x="10" y="100" width="70" height="24" rx="5" style="fill:var(--bad-soft);stroke:var(--bad)"/><text x="45" y="117" text-anchor="middle" style="fill:var(--text)">T3 대기</text>
+          <rect x="10" y="130" width="70" height="24" rx="5" style="fill:var(--bad-soft);stroke:var(--bad)"/><text x="45" y="147" text-anchor="middle" style="fill:var(--text)">… T8</text>
+        </g>
+        <line x1="82" y1="52" x2="228" y2="95" style="stroke:var(--good);stroke-width:2"/>
+        <line x1="82" y1="82" x2="228" y2="100" style="stroke:var(--bad);stroke-width:1.5;stroke-dasharray:4 3"/>
+        <line x1="82" y1="112" x2="228" y2="105" style="stroke:var(--bad);stroke-width:1.5;stroke-dasharray:4 3"/>
+        <line x1="82" y1="142" x2="228" y2="110" style="stroke:var(--bad);stroke-width:1.5;stroke-dasharray:4 3"/>
+        <rect x="230" y="70" width="190" height="60" rx="8" style="fill:var(--warn-soft);stroke:var(--warn)"/>
+        <text x="325" y="95" text-anchor="middle" style="fill:var(--text);font-size:13px;font-weight:600">synchronized(this)</text>
+        <text x="325" y="115" text-anchor="middle" style="fill:var(--muted);font-size:11px">캐시 미스(null 키)마다 진입</text>
+        <line x1="420" y1="100" x2="458" y2="100" style="stroke:var(--muted);stroke-width:2"/>
+        <rect x="460" y="70" width="170" height="60" rx="8" style="fill:var(--surface-2);stroke:var(--border)"/>
+        <text x="545" y="95" text-anchor="middle" style="fill:var(--text);font-size:12px">super.getService → null</text>
+        <text x="545" y="115" text-anchor="middle" style="fill:var(--muted);font-size:11px">put 생략 ⇒ 다음에도 미스</text>
+        <text x="320" y="185" text-anchor="middle" style="fill:var(--bad);font-size:13px;font-weight:600">시간의 51%가 BLOCKED (README stack 프로파일)</text>
+      </svg>
+    </section>
+
+    <section id="cases">
+      <h2><span class="num">03</span>비교·핵심 구현</h2>
+      <p class="sub">위: AES 실험의 핵심 코드. 아래: README에 설명이 없는 나머지 예제들.</p>
+
+      <div data-tabs>
+        <div class="tabs" role="tablist">
+          <button role="tab" data-target="t-before">AesUtilBefore</button>
+          <button role="tab" data-target="t-after">AesUtilAfter</button>
+          <button role="tab" data-target="t-bench">JMH 벤치마크</button>
+          <button role="tab" data-target="t-equal">동치 테스트</button>
+        </div>
+        <div class="tabpanel card" id="t-before">
+          <h3>Before — 매 호출 등록 <span class="badge bad">약 559 ops/s (1T)</span></h3>
+<pre><code>public static byte[] encrypt(byte[] plainText, byte[] key, byte[] iv) throws GeneralSecurityException {
+    Security.addProvider(new BouncyCastleProvider());
+
+    Cipher cipher = Cipher.getInstance(TRANSFORMATION, BouncyCastleProvider.PROVIDER_NAME);
+    cipher.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(key, KEY_ALGORITHM), new IvParameterSpec(iv));
+    return cipher.doFinal(plainText);
+}</code></pre>
+          <dl class="kv">
+            <dt>문제</dt><dd>매 호출 약 2.85MB 할당(gc 프로파일). static 유틸이 JVM 전역 <code>Security</code> 상태를 건드려 테스트 간 상태 제어도 어려움(README).</dd>
+            <dt>코드</dt><dd><code>labs/java-sandbox/src/main/java/dev/deepdive/sandbox/crypto/AesUtilBefore.java</code></dd>
+          </dl>
+        </div>
+        <div class="tabpanel card" id="t-after">
+          <h3>After — Provider 생성자 주입 <span class="badge good">약 853,343 ops/s (1T)</span></h3>
+<pre><code>public final class AesUtilAfter {
+    private final Provider provider;
+
+    public AesUtilAfter(Provider provider) {
+        this.provider = Objects.requireNonNull(provider);
+    }
+
+    public byte[] encrypt(byte[] plainText, byte[] key, byte[] iv) throws GeneralSecurityException {
+        Cipher cipher = Cipher.getInstance(TRANSFORMATION, provider);
+        cipher.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(key, KEY_ALGORITHM), new IvParameterSpec(iv));
+        return cipher.doFinal(plainText);
+    }
+}</code></pre>
+          <dl class="kv">
+            <dt>장점</dt><dd>등록(전역 상태)과 암호화 로직 분리. 단위 테스트에서 <code>new AesUtilAfter(new BouncyCastleProvider())</code>로 전역 등록 없이 생성 가능(README).</dd>
+            <dt>남은 특성</dt><dd>여러 스레드가 같은 Provider 객체를 공유하면 BC의 <code>getService</code> 동기화에서 경합. README는 "BC 내부 특성이라 관찰까지만"으로 정리.</dd>
+            <dt>코드</dt><dd><code>labs/java-sandbox/src/main/java/dev/deepdive/sandbox/crypto/AesUtilAfter.java</code></dd>
+          </dl>
+        </div>
+        <div class="tabpanel card" id="t-bench">
+          <h3>JMH 설정 — 왜 nanoTime 루프가 아닌가</h3>
+<pre><code>@BenchmarkMode(Mode.Throughput)
+@OutputTimeUnit(TimeUnit.SECONDS)
+@Warmup(iterations = 3, time = 1)
+@Measurement(iterations = 5, time = 1)
+@Fork(1)
+@Threads(1)          // EightThreads 버전은 @Threads(8)만 다름
+public class AesProviderRegistrationSingleThreadBenchmark {
+    @Benchmark
+    public void encrypt_withRepeatedProviderRegistration(CryptoInput input, Blackhole blackhole) throws Exception {
+        blackhole.consume(AesUtilBefore.encrypt(input.plainText, input.key, input.iv));
+    }
+    @Benchmark
+    public void encrypt_withProviderInitializedOnce(CryptoInput input, Blackhole blackhole) throws Exception {
+        blackhole.consume(input.aesUtilAfter.encrypt(input.plainText, input.key, input.iv));
+    }
+    @State(Scope.Benchmark)
+    public static class CryptoInput { ... @Setup public void setUp() { ... } }
+}</code></pre>
+          <dl class="kv">
+            <dt>JIT 워밍업</dt><dd>초반 인터프리터 구간을 측정에서 제외 (<code>@Warmup</code>).</dd>
+            <dt>DCE 방지</dt><dd>반환값을 <code>Blackhole.consume()</code> → JIT가 호출을 지우지 못함.</dd>
+            <dt>입력 공유</dt><dd><code>@State(Scope.Benchmark)</code>로 key/iv/plainText를 한 번만 생성, 모든 스레드가 공유(읽기 전용).</dd>
+            <dt>격리</dt><dd><code>@Fork(1)</code>로 별도 JVM에서 실행. <code>build.gradle</code>의 <code>jmh { }</code> 블록도 같은 값(3/5/1/1s)을 설정.</dd>
+            <dt>실행</dt><dd><code>./gradlew :java-sandbox:jmh -PjmhIncludes='AesProviderRegistration.*Benchmark'</code>, 프로파일러는 <code>-PjmhProfilers=gc</code> / <code>stack</code>. 결과: <code>labs/java-sandbox/build/results/jmh/results.txt</code>.</dd>
+            <dt>코드</dt><dd><code>labs/java-sandbox/src/jmh/java/dev/deepdive/sandbox/crypto/AesProviderRegistrationSingleThreadBenchmark.java</code>, <code>.../AesProviderRegistrationEightThreadsBenchmark.java</code></dd>
+          </dl>
+        </div>
+        <div class="tabpanel card" id="t-equal">
+          <h3>동치 테스트 — 리팩터링이 결과를 바꾸지 않음</h3>
+<pre><code>byte[] before = AesUtilBefore.encrypt(plainText, key, iv);
+AesUtilAfter aesUtilAfter = new AesUtilAfter(new BouncyCastleProvider());
+byte[] after = aesUtilAfter.encrypt(plainText, key, iv);
+
+assertThat(after).isEqualTo(before);</code></pre>
+          <dl class="kv">
+            <dt>의미</dt><dd>같은 입력이면 등록 방식과 무관하게 같은 암호문 → 성능 비교가 "같은 일"을 비교하고 있음을 보장.</dd>
+            <dt>코드</dt><dd><code>labs/java-sandbox/src/test/java/dev/deepdive/sandbox/crypto/AesUtilComparisonTest.java</code></dd>
+          </dl>
+        </div>
+      </div>
+
+      <h3 style="margin-top:28px">그 밖의 예제 <span class="badge info">README "그 밖의 예제" 절</span></h3>
+      <p class="sub">코드와 테스트만 있는 학습 예제들. 테스트 이름이 곧 결론입니다.</p>
+      <div data-tabs>
+        <div class="tabs" role="tablist">
+          <button role="tab" data-target="t-generics">제네릭</button>
+          <button role="tab" data-target="t-varargs">가변인자</button>
+          <button role="tab" data-target="t-coll">컬렉션 팩토리</button>
+          <button role="tab" data-target="t-record">record</button>
+          <button role="tab" data-target="t-reflect">리플렉션</button>
+          <button role="tab" data-target="t-single">LazyHolder 싱글턴</button>
+          <button role="tab" data-target="t-facade">파사드</button>
+        </div>
+        <div class="tabpanel card" id="t-generics">
+          <h3>제네릭 · 와일드카드 (PECS)</h3>
+<pre><code>static int sum(List&lt;? extends Number&gt; values) { ... }          // 읽기(produce): Number로 꺼냄, add 불가
+static void addDefaultScores(List&lt;? super Integer&gt; values) {   // 쓰기(consume): Integer 넣기 가능
+    values.add(100);
+    values.add(90);
+}
+static Object bodyOfAnyBox(Box&lt;?&gt; box) { ... }       // 아무 Box나 받음, 값은 Object
+static Object bodyOfObjectBox(Box&lt;Object&gt; box) { ... }  // 정확히 Box&lt;Object&gt;만</code></pre>
+          <ul class="plain">
+            <li>raw type으로 <code>List&lt;String&gt;</code>에 Integer를 넣으면 꺼낼 때 <code>ClassCastException</code>.</li>
+            <li><code>? extends</code>는 읽기, <code>? super</code>는 쓰기. super로 읽으면 Object까지만 보장.</li>
+            <li><code>&lt;?&gt;</code> = 받기 자유·쓰기 불가, <code>&lt;Object&gt;</code> = 받기 빡빡·쓰기 자유(제네릭은 무공변). <code>ResponseEntity&lt;?&gt;</code> vs <code>ResponseEntity&lt;Object&gt;</code> 비유.</li>
+          </ul>
+          <p class="source"><code>src/main/java/dev/deepdive/sandbox/GenericsExamples.java</code>, <code>src/test/java/dev/deepdive/sandbox/GenericsExamplesTest.java</code></p>
+        </div>
+        <div class="tabpanel card" id="t-varargs">
+          <h3>가변인자 · heap pollution · 방어적 복사</h3>
+<pre><code>@SuppressWarnings({"unchecked", "varargs"})
+static String firstAfterHeapPollution(List&lt;String&gt;... values) {
+    Object[] array = values;
+    array[0] = List.of(100);          // 배열을 통해 잘못된 타입이 섞임
+    return values[0].getFirst();      // → ClassCastException
+}
+
+static KeywordGroup unsafe(String... keywords) { return new KeywordGroup(keywords); }
+static KeywordGroup safe(String... keywords)   { return new KeywordGroup(Arrays.copyOf(keywords, keywords.length)); }</code></pre>
+          <ul class="plain">
+            <li>가변인자는 배열이고 제네릭 타입은 런타임에 지워져 heap pollution 위험. 안전한 메서드라면 <code>@SafeVarargs</code>(<code>flatten</code>)로 의도 표현.</li>
+            <li>받은 배열을 그대로 저장하면 호출자가 원본을 바꿀 때 내부 상태도 바뀜 → 복사해서 저장.</li>
+          </ul>
+          <p class="source"><code>src/main/java/dev/deepdive/sandbox/VarargsExamples.java</code>, <code>src/test/java/dev/deepdive/sandbox/VarargsExamplesTest.java</code></p>
+        </div>
+        <div class="tabpanel card" id="t-coll">
+          <h3>컬렉션 팩토리 메서드</h3>
+          <div class="tablewrap">
+            <table>
+              <thead><tr><th>생성</th><th>구조 변경</th><th>null</th><th>원본과 관계</th></tr></thead>
+              <tbody>
+                <tr><td><code>List.of</code></td><td>불가 (UOE)</td><td>불가 (NPE)</td><td>새 리스트, 요소는 deep copy 아님</td></tr>
+                <tr><td><code>Set.of</code></td><td>불가</td><td>—</td><td>중복 인자면 IAE</td></tr>
+                <tr><td><code>new ArrayList</code></td><td>가능</td><td>가능</td><td>—</td></tr>
+                <tr><td><code>Arrays.asList</code></td><td>크기 변경 불가, <code>set</code>은 가능</td><td>—</td><td>원본 배열에 반영</td></tr>
+                <tr><td><code>Collections.unmodifiableList</code></td><td>불가</td><td>—</td><td>view: 원본 변경이 보임</td></tr>
+                <tr><td><code>List.copyOf</code></td><td>불가</td><td>—</td><td>복사본: 원본 변경 안 보임</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="source"><code>src/test/java/dev/deepdive/sandbox/CollectionFactoryMethodExamplesTest.java</code>, <code>src/main/java/dev/deepdive/sandbox/CollectionFactoryMethodExamples.java</code> (UOE = UnsupportedOperationException)</p>
+        </div>
+        <div class="tabpanel card" id="t-record">
+          <h3>record — DTO·Command·VO</h3>
+<pre><code>record CreateOrderCommand(Long memberId, List&lt;OrderLine&gt; lines) {
+    CreateOrderCommand {                       // compact constructor: 검증 + 정규화
+        if (memberId == null) throw new IllegalArgumentException("memberId is required");
+        if (lines == null || lines.isEmpty()) throw new IllegalArgumentException("order lines are required");
+        lines = List.copyOf(lines);            // 방어적 복사 → 외부 변경 차단, 반환 리스트도 수정 불가
+    }
+}
+record EmailAddress(String value) {
+    EmailAddress { ... value = value.strip().toLowerCase(); ... }   // 값이 같으면 equals</code></pre>
+          <ul class="plain">
+            <li>equals/hashCode/toString 자동 생성, 정적 팩토리(<code>Money.won(...)</code>)로 생성 의도에 이름 붙이기.</li>
+            <li>VO는 값을 바꾸지 않고 새 값을 반환(<code>Money.add</code>). Entity/JPA처럼 식별자·변경 추적·프록시가 중요한 타입엔 보통 안 맞음(테스트 주석).</li>
+          </ul>
+          <p class="source"><code>src/test/java/dev/deepdive/sandbox/RecordTest.java</code> (record 정의도 테스트 안에 있음)</p>
+        </div>
+        <div class="tabpanel card" id="t-reflect">
+          <h3>리플렉션</h3>
+<pre><code>Class&lt;?&gt; clazz = Class.forName("dev.deepdive.sandbox.Person");
+Constructor&lt;Person&gt; ctor = Person.class.getDeclaredConstructor(String.class);
+ctor.setAccessible(true);                  // private 생성자 접근
+Method secret = Person.class.getDeclaredMethod("secret");
+secret.setAccessible(true);
+String result = (String) secret.invoke(person);   // "홍길동의 비밀 나이: 30"</code></pre>
+          <ul class="plain">
+            <li><code>getDeclaredFields()</code>는 private 포함 이 클래스 선언분, <code>getFields()</code>는 public만(상속 포함).</li>
+            <li>static 필드/메서드는 인스턴스 대신 <code>null</code>을 넘김. 테스트는 바꾼 static 값을 원복.</li>
+          </ul>
+          <p class="source"><code>src/main/java/dev/deepdive/sandbox/Person.java</code>, <code>src/test/java/dev/deepdive/sandbox/ReflectionTest.java</code></p>
+        </div>
+        <div class="tabpanel card" id="t-single">
+          <h3>LazyHolder 싱글턴</h3>
+<pre><code>private static class Holder {
+    private static final LazyHolderSingleton INSTANCE = new LazyHolderSingleton();
+}
+public static LazyHolderSingleton getInstance() {
+    return Holder.INSTANCE;
+}</code></pre>
+          <ul class="plain">
+            <li>중첩 클래스는 <code>getInstance()</code> 첫 호출 때 로딩 → 지연 초기화. 클래스 초기화는 JVM이 스레드 안전하게 한 번만 수행 → <code>synchronized</code> 불필요.</li>
+            <li>테스트: 스레드 풀 16에서 100번 동시 호출 → 인스턴스 Set 크기 1.</li>
+          </ul>
+          <p class="source"><code>src/main/java/dev/deepdive/sandbox/LazyHolderSingleton.java</code>, <code>src/test/java/dev/deepdive/sandbox/LazyHolderSingletonTest.java</code></p>
+        </div>
+        <div class="tabpanel card" id="t-facade">
+          <h3>파사드 패턴</h3>
+<pre><code>OrderResult placeOrder(OrderCommand command) {
+    Reservation reservation = stockService.reserve(command.productId(), command.quantity());
+    Payment payment = paymentGateway.pay(command.memberId(), command.amount());
+    Delivery delivery = deliveryService.request(command.memberId(), reservation.id());
+    notificationService.send(command.memberId(), delivery.id());
+    return new OrderResult(payment.id(), delivery.id());
+}</code></pre>
+          <ul class="plain">
+            <li>클라이언트는 하위 시스템 4개의 호출 순서를 몰라도 <code>placeOrder</code> 하나만 호출. 테스트는 이벤트 순서(재고 → 결제 → 배송 → 알림)를 검증.</li>
+          </ul>
+          <p class="source"><code>src/main/java/dev/deepdive/sandbox/OrderFacade.java</code>, <code>src/test/java/dev/deepdive/sandbox/OrderFacadeTest.java</code></p>
+        </div>
+      </div>
+    </section>
+
+    <section id="results">
+      <h2><span class="num">04</span>결과·수치</h2>
+      <p class="sub">모든 수치: README "측정 결과"·"프로파일링으로 검증" 절, 저장소 환경(18코어) 실측. 절대값은 머신·JVM·부하에 따라 다릅니다.</p>
+      <div class="grid c2">
+        <div class="card">
+          <h3 style="margin-top:0">처리량 (ops/s, 클수록 빠름)</h3>
+          <div class="bars">
+            <div class="bar good" style="--v:.699"><span>once · 1스레드</span><div class="track"><div class="fill"></div></div><span class="val">853,343</span></div>
+            <div class="bar good" style="--v:1"><span>once · 8스레드</span><div class="track"><div class="fill"></div></div><span class="val">1,221,121</span></div>
+            <div class="bar bad" style="--v:.00046"><span>repeated · 1스레드</span><div class="track"><div class="fill"></div></div><span class="val">559</span></div>
+            <div class="bar bad" style="--v:.0031"><span>repeated · 8스레드</span><div class="track"><div class="fill"></div></div><span class="val">3,756</span></div>
+          </div>
+          <div class="source">선형 축(최대 1,221,121). repeated 막대가 거의 안 보이는 것 자체가 격차입니다: 1스레드 약 1,526배, 8스레드 약 325배. 8스레드 값은 8스레드 <b>합계</b>.</div>
+        </div>
+        <div class="card">
+          <h3 style="margin-top:0">스레드 확장 배수 (8스레드 ÷ 1스레드, 이상적 ×8)</h3>
+          <div class="bars">
+            <div class="bar" style="--v:1"><span>이상적</span><div class="track"><div class="fill"></div></div><span class="val">×8</span></div>
+            <div class="bar good" style="--v:.8375"><span>repeated</span><div class="track"><div class="fill"></div></div><span class="val">×6.7</span></div>
+            <div class="bar bad" style="--v:.175"><span>once</span><div class="track"><div class="fill"></div></div><span class="val">×1.4</span></div>
+          </div>
+          <div class="source">반전 포인트: 빠른 once가 거의 확장되지 않음. README: once 8스레드 값은 run마다 변동이 커서 55만~122만이 관측됨 → 경향이 핵심.</div>
+        </div>
+        <div class="card">
+          <h3 style="margin-top:0">gc.alloc.rate.norm (op 1회당 할당 바이트)</h3>
+          <div class="bars">
+            <div class="bar good" style="--v:.0014"><span>once</span><div class="track"><div class="fill"></div></div><span class="val">4,032 B</span></div>
+            <div class="bar bad" style="--v:1"><span>repeated</span><div class="track"><div class="fill"></div></div><span class="val">2,848,583 B</span></div>
+          </div>
+          <div class="source"><code>-PjmhProfilers=gc</code>, 단일 스레드 벤치마크. repeated는 once의 약 707배.</div>
+        </div>
+        <div class="card">
+          <h3 style="margin-top:0">stack 프로파일 (8스레드 once)</h3>
+          <div class="bars">
+            <div class="bar bad" style="--v:.51"><span>BLOCKED</span><div class="track"><div class="fill"></div></div><span class="val">51%</span></div>
+            <div class="bar warn" style="--v:.999"><span>그중 getService</span><div class="track"><div class="fill"></div></div><span class="val">99.9%</span></div>
+          </div>
+          <div class="source"><code>-PjmhProfilers=stack</code>. BLOCKED의 거의 전부가 <code>BouncyCastleProvider.getService</code>.</div>
+        </div>
+      </div>
+      <div class="callout"><strong>암달의 법칙으로 읽기:</strong> repeated는 일(할당)이 많고 그 일이 스레드 로컬이라 병렬화가 잘 됨 → 작은 전역 락이 숨겨짐. once는 일이 적어 <code>synchronized getService</code> 한 군데가 시간의 큰 비중 → 코어가 18개여도 확장 불가. 단 결론(매 호출 Provider 생성·등록을 피하라)은 그대로입니다.</div>
+      <p class="source">참고: README "출력 표 읽는 법"의 예시 표(847,912 / 567 ops/s)는 위 "측정 결과" 표(853,343 / 559)와 다른 run의 값입니다.</p>
+    </section>
+
+    <section id="limits">
+      <h2><span class="num">05</span>한계·약점</h2>
+      <p class="sub">README가 스스로 밝힌 한계와, 코드·문서에서 확인되는 약점.</p>
+
+      <h3><span class="badge info">README 명시</span></h3>
+      <ul class="plain">
+        <li>절대값은 머신·JVM·부하에 따라 다름. once 8스레드는 run마다 55만~122만으로 변동이 큼.</li>
+        <li><span class="badge good">README 정정함</span> README는 "같은 fork 안에서 두 벤치마크가 순차 실행되므로 한쪽 등록분이 다른 쪽에 남음"이라 적었지만, JMH는 벤치마크마다 따로 fork합니다(실행 출력에 벤치마크별 <code># Fork: 1 of 1</code>). 각 fork 안에서 BC는 한 번만 실제로 등록되고, repeated의 이후 <code>addProvider</code>는 매번 -1입니다.</li>
+        <li>once 경로의 <code>getService</code> 경합은 BC 내부 특성이라 "관찰까지만" — 해결책은 다루지 않음.</li>
+      </ul>
+
+      <h3><span class="badge bad">코드·문서 분석</span></h3>
+      <details id="lim-1" class="qa risk"><summary>repeated에서 새로 만든 Provider가 실제 암호화에 쓰이는가? — 쓰이지 않음, 확인함 <span class="badge good">수정함</span></summary><div class="a">
+        <p><b>확인 결과</b> (<code>ProviderRegistrationTest</code>): BC가 이미 있으면 <code>Security.addProvider(new BouncyCastleProvider())</code>는 <b>-1</b>을 돌려주고 목록을 바꾸지 않습니다. <code>AesUtilBefore.encrypt</code>를 여러 번 불러도 이름이 BC인 Provider는 처음 그 인스턴스 하나이고, <code>Cipher.getInstance(T, "BC").getProvider()</code>는 그 등록 인스턴스와 같은 객체입니다. 매번 만든 Provider는 할당 비용(op당 약 2.85MB)만 남기고 버려집니다.</p>
+        <p><b>해석에 주는 영향</b>: repeated도 once와 같은 공유 인스턴스의 <code>synchronized getService</code>를 거칩니다. 그런데도 ×6.7로 확장되는 것은 경합 지점이 없어서가 아니라 할당 비용이 압도적이라 경합이 묻히기 때문입니다. README "매번 만든 Provider는 암호화에 쓰이지 않는다" 절과 해석 2)에 반영했습니다.</p>
+        <p>원래 분석: <code>AesUtilBefore</code>는 새 인스턴스를 <code>addProvider</code>한 뒤 <b>이름</b> <code>"BC"</code>로 <code>Cipher.getInstance</code>합니다. 같은 이름이 이미 등록돼 있으면 <code>addProvider</code>는 추가하지 않으므로(<span class="badge info">일반 지식</span>), 암호화에는 처음 등록된 인스턴스가 쓰이고 새 인스턴스는 버려질 가능성이 높습니다. 그렇다면 repeated도 공유 Provider의 <code>getService</code>를 거치는 셈인데, 이를 검증한 측정은 저장소에 없습니다. 면접에서는 "확인 필요"로 답하는 게 안전합니다.</p>
+      </div></details>
+      <details id="lim-2" class="qa risk"><summary>Javadoc의 실행 경로가 틀림: <code>:labs:java-sandbox:jmh</code> <span class="badge good">수정함</span></summary><div class="a">
+        <p><b>어떻게 고쳤나</b>: javadoc을 <code>./gradlew :java-sandbox:jmh</code>로 바꿨습니다.</p>
+        <p><code>AesProviderRegistrationSingleThreadBenchmark</code> javadoc은 <code>./gradlew :labs:java-sandbox:jmh</code>라고 적지만, <code>settings.gradle</code>은 프로젝트를 <code>:java-sandbox</code>로 등록합니다. README와 EightThreads javadoc의 <code>:java-sandbox:jmh</code>가 맞습니다.</p>
+      </div></details>
+      <details id="lim-3" class="qa risk"><summary>오차 설명 불일치: javadoc "±95% 신뢰구간" vs README "99.9% 신뢰구간" <span class="badge good">수정함</span></summary><div class="a">
+        <p><b>어떻게 고쳤나</b>: javadoc을 "99.9% 신뢰구간의 절반(JMH 기본값)"으로 바꿨습니다. 실제 JMH 출력도 <code>±(99.9%)</code>, <code>CI (99.9%)</code>로 찍힙니다.</p>
+        <p>SingleThread javadoc은 Error를 "±95% 신뢰구간"이라 하고, README는 "99.9% 신뢰구간의 절반"이라 합니다. JMH 기본 출력은 99.9% 신뢰구간입니다 <span class="badge info">일반 지식</span>.</p>
+      </div></details>
+      <details id="lim-4" class="qa risk"><summary>EightThreads javadoc이 once 경로를 <code>Cipher.getInstance(..., "BC")</code>로 설명 <span class="badge good">수정함</span></summary><div class="a">
+        <p><b>어떻게 고쳤나</b>: once 경로는 <code>AesUtilAfter</code>의 <code>Cipher.getInstance(TRANSFORMATION, provider)</code>(객체로 찾음)로, repeated 경로는 이름 <code>"BC"</code>로 찾은 등록 인스턴스를 쓴다고 나눠 적었습니다.</p>
+        <p>once 경로(<code>AesUtilAfter</code>)는 이름 <code>"BC"</code>가 아니라 Provider 객체로 <code>getInstance</code>합니다. 경합 지점(<code>getService</code>)에 대한 결론은 같지만 설명이 코드와 다릅니다.</p>
+      </div></details>
+      <details id="lim-5" class="qa risk"><summary>통계적 근거가 얇다: fork 1, 측정 5회</summary><div class="a">
+        <p>fork 1 × 5 iteration은 JVM 간 편차를 보지 못합니다. README도 once 8스레드 값이 크게 흔들렸다고 적습니다. 결론의 "방향"(수백~천 배 차이, 확장 배수 역전)은 크지만, 정확한 배수를 인용할 때는 단서를 붙이세요.</p>
+      </div></details>
+      <details id="lim-6" class="qa risk"><summary>README가 AES 실험만 다룬다 <span class="badge good">수정함</span></summary><div class="a">
+        <p><b>어떻게 고쳤나</b>: README에 "그 밖의 예제" 절을 추가해 제네릭·가변인자·컬렉션 팩토리·record·리플렉션·LazyHolder 싱글턴·파사드 각각의 코드·테스트 파일과 테스트가 보여 주는 내용을 표로 정리했습니다.</p>
+        <p>원래 제네릭·가변인자·컬렉션 팩토리·record·리플렉션·싱글턴·파사드 예제는 README에 설명이 없고, 코드 주석과 테스트 이름이 유일한 문서입니다(이 페이지의 "그 밖의 예제" 탭 참고). 측정 수치 없음 — 모두 동작을 단언하는 단위 테스트입니다.</p>
+      </div></details>
+    </section>
+
+    <section id="interview">
+      <h2><span class="num">06</span>면접 Q&amp;A</h2>
+      <p class="sub">질문을 먼저 읽고 스스로 답해 본 뒤 펼쳐 보세요.</p>
+      <div class="qa-tools"><button type="button" data-qa="open">모두 펼치기</button><button type="button" data-qa="close">모두 접기</button></div>
+
+      <details id="iv-1" class="qa"><summary>왜 System.nanoTime 루프 대신 JMH를 썼나요?</summary><div class="a">
+        <ul>
+          <li>JIT 워밍업: 초반 인터프리터 구간이 평균을 왜곡 → <code>@Warmup</code>으로 제외.</li>
+          <li>죽은 코드 제거: 결과를 안 쓰면 JIT가 호출을 지움 → <code>Blackhole.consume</code>.</li>
+          <li>상수 폴딩·상태 오염: <code>@State</code>로 입력 분리, <code>@Fork</code>로 깨끗한 JVM.</li>
+          <li>근거: SingleThread 벤치마크 javadoc "왜 직접 재지 않고 JMH를 쓰나".</li>
+        </ul>
+      </div></details>
+      <details id="iv-2" class="qa"><summary>repeated가 1,500배 가까이 느린 원인을 어떻게 확정했나요?</summary><div class="a">
+        <ul>
+          <li>추측(객체 생성 비용)을 <code>-prof gc</code>로 검증: <code>gc.alloc.rate.norm</code> repeated 2,848,583 B/op vs once 4,032 B/op.</li>
+          <li>범인은 암호화 연산이 아니라 매 호출 <code>new BouncyCastleProvider()</code>(수백 개 알고리즘 매핑을 채우는 생성자).</li>
+          <li>교훈: 무거운 객체는 한 번 만들어 재사용·주입.</li>
+        </ul>
+      </div></details>
+      <details id="iv-3" class="qa"><summary>빠른 once가 8스레드에서 ×1.4밖에 확장되지 않은 이유는?</summary><div class="a">
+        <ul>
+          <li><code>-prof stack</code>: 51% BLOCKED, 그중 99.9%가 <code>BouncyCastleProvider.getService</code>.</li>
+          <li>getService는 DCL 구조지만 null 결과를 캐시하지 않아, <code>Cipher.getInstance</code>가 조회하는 이름 변형 중 매칭 없는 키는 매번 <code>synchronized</code>에 들어감 → 공유 Provider 하나에 8스레드가 줄 섬 (README 분석).</li>
+          <li>암달의 법칙: 일이 적은 쪽은 직렬 구간 비중이 커서 확장이 막힘. repeated는 스레드 로컬 할당이 지배라 ×6.7. repeated도 같은 등록 BC 인스턴스의 <code>getService</code>를 거치지만(<code>ProviderRegistrationTest</code>) 할당 비용에 묻힘.</li>
+          <li>프로파일 전 가설("JCE 내부 검증")이 틀렸다는 점도 README에 기록 — 측정의 가치.</li>
+        </ul>
+      </div></details>
+      <details id="iv-4" class="qa"><summary>운영에서 once의 경합까지 줄이려면 어떤 선택지가 있나요?</summary><div class="a">
+        <ul>
+          <li>README는 "관찰까지만"이라 저장소에 검증된 해법은 없음. 아래는 아이디어 수준(검증 필요).</li>
+          <li>스레드별 <code>Cipher</code> 재사용(<code>ThreadLocal</code>) → <code>getInstance</code> 호출 자체를 줄임. <code>Cipher</code>는 스레드 안전하지 않으므로 공유 금지 <span class="badge info">일반 지식</span>.</li>
+          <li>JDK 기본 Provider로 충분한 변환이면 BC 대신 사용(예: <code>AES/CBC/PKCS5Padding</code>) — 패딩 호환성 확인 필요.</li>
+          <li>무엇이든 바꾼 뒤 같은 JMH·프로파일로 재측정.</li>
+        </ul>
+      </div></details>
+      <details id="iv-5" class="qa"><summary>static 유틸 대신 생성자 주입으로 바꾼 설계상 이점은?</summary><div class="a">
+        <ul>
+          <li>전역 상태(<code>Security</code> 등록)와 비즈니스 로직(암호화) 분리 → 등록은 애플리케이션 초기화에서 1회.</li>
+          <li>테스트 용이성: <code>new AesUtilAfter(new BouncyCastleProvider())</code>로 전역 상태를 건드리지 않고 생성.</li>
+          <li>스프링이라면 Provider나 <code>AesUtilAfter</code>를 빈으로 등록해 주입하는 형태와 자연스럽게 연결.</li>
+        </ul>
+      </div></details>
+      <details id="iv-6" class="qa"><summary>JMH 결과의 Score, Error, Cnt는 어떻게 읽나요?</summary><div class="a">
+        <ul>
+          <li>Mode <code>thrpt</code> = 처리량, Units <code>ops/s</code>는 클수록 빠름. <code>@Threads(8)</code>의 값은 8스레드 합계.</li>
+          <li>Cnt = 집계된 측정 반복 수(5), 워밍업 제외.</li>
+          <li>Error = 신뢰구간 절반. JMH 기본은 99.9%(출력의 <code>±(99.9%)</code>). javadoc의 95% 표기는 99.9%로 고쳤습니다.</li>
+        </ul>
+      </div></details>
+      <details id="iv-7" class="qa"><summary>(기타 예제) <code>List&lt;? extends T&gt;</code>와 <code>List&lt;? super T&gt;</code>는 언제 쓰나요?</summary><div class="a">
+        <ul>
+          <li>PECS: Producer Extends, Consumer Super. 꺼내 읽으면 extends(<code>sum</code>), 넣으면 super(<code>addDefaultScores</code>).</li>
+          <li><code>&lt;?&gt;</code>는 아무 타입이나 받지만 넣을 수 없고, <code>&lt;Object&gt;</code>는 정확히 Object 컨테이너만 받음 — 제네릭은 무공변.</li>
+        </ul>
+      </div></details>
+      <details id="iv-8" class="qa"><summary>(기타 예제) List.of, Collections.unmodifiableList, List.copyOf의 차이는?</summary><div class="a">
+        <ul>
+          <li>셋 다 구조 변경 불가. <code>unmodifiableList</code>는 원본의 view라 원본 변경이 보이고, <code>copyOf</code>/<code>of</code>는 별도 리스트.</li>
+          <li><code>List.of</code>는 null 불가, 요소 객체를 deep copy하지 않음. record compact constructor에서 <code>List.copyOf</code>로 방어적 복사하는 이유.</li>
+        </ul>
+      </div></details>
+      <details id="iv-9" class="qa"><summary>(기타 예제) LazyHolder 싱글턴이 synchronized 없이 스레드 안전한 이유는?</summary><div class="a">
+        <ul>
+          <li>중첩 클래스 <code>Holder</code>는 <code>getInstance()</code> 첫 호출 시 초기화되고, 클래스 초기화는 JVM이 한 번만, 스레드 안전하게 수행 <span class="badge info">일반 지식: JLS 클래스 초기화</span>.</li>
+          <li>테스트: 100번 동시 호출해도 인스턴스 1개.</li>
+        </ul>
+      </div></details>
+    </section>
+
+    <section id="files">
+      <h2><span class="num">07</span>파일 지도</h2>
+      <p class="sub">코드를 다시 볼 때 여기서부터. (경로는 <code>labs/java-sandbox/</code> 기준)</p>
+      <ul class="files">
+        <li><code>README.md</code><span>AES Provider JMH 실험 전체: 구조, 실행, 결과, gc/stack 프로파일, 해석</span></li>
+        <li><code>build.gradle</code><span>JMH 플러그인, <code>-PjmhIncludes</code>/<code>-PjmhProfilers</code> 처리, 워밍업·측정 설정</span></li>
+        <li><code>src/main/java/dev/deepdive/sandbox/crypto/AesUtilBefore.java</code><span>매 호출 Provider 생성·등록</span></li>
+        <li><code>src/main/java/dev/deepdive/sandbox/crypto/AesUtilAfter.java</code><span>Provider 생성자 주입</span></li>
+        <li><code>src/jmh/java/dev/deepdive/sandbox/crypto/AesProviderRegistrationSingleThreadBenchmark.java</code><span>1스레드 벤치마크 (어노테이션 설명 주석 풍부)</span></li>
+        <li><code>src/jmh/java/dev/deepdive/sandbox/crypto/AesProviderRegistrationEightThreadsBenchmark.java</code><span>8스레드 벤치마크</span></li>
+        <li><code>src/test/java/dev/deepdive/sandbox/crypto/AesUtilComparisonTest.java</code><span>두 방식 암호문 동일성</span></li>
+        <li><code>src/test/java/dev/deepdive/sandbox/crypto/ProviderRegistrationTest.java</code><span>addProvider -1, Cipher가 쓰는 Provider 인스턴스 확인</span></li>
+        <li><code>src/main/java/dev/deepdive/sandbox/GenericsExamples.java</code><span>제네릭·와일드카드 (테스트: <code>GenericsExamplesTest</code>)</span></li>
+        <li><code>src/main/java/dev/deepdive/sandbox/VarargsExamples.java</code><span>가변인자·heap pollution (테스트: <code>VarargsExamplesTest</code>)</span></li>
+        <li><code>src/test/java/dev/deepdive/sandbox/CollectionFactoryMethodExamplesTest.java</code><span>List.of / Set.of / asList / unmodifiable / copyOf</span></li>
+        <li><code>src/test/java/dev/deepdive/sandbox/RecordTest.java</code><span>record DTO·Command·VO</span></li>
+        <li><code>src/test/java/dev/deepdive/sandbox/ReflectionTest.java</code><span>리플렉션 (대상: <code>Person.java</code>)</span></li>
+        <li><code>src/main/java/dev/deepdive/sandbox/LazyHolderSingleton.java</code><span>LazyHolder 싱글턴</span></li>
+        <li><code>src/main/java/dev/deepdive/sandbox/OrderFacade.java</code><span>파사드 패턴</span></li>
+      </ul>
+    </section>
+
+    <footer>README와 소스 코드를 근거로 정리한 문서입니다. 수치는 README에 기록된 값이며, 테스트로 검증되지 않은 값은 그렇게 표기했습니다.</footer>
+  </main>
+</div>
+<script>
+/* ===== 공통 스크립트 (모든 모듈 overview.html에서 동일하게 유지) ===== */
+(function(){
+  var root=document.documentElement;
+  try{var saved=localStorage.getItem('deepdive-theme');if(saved)root.setAttribute('data-theme',saved);}catch(e){}
+  var tt=document.querySelector('.theme-toggle');
+  if(tt)tt.addEventListener('click',function(){
+    var cur=root.getAttribute('data-theme');
+    if(!cur)cur=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';
+    var next=cur==='dark'?'light':'dark';root.setAttribute('data-theme',next);
+    try{localStorage.setItem('deepdive-theme',next);}catch(e){}
+  });
+  document.querySelectorAll('[data-flow]').forEach(function(flow){
+    var steps=flow.querySelectorAll('.step');var detail=flow.nextElementSibling;
+    function show(btn){
+      steps.forEach(function(s){s.setAttribute('aria-selected',s===btn?'true':'false');});
+      if(detail)detail.querySelectorAll(':scope>div').forEach(function(d){d.classList.toggle('on',d.id===btn.dataset.target);});
+    }
+    steps.forEach(function(s){s.addEventListener('click',function(){show(s);});});
+    if(steps[0])show(steps[0]);
+  });
+  document.querySelectorAll('[data-tabs]').forEach(function(box){
+    var btns=box.querySelectorAll(':scope>.tabs>button');
+    function show(btn){
+      btns.forEach(function(b){b.setAttribute('aria-selected',b===btn?'true':'false');});
+      box.querySelectorAll(':scope>.tabpanel').forEach(function(p){p.classList.toggle('on',p.id===btn.dataset.target);});
+    }
+    btns.forEach(function(b){b.addEventListener('click',function(){show(b);});});
+    if(btns[0])show(btns[0]);
+  });
+  document.querySelectorAll('[data-qa]').forEach(function(b){
+    b.addEventListener('click',function(){
+      var sec=b.closest('section');var open=b.dataset.qa==='open';
+      sec.querySelectorAll('details.qa').forEach(function(d){d.open=open;});
+    });
+  });
+  var links=document.querySelectorAll('nav.toc a[href^="#"]');
+  if('IntersectionObserver' in window){
+    var io=new IntersectionObserver(function(es){es.forEach(function(e){
+      if(e.isIntersecting){links.forEach(function(l){l.classList.toggle('active',l.getAttribute('href')==='#'+e.target.id);});}
+    });},{rootMargin:'-20% 0px -70% 0px'});
+    document.querySelectorAll('main section[id]').forEach(function(s){io.observe(s);});
+  }
+  function openHash(){
+    var id='';try{id=decodeURIComponent(location.hash.slice(1));}catch(e){}
+    if(!id)return;var el=document.getElementById(id);if(!el)return;
+    var d=el.tagName==='DETAILS'?el:el.closest('details');if(d)d.open=true;
+    var p=el.closest('.tabpanel');
+    if(p&&!p.classList.contains('on')){var b=p.parentElement.querySelector(':scope>.tabs>button[data-target="'+p.id+'"]');if(b)b.click();}
+    setTimeout(function(){el.scrollIntoView({block:'start'});},0);
+  }
+  window.addEventListener('hashchange',openHash);openHash();
+})();
+</script>
+</body>
+</html>

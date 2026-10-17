@@ -6,10 +6,22 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 
 @Entity
-@Table(name = "ledger_transactions")
+@Table(
+        name = "ledger_transactions",
+        uniqueConstraints = @UniqueConstraint(
+                name = JpaLedgerTransactionEntity.IDEMPOTENCY_KEY_CONSTRAINT,
+                columnNames = "idempotency_key"
+        )
+)
 public class JpaLedgerTransactionEntity {
+
+    /**
+     * 같은 주문 라인을 장부에 두 번 기록하지 못하게 막는 UNIQUE 제약. schema.sql 의 이름과 같아야 한다.
+     */
+    public static final String IDEMPOTENCY_KEY_CONSTRAINT = "uk_ledger_transactions_idempotency_key";
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -26,7 +38,7 @@ public class JpaLedgerTransactionEntity {
     @Column(name = "order_id")
     private String orderId;
 
-    @Column(name = "idempotency_key")
+    @Column(name = "idempotency_key", nullable = false)
     private String idempotencyKey;
 
     protected JpaLedgerTransactionEntity() {

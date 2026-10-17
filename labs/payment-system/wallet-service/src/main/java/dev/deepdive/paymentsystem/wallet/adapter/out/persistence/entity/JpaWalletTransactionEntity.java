@@ -9,12 +9,24 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 
 import java.math.BigDecimal;
 
 @Entity
-@Table(name = "wallet_transactions")
+@Table(
+        name = "wallet_transactions",
+        uniqueConstraints = @UniqueConstraint(
+                name = JpaWalletTransactionEntity.IDEMPOTENCY_KEY_CONSTRAINT,
+                columnNames = "idempotency_key"
+        )
+)
 public class JpaWalletTransactionEntity {
+
+    /**
+     * 같은 주문 라인을 두 번 정산하지 못하게 막는 UNIQUE 제약. schema.sql 의 이름과 같아야 한다.
+     */
+    public static final String IDEMPOTENCY_KEY_CONSTRAINT = "uk_wallet_transactions_idempotency_key";
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -37,7 +49,7 @@ public class JpaWalletTransactionEntity {
     @Column(name = "reference_id")
     private Long referenceId;
 
-    @Column(name = "idempotency_key")
+    @Column(name = "idempotency_key", nullable = false)
     private String idempotencyKey;
 
     protected JpaWalletTransactionEntity() {

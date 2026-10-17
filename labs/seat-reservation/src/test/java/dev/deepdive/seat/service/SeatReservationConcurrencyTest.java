@@ -77,7 +77,8 @@ class SeatReservationConcurrencyTest extends KafkaContainerTest {
             start.countDown();
             done.await();
 
-            long reservationCount = seatReservationRepository.count();
+            // 비교군은 유니크 제약이 없는 unsafe_seat_reservation 테이블에 쓴다 (확정 테이블에는 유니크 제약이 있음)
+            long reservationCount = unsafeSeatReservationRepository.count();
             System.out.printf("제어 없음 - 좌석 %d개에 예약 %d건 (이중 배정 포함)%n", SEATS, reservationCount);
 
             // 좌석 수보다 많은 예약 = 같은 좌석이 여러 명에게 배정됨

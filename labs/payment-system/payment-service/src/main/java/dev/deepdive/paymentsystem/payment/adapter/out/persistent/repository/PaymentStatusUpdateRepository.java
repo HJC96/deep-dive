@@ -7,5 +7,7 @@ public interface PaymentStatusUpdateRepository {
 
     Mono<Boolean> updatePaymentStatusToExecuting(String orderId, String paymentKey);
 
+    Mono<Boolean> updatePaymentStatusToExecutingForRecovery(String orderId);
+
     Mono<Boolean> updatePaymentStatus(PaymentStatusUpdateCommand command);
 }

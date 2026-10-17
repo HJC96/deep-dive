@@ -77,19 +77,30 @@ class TryConfirmCancelTest extends TccJpaTest {
         assertThat(seatTried).isTrue();    // 좌석은 이미 잡혔고, 그 상태로 커밋까지 됐다
         assertThat(walletTried).isFalse(); // 잔액 50,000으로 60,000을 묶지 못한다
 
+        // Try가 거절된 지갑에는 아직 아무 기록도 없다.
+        assertThat(walletLogState(REQUEST_ID)).isNull();
+
         // --- 2단계: Cancel ---
-        // 한 명이라도 실패하면 성공한 쪽을 되돌린다. 2PC의 롤백과 달리 반대 방향 업무 작업이다.
+        // 한 명이라도 실패하면 되돌린다. 2PC의 롤백과 달리 반대 방향 업무 작업이다.
         // 데이터베이스가 되돌려 주는 게 아니라, 잡아 둔 만큼 빼는 UPDATE를 참여자가 직접 한 번 더 한다.
+        //
+        // 코디네이터는 누가 무엇을 잡았는지 따지지 않고 참여자 전원에게 Cancel을 보낸다.
+        // Try 응답이 유실됐을 수도 있으니 "false를 돌려준 참여자는 아무것도 안 했다"고 단정할 수 없어서다.
         seatParticipant.cancel(REQUEST_ID);
+        walletParticipant.cancel(REQUEST_ID);
 
         assertThat(reservedCount()).isZero();
         assertThat(heldCount()).isZero();
         assertThat(balance()).isEqualTo(50_000);
         assertThat(frozen()).isZero();
 
-        // 좌석은 Try를 했으니 되돌린 기록이 남고, 지갑은 Try 자체가 실패해 남길 기록이 없다.
+        // 좌석은 Try를 했으니 잡아 둔 2석을 되돌리고 CANCELLED를 남긴다.
+        // 지갑은 Try가 거절돼 기록이 없던 요청의 Cancel을 받는다. 빈 취소다. 돈은 건드리지 않고
+        // CANCELLED만 남기니, 같은 요청의 Try가 뒤늦게 재전송돼도 거부된다.
         assertThat(seatLogState(REQUEST_ID)).isEqualTo(CANCELLED);
-        assertThat(walletLogState(REQUEST_ID)).isNull();
+        assertThat(walletLogState(REQUEST_ID)).isEqualTo(CANCELLED);
+        assertThat(walletParticipant.tryFreeze(REQUEST_ID, USER_ID, AMOUNT)).isFalse();
+        assertThat(balance()).isEqualTo(50_000);
     }
 
     @Test
@@ -106,12 +117,15 @@ class TryConfirmCancelTest extends TccJpaTest {
              Statement statement = other.createStatement()) {
             statement.execute("SET SESSION innodb_lock_wait_timeout = " + LOCK_WAIT_SECONDS);
 
-            // 읽기: 잡힌 상태가 그대로 보인다.
-            // 2PC의 PreparedLockTest에서는 같은 자리에서 커밋 전 옛 값 0이 보였다.
+            // 읽기: 예약 1이 잡아 둔 2석이 그대로 보인다.
+            // 2PC의 PreparedLockTest에서는 같은 자리에서 reserved_count가 커밋 전 옛 값 0으로 보여,
+            // prepare된 2석이 남에게 보이지 않았다. TCC는 잡아 둔 몫을 held_count라는 별도 칸에 커밋했으니
+            // reserved_count는 똑같이 0이지만 held_count에 2가 보인다.
             try (ResultSet resultSet = statement.executeQuery(
-                    "SELECT held_count FROM workshop_seat WHERE id = " + WORKSHOP_ID)) {
+                    "SELECT reserved_count, held_count FROM workshop_seat WHERE id = " + WORKSHOP_ID)) {
                 assertThat(resultSet.next()).isTrue();
-                assertThat(resultSet.getInt(1)).isEqualTo(SEAT_COUNT);
+                assertThat(resultSet.getInt("reserved_count")).isZero();
+                assertThat(resultSet.getInt("held_count")).isEqualTo(SEAT_COUNT);
             }
 
             // 쓰기: 2PC에서 Lock wait timeout이 나던 바로 그 문장이 여기서는 통과한다.

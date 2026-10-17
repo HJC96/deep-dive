@@ -1,0 +1,609 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>cache-patterns 한눈에</title>
+<style>
+/* ===== 공통 스타일 (모든 모듈 overview.html에서 동일하게 유지) ===== */
+:root{
+  --bg:#f7f7f5;--surface:#ffffff;--surface-2:#f0efeb;--border:#e2e0da;
+  --text:#1d1d1b;--muted:#6b6a65;--accent:#2f5bd3;--accent-soft:#e6ecfb;
+  --good:#1f8a4c;--good-soft:#e3f4ea;--bad:#c2410c;--bad-soft:#fcebe1;
+  --warn:#a16207;--warn-soft:#fbf3dc;--code-bg:#f3f2ee;
+  --shadow:0 1px 2px rgba(0,0,0,.04),0 4px 16px rgba(0,0,0,.04);
+  --radius:12px;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --sans:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Pretendard","Noto Sans KR","Segoe UI",sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#141413;--surface:#1c1c1a;--surface-2:#252522;--border:#33322e;
+    --text:#ecebe6;--muted:#a09e96;--accent:#7c9cff;--accent-soft:#1f2a47;
+    --good:#4ccf85;--good-soft:#16301f;--bad:#ff8a5c;--bad-soft:#3a1f14;
+    --warn:#e8b84a;--warn-soft:#3a2f12;--code-bg:#22221f;
+    --shadow:none;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#141413;--surface:#1c1c1a;--surface-2:#252522;--border:#33322e;
+  --text:#ecebe6;--muted:#a09e96;--accent:#7c9cff;--accent-soft:#1f2a47;
+  --good:#4ccf85;--good-soft:#16301f;--bad:#ff8a5c;--bad-soft:#3a1f14;
+  --warn:#e8b84a;--warn-soft:#3a2f12;--code-bg:#22221f;
+  --shadow:none;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);line-height:1.65;font-size:15.5px;-webkit-font-smoothing:antialiased}
+a{color:var(--accent)}
+code,.mono{font-family:var(--mono);font-size:.86em;background:var(--code-bg);padding:.1em .35em;border-radius:5px;word-break:break-all}
+pre{background:var(--code-bg);padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.55;margin:10px 0}
+pre code{background:none;padding:0;font-size:inherit;word-break:normal}
+.layout{display:grid;grid-template-columns:220px minmax(0,1fr);gap:40px;max-width:1180px;margin:0 auto;padding:32px 24px 80px}
+@media (max-width:860px){.layout{grid-template-columns:minmax(0,1fr);gap:0;padding:20px 16px 60px}}
+nav.toc{position:sticky;top:24px;align-self:start;font-size:14px}
+nav.toc .home{display:inline-block;margin-bottom:14px;color:var(--muted);text-decoration:none;font-size:13px}
+nav.toc ol{list-style:none;padding:0;margin:0;border-left:2px solid var(--border)}
+nav.toc li a{display:block;padding:5px 0 5px 14px;margin-left:-2px;border-left:2px solid transparent;color:var(--muted);text-decoration:none}
+nav.toc li a.active,nav.toc li a:hover{color:var(--text);border-left-color:var(--accent)}
+@media (max-width:860px){
+  nav.toc{position:static;margin-bottom:18px}
+  nav.toc ol{display:flex;flex-wrap:wrap;gap:6px;border:0}
+  nav.toc li a{padding:4px 10px;margin:0;border:1px solid var(--border);border-radius:999px;font-size:13px}
+  nav.toc li a.active{border-color:var(--accent)}
+}
+header.hero{margin-bottom:28px}
+.eyebrow{font-size:12.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
+h1{font-size:30px;line-height:1.25;margin:6px 0 10px;letter-spacing:-.01em}
+.lead{font-size:17px;color:var(--text);margin:0 0 14px;max-width:62ch}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font-size:12.5px;padding:3px 10px;border-radius:999px;background:var(--surface-2);border:1px solid var(--border);color:var(--muted)}
+section{margin:44px 0 0;scroll-margin-top:20px}
+h2{font-size:21px;margin:0 0 6px;letter-spacing:-.01em}
+h2 .num{color:var(--accent);margin-right:8px;font-variant-numeric:tabular-nums}
+.sub{color:var(--muted);margin:0 0 16px;font-size:14.5px}
+h3{font-size:16.5px;margin:18px 0 6px}
+.card{overflow-wrap:anywhere;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow)}
+.grid{display:grid;gap:12px}
+.grid.c2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.grid.c3{grid-template-columns:repeat(3,minmax(0,1fr))}
+@media (max-width:700px){.grid.c2,.grid.c3{grid-template-columns:minmax(0,1fr)}}
+.tldr .label{font-size:12px;font-weight:700;letter-spacing:.05em;color:var(--muted);text-transform:uppercase;margin-bottom:4px}
+.tldr .card{border-top:3px solid var(--accent)}
+.tldr .card.good{border-top-color:var(--good)}
+.tldr .card.bad{border-top-color:var(--bad)}
+.tldr p{margin:0}
+/* 흐름 다이어그램: 단계 클릭 시 상세 표시 */
+.flow{display:flex;flex-wrap:wrap;align-items:stretch;gap:0;margin:6px 0 10px}
+.flow .step{flex:1 1 140px;min-width:120px;text-align:left;font:inherit;color:inherit;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 12px;cursor:pointer;position:relative;transition:border-color .15s,background .15s}
+.flow .step:hover{border-color:var(--accent)}
+.flow .step[aria-selected="true"]{border-color:var(--accent);background:var(--accent-soft)}
+.flow .step .k{display:block;font-size:11.5px;color:var(--muted);font-weight:600}
+.flow .step .t{display:block;font-weight:600;font-size:14px;line-height:1.35}
+.flow .step.fail{border-style:dashed;border-color:var(--bad)}
+.flow .step.fail[aria-selected="true"]{background:var(--bad-soft)}
+.flow .arrow{display:flex;align-items:center;padding:0 6px;color:var(--muted);font-size:18px}
+@media (max-width:700px){.flow{flex-direction:column}.flow .step{flex:none}.flow .arrow{justify-content:center;padding:2px 0;transform:rotate(90deg)}}
+.flow-detail{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:10px;padding:14px 18px;min-height:64px}
+.flow-detail>div{display:none}
+.flow-detail>div.on{display:block}
+.flow-detail p:first-child{margin-top:0}.flow-detail p:last-child{margin-bottom:0}
+/* 탭 */
+.tabs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.tabs button{font:inherit;font-size:13.5px;padding:6px 12px;border-radius:999px;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{background:var(--text);color:var(--bg);border-color:var(--text)}
+.tabpanel{display:none}.tabpanel.on{display:block}
+.kv{display:grid;grid-template-columns:110px minmax(0,1fr);gap:6px 14px;margin:10px 0 0;font-size:14.5px}
+.kv dt{color:var(--muted);font-weight:600}
+.kv dd{margin:0}
+@media (max-width:520px){.kv{grid-template-columns:1fr}.kv dt{margin-top:6px}}
+/* 표 */
+.tablewrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:top}
+th{background:var(--surface-2);font-weight:600;font-size:13px;color:var(--muted);white-space:nowrap}
+tr:last-child td{border-bottom:0}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+.hl{background:var(--accent-soft)}
+/* 막대 그래프 (값은 --v: 0~1 비율) */
+.bars{display:grid;gap:8px}
+.bar{display:grid;grid-template-columns:150px minmax(0,1fr) 92px;align-items:center;gap:10px;font-size:13.5px}
+.bar .track{height:20px;background:var(--surface-2);border-radius:6px;overflow:hidden}
+.bar .fill{height:100%;width:calc(var(--v) * 100%);background:var(--accent);border-radius:6px;min-width:2px;transition:width .6s ease}
+.bar.good .fill{background:var(--good)}.bar.bad .fill{background:var(--bad)}.bar.warn .fill{background:var(--warn)}
+.bar .val{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--mono);font-size:12.5px}
+@media (max-width:520px){.bar{grid-template-columns:100px minmax(0,1fr) 72px}}
+.source{font-size:12.5px;color:var(--muted);margin-top:10px}
+/* 배지·콜아웃 */
+.badge{display:inline-block;font-size:11.5px;font-weight:700;padding:1px 8px;border-radius:999px;vertical-align:middle}
+.badge.good{background:var(--good-soft);color:var(--good)}
+.badge.bad{background:var(--bad-soft);color:var(--bad)}
+.badge.warn{background:var(--warn-soft);color:var(--warn)}
+.badge.info{background:var(--accent-soft);color:var(--accent)}
+.callout{border-radius:10px;padding:12px 16px;margin:12px 0;font-size:14.5px;border:1px solid var(--border);background:var(--surface)}
+.callout.warn{background:var(--warn-soft);border-color:transparent}
+.callout.bad{background:var(--bad-soft);border-color:transparent}
+.callout.good{background:var(--good-soft);border-color:transparent}
+.callout strong:first-child{margin-right:4px}
+/* 아코디언 (면접 Q&A, 약점) */
+details.qa{background:var(--surface);border:1px solid var(--border);border-radius:10px;margin:8px 0;overflow:hidden}
+details.qa summary{cursor:pointer;padding:12px 16px;font-weight:600;list-style:none;display:flex;gap:10px;align-items:flex-start}
+details.qa summary::-webkit-details-marker{display:none}
+details.qa summary::before{content:"Q";flex:none;width:22px;height:22px;border-radius:6px;background:var(--accent-soft);color:var(--accent);font-size:12px;display:grid;place-items:center;margin-top:1px}
+details.qa.risk summary::before{content:"!";background:var(--bad-soft);color:var(--bad)}
+details.qa[open] summary{border-bottom:1px solid var(--border)}
+details.qa .a{padding:12px 16px 14px 48px;font-size:14.5px}
+details.qa .a p{margin:0 0 8px}details.qa .a ul{margin:0;padding-left:18px}
+.qa-tools{display:flex;gap:8px;margin-bottom:8px}
+.qa-tools button,.theme-toggle{font:inherit;font-size:13px;padding:5px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer}
+.theme-toggle{position:fixed;right:16px;bottom:16px;z-index:5;box-shadow:var(--shadow)}
+/* 파일 지도 */
+ul.files{list-style:none;padding:0;margin:0;display:grid;gap:6px}
+ul.files li{display:grid;grid-template-columns:minmax(0,1fr);gap:2px;padding:9px 12px;background:var(--surface);border:1px solid var(--border);border-radius:9px}
+ul.files li code{background:none;padding:0;font-size:12.5px}
+ul.files li span{color:var(--muted);font-size:13.5px}
+footer{margin-top:56px;padding-top:18px;border-top:1px solid var(--border);color:var(--muted);font-size:13px}
+ul.plain{margin:6px 0;padding-left:20px}ul.plain li{margin:3px 0}
+</style>
+</head>
+<body>
+<button class="theme-toggle" type="button" aria-label="테마 전환">◐ 테마</button>
+<div class="layout">
+  <nav class="toc" aria-label="목차">
+    <a class="home" href="../index.html">← 전체 모듈</a>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin:0 0 14px"><a class="chip" style="text-decoration:none" href="../changes.html#m-cache-patterns">개선 내역</a><a class="chip" style="text-decoration:none" href="../interview.html#m-cache-patterns">질문 모음</a></div>
+    <ol>
+      <li><a href="#tldr">한눈에</a></li>
+      <li><a href="#flow">흐름</a></li>
+      <li><a href="#cases">비교·핵심 구현</a></li>
+      <li><a href="#results">결과·수치</a></li>
+      <li><a href="#limits">한계·약점</a></li>
+      <li><a href="#interview">면접 Q&amp;A</a></li>
+      <li><a href="#files">파일 지도</a></li>
+    </ol>
+  </nav>
+  <main>
+    <header class="hero">
+      <div class="eyebrow">deep-dive · labs/cache-patterns</div>
+      <h1>캐시 패턴 실험실 — 읽기·쓰기 패턴 5개와 장애 3대장을 순수 Java로</h1>
+      <p class="lead">캐시는 "넣으면 빨라진다"로 끝나지 않습니다. <strong>언제 채우고, 언제 지우고, 동시에 몰리면 어떻게 되는지</strong>에 따라 오래된 값이 남거나 DB가 터집니다. 이 모듈은 Redis·Spring 없이 <code>InMemoryCache</code>와 <code>InMemoryProductStore</code>만으로 패턴마다 작은 클래스를 만들고, 저장소 read/write 횟수를 세는 단위 테스트로 차이를 확인합니다.</p>
+      <div class="chips"><span class="chip">Java 21</span><span class="chip">순수 Java (Spring 없음)</span><span class="chip">JUnit 5 + AssertJ</span><span class="chip">InMemoryCache</span><span class="chip">Redis 없음</span></div>
+    </header>
+
+    <section id="tldr" class="tldr">
+      <h2><span class="num">01</span>한눈에</h2>
+      <p class="sub">30초 요약</p>
+      <div class="grid c3">
+        <div class="card bad"><div class="label">문제</div><p>캐시를 잘못 채우거나 지우면 <strong>DB와 다른 오래된 값</strong>이 남고, 인기 키 동시 miss·없는 키 반복 조회·동시 만료가 일어나면 <strong>요청이 DB로 몰립니다</strong>.</p></div>
+        <div class="card"><div class="label">접근</div><p>읽기 2개(Cache Aside, Read Through), 쓰기 3개(Write Through/Around/Behind), race 1개, 3대장(Stampede/Penetration/Avalanche) 방어 클래스를 각각 만들고 <strong>저장소 호출 횟수</strong>로 비교.</p></div>
+        <div class="card good"><div class="label">결론</div><p>일반 조회는 <strong>Cache Aside + Write Around(쓰기 후 evict)</strong>가 기본값. 문제별로 single-flight / refresh-ahead, negative caching / Bloom filter, TTL jitter, 버전 비교를 덧붙입니다.</p></div>
+      </div>
+    </section>
+
+    <section id="flow">
+      <h2><span class="num">02</span>흐름</h2>
+      <p class="sub">README의 학습 순서입니다. 단계를 클릭하면 무엇을 보는지 나옵니다.</p>
+      <div class="flow" data-flow>
+        <button class="step" data-target="cp-f1"><span class="k">STEP 1</span><span class="t">읽기 miss 처리</span></button>
+        <span class="arrow">→</span>
+        <button class="step" data-target="cp-f2"><span class="k">STEP 2</span><span class="t">쓰기 반영 방식</span></button>
+        <span class="arrow">→</span>
+        <button class="step fail" data-target="cp-f3"><span class="k">문제</span><span class="t">Race Condition</span></button>
+        <span class="arrow">→</span>
+        <button class="step fail" data-target="cp-f4"><span class="k">3대장</span><span class="t">Stampede · Penetration · Avalanche</span></button>
+      </div>
+      <div class="flow-detail">
+        <div id="cp-f1"><p><strong>누가 저장소를 호출하느냐</strong>의 차이. Cache Aside는 서비스가 miss를 확인하고 직접 <code>store.findById</code>, Read Through는 서비스가 <code>readThroughCache.get</code>만 부르고 캐시 계층이 loader로 저장소를 부릅니다.</p></div>
+        <div id="cp-f2"><p><strong>쓰기 직후 캐시에 무엇이 남느냐</strong>의 차이. Write Through는 최신 값(put), Write Around는 비움(evict), Write Behind는 캐시만 최신이고 저장소는 <code>flush()</code> 때 반영.</p></div>
+        <div id="cp-f3"><p>Cache Aside에서 읽기가 v1을 읽은 뒤, 쓰기가 v2 저장 + evict를 끝내고, 읽기가 뒤늦게 v1을 put하면 <strong>캐시 v1 / 저장소 v2</strong>로 어긋납니다. 방어: <code>VersionedCache</code>(낮은 버전 put 거부).</p></div>
+        <div id="cp-f4"><ul class="plain"><li><strong>Stampede</strong>: 인기 키 동시 miss → <code>SingleFlightCache</code>, <code>RefreshAheadCache</code></li><li><strong>Penetration</strong>: 없는 키 반복 조회 → <code>NegativeCachingCache</code>, <code>BloomFilter</code></li><li><strong>Avalanche</strong>: 많은 키 동시 만료 → <code>ExpiringCache</code> + TTL jitter</li></ul></div>
+      </div>
+
+      <h3>패턴별 App ↔ Cache ↔ DB 흐름</h3>
+      <p class="sub">실선은 호출, 점선은 응답. 탭을 눌러 패턴을 바꿔 보세요.</p>
+      <div data-tabs>
+        <div class="tabs" role="tablist">
+          <button role="tab" data-target="cp-sq-aside">Cache Aside</button>
+          <button role="tab" data-target="cp-sq-rt">Read Through</button>
+          <button role="tab" data-target="cp-sq-wt">Write Through</button>
+          <button role="tab" data-target="cp-sq-wa">Write Around</button>
+          <button role="tab" data-target="cp-sq-wb">Write Behind</button>
+        </div>
+        <div class="tabpanel card" id="cp-sq-aside">
+          <svg viewBox="0 0 520 452" role="img" aria-label="Cache Aside 읽기/쓰기 흐름" style="width:100%;max-width:640px;height:auto;display:block;margin:6px auto 10px;font-family:var(--sans)"><title>Cache Aside 읽기/쓰기 흐름</title><defs><marker id="cp-aside-m-text" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" style="fill:var(--text)"/></marker><marker id="cp-aside-m-muted" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" style="fill:var(--muted)"/></marker><marker id="cp-aside-m-good" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" style="fill:var(--good)"/></marker><marker id="cp-aside-m-bad" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" style="fill:var(--bad)"/></marker><marker id="cp-aside-m-accent" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" style="fill:var(--accent)"/></marker></defs><rect x="7.5" y="8" width="109" height="28" rx="7" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1"/><text x="62.0" y="27" text-anchor="middle" style="fill:var(--text);font-size:12.5px;font-weight:700">Service</text><line x1="62.0" y1="36" x2="62.0" y2="446" style="stroke:var(--border);stroke-width:1.5;stroke-dasharray:3 4"/><rect x="218.0" y="8" width="84" height="28" rx="7" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1"/><text x="260.0" y="27" text-anchor="middle" style="fill:var(--text);font-size:12.5px;font-weight:700">Cache</text><line x1="260.0" y1="36" x2="260.0" y2="446" style="stroke:var(--border);stroke-width:1.5;stroke-dasharray:3 4"/><rect x="416.0" y="8" width="84" height="28" rx="7" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1"/><text x="458.0" y="27" text-anchor="middle" style="fill:var(--text);font-size:12.5px;font-weight:700">Store</text><line x1="458.0" y1="36" x2="458.0" y2="446" style="stroke:var(--border);stroke-width:1.5;stroke-dasharray:3 4"/><rect x="8" y="60" width="504" height="22" rx="6" style="fill:var(--surface-2)"/><text x="260.0" y="75" text-anchor="middle" style="fill:var(--muted);font-size:12px;font-weight:600">읽기 ① 첫 조회 → miss</text><line x1="66.0" y1="106" x2="254.0" y2="106" style="stroke:var(--text);stroke-width:1.6;" marker-end="url(#cp-aside-m-text)"/><text x="161.0" y="101" text-anchor="middle" style="fill:var(--text);font-size:12.5px">get(1L)</text><line x1="256.0" y1="138" x2="68.0" y2="138" style="stroke:var(--muted);stroke-width:1.6;stroke-dasharray:5 4;" marker-end="url(#cp-aside-m-muted)"/><text x="161.0" y="133" text-anchor="middle" style="fill:var(--muted);font-size:12.5px">miss</text><line x1="66.0" y1="170" x2="452.0" y2="170" style="stroke:var(--text);stroke-width:1.6;" marker-end="url(#cp-aside-m-text)"/><text x="260.0" y="165" text-anchor="middle" style="fill:var(--text);font-size:12.5px">findById(1L)</text><line x1="454.0" y1="202" x2="68.0" y2="202" style="stroke:var(--muted);stroke-width:1.6;stroke-dasharray:5 4;" marker-end="url(#cp-aside-m-muted)"/><text x="260.0" y="197" text-anchor="middle" style="fill:var(--muted);font-size:12.5px">Product</text><line x1="66.0" y1="234" x2="254.0" y2="234" style="stroke:var(--text);stroke-width:1.6;" marker-end="url(#cp-aside-m-text)"/><text x="161.0" y="229" text-anchor="middle" style="fill:var(--text);font-size:12.5px">put(1L, p)</text><rect x="8" y="250" width="504" height="22" rx="6" style="fill:var(--surface-2)"/><text x="260.0" y="265" text-anchor="middle" style="fill:var(--muted);font-size:12px;font-weight:600">읽기 ② 재조회 → hit</text><line x1="66.0" y1="296" x2="254.0" y2="296" style="stroke:var(--text);stroke-width:1.6;" marker-end="url(#cp-aside-m-text)"/><text x="161.0" y="291" text-anchor="middle" style="fill:var(--text);font-size:12.5px">get(1L)</text><line x1="256.0" y1="328" x2="68.0" y2="328" style="stroke:var(--good);stroke-width:1.6;stroke-dasharray:5 4;" marker-end="url(#cp-aside-m-good)"/><text x="161.0" y="323" text-anchor="middle" style="fill:var(--good);font-size:12.5px;font-weight:600">hit → 바로 반환</text><rect x="8" y="344" width="504" height="22" rx="6" style="fill:var(--surface-2)"/><text x="260.0" y="359" text-anchor="middle" style="fill:var(--muted);font-size:12px;font-weight:600">쓰기: 저장소 반영 후 캐시 제거</text><line x1="66.0" y1="390" x2="452.0" y2="390" style="stroke:var(--text);stroke-width:1.6;" marker-end="url(#cp-aside-m-text)"/><text x="260.0" y="385" text-anchor="middle" style="fill:var(--text);font-size:12.5px">save(updated)</text><line x1="66.0" y1="422" x2="254.0" y2="422" style="stroke:var(--text);stroke-width:1.6;" marker-end="url(#cp-aside-m-text)"/><text x="161.0" y="417" text-anchor="middle" style="fill:var(--text);font-size:12.5px">evict(1L)</text></svg>
+          <p>서비스가 직접 miss를 확인하고 저장소에서 읽어 캐시에 넣습니다. 쓰기 때는 저장 후 <code>evict</code>. 가장 흔한 형태이고 캐시 정책을 코드에서 명시적으로 제어합니다.</p>
+        </div>
+        <div class="tabpanel card" id="cp-sq-rt">
+          <svg viewBox="0 0 560 454" role="img" aria-label="Read Through 읽기/쓰기 흐름" style="width:100%;max-width:680px;height:auto;display:block;margin:6px auto 10px;font-family:var(--sans)"><title>Read Through 읽기/쓰기 흐름</title><defs><marker id="cp-readthrough-m-text" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" style="fill:var(--text)"/></marker><marker id="cp-readthrough-m-muted" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" style="fill:var(--muted)"/></marker><marker id="cp-readthrough-m-good" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" style="fill:var(--good)"/></marker><marker id="cp-readthrough-m-bad" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" style="fill:var(--bad)"/></marker><marker id="cp-readthrough-m-accent" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" style="fill:var(--accent)"/></marker></defs><rect x="7.5" y="8" width="109" height="28" rx="7" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1"/><text x="62.0" y="27" text-anchor="middle" style="fill:var(--text);font-size:12.5px;font-weight:700">Service</text><line x1="62.0" y1="36" x2="62.0" y2="448" style="stroke:var(--border);stroke-width:1.5;stroke-dasharray:3 4"/><rect x="148.33333333333334" y="8" width="118" height="28" rx="7" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1"/><text x="207.33333333333334" y="27" text-anchor="middle" style="fill:var(--text);font-size:12.5px;font-weight:700">ReadThrough</text><line x1="207.33333333333334" y1="36" x2="207.33333333333334" y2="448" style="stroke:var(--border);stroke-width:1.5;stroke-dasharray:3 4"/><rect x="293.6666666666667" y="8" width="118" height="28" rx="7" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1"/><text x="352.6666666666667" y="27" text-anchor="middle" style="fill:var(--text);font-size:12.5px;font-weight:700">InMemory</text><line x1="352.6666666666667" y1="36" x2="352.6666666666667" y2="448" style="stroke:var(--border);stroke-width:1.5;stroke-dasharray:3 4"/><rect x="456.0" y="8" width="84" height="28" rx="7" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1"/><text x="498.0" y="27" text-anchor="middle" style="fill:var(--text);font-size:12.5px;font-weight:700">Store</text><line x1="498.0" y1="36" x2="498.0" y2="448" style="stroke:var(--border);stroke-width:1.5;stroke-dasharray:3 4"/><rect x="8" y="60" width="544" height="22" rx="6" style="fill:var(--surface-2)"/><text x="280.0" y="75" text-anchor="middle" style="fill:var(--muted);font-size:12px;font-weight:600">읽기: 서비스는 get만, miss 처리는 캐시 계층</text><line x1="66.0" y1="106" x2="201.33333333333334" y2="106" style="stroke:var(--text);stroke-width:1.6;" marker-end="url(#cp-readthrough-m-text)"/><text x="134.66666666666669" y="101" text-anchor="middle" style="fill:var(--text);font-size:12.5px">get(1L)</text><line x1="211.33333333333334" y1="138" x2="346.6666666666667" y2="138" style="stroke:var(--text);stroke-width:1.6;" marker-end="url(#cp-readthrough-m-text)"/><text x="280.0" y="133" text-anchor="middle" style="fill:var(--text);font-size:12.5px">get(1L)</text><line x1="348.6666666666667" y1="170" x2="213.33333333333334" y2="170" style="stroke:var(--muted);stroke-width:1.6;stroke-dasharray:5 4;" marker-end="url(#cp-readthrough-m-muted)"/><text x="280.0" y="165" text-anchor="middle" style="fill:var(--muted);font-size:12.5px">miss</text><line x1="211.33333333333334" y1="202" x2="492.0" y2="202" style="stroke:var(--text);stroke-width:1.6;" marker-end="url(#cp-readthrough-m-text)"/><text x="352.6666666666667" y="197" text-anchor="middle" style="fill:var(--text);font-size:12.5px">loader.apply(1L)</text><line x1="494.0" y1="234" x2="213.33333333333334" y2="234" style="stroke:var(--muted);stroke-width:1.6;stroke-dasharray:5 4;" marker-end="url(#cp-readthrough-m-muted)"/><text x="352.6666666666667" y="229" text-anchor="middle" style="fill:var(--muted);font-size:12.5px">Product</text><line x1="211.33333333333334" y1="266" x2="346.6666666666667" y2="266" style="stroke:var(--text);stroke-width:1.6;" marker-end="url(#cp-readthrough-m-text)"/><text x="280.0" y="261" text-anchor="middle" style="fill:var(--text);font-size:12.5px">put</text><line x1="203.33333333333334" y1="298" x2="68.0" y2="298" style="stroke:var(--muted);stroke-width:1.6;stroke-dasharray:5 4;" marker-end="url(#cp-readthrough-m-muted)"/><text x="134.66666666666669" y="293" text-anchor="middle" style="fill:var(--muted);font-size:12.5px">Product</text><rect x="8" y="314" width="544" height="22" rx="6" style="fill:var(--surface-2)"/><text x="280.0" y="329" text-anchor="middle" style="fill:var(--muted);font-size:12px;font-weight:600">쓰기: 저장 후 캐시 계층으로 evict</text><line x1="66.0" y1="360" x2="492.0" y2="360" style="stroke:var(--text);stroke-width:1.6;" marker-end="url(#cp-readthrough-m-text)"/><text x="280.0" y="355" text-anchor="middle" style="fill:var(--text);font-size:12.5px">save(updated)</text><line x1="66.0" y1="392" x2="201.33333333333334" y2="392" style="stroke:var(--text);stroke-width:1.6;" marker-end="url(#cp-readthrough-m-text)"/><text x="134.66666666666669" y="387" text-anchor="middle" style="fill:var(--text);font-size:12.5px">evict(1L)</text><line x1="211.33333333333334" y1="424" x2="346.6666666666667" y2="424" style="stroke:var(--text);stroke-width:1.6;" marker-end="url(#cp-readthrough-m-text)"/><text x="280.0" y="419" text-anchor="middle" style="fill:var(--text);font-size:12.5px">evict</text></svg>
+          <p>서비스 코드는 <code>products.get(id)</code> 한 줄. miss 처리와 loader 호출은 <code>ReadThroughCache</code>가 담당합니다. 실무에선 Caffeine 같은 loading cache나 Redis 앞 공통 래퍼로 표현된다고 README가 설명합니다(Redis 단독으로는 Read Through가 자동으로 생기지 않음).</p>
+        </div>
+        <div class="tabpanel card" id="cp-sq-wt">
+          <svg viewBox="0 0 520 294" role="img" aria-label="Write Through 흐름" style="width:100%;max-width:640px;height:auto;display:block;margin:6px auto 10px;font-family:var(--sans)"><title>Write Through 흐름</title><defs><marker id="cp-writethrough-m-text" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" style="fill:var(--text)"/></marker><marker id="cp-writethrough-m-muted" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" style="fill:var(--muted)"/></marker><marker id="cp-writethrough-m-good" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" style="fill:var(--good)"/></marker><marker id="cp-writethrough-m-bad" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" style="fill:var(--bad)"/></marker><marker id="cp-writethrough-m-accent" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" style="fill:var(--accent)"/></marker></defs><rect x="7.5" y="8" width="109" height="28" rx="7" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1"/><text x="62.0" y="27" text-anchor="middle" style="fill:var(--text);font-size:12.5px;font-weight:700">Service</text><line x1="62.0" y1="36" x2="62.0" y2="288" style="stroke:var(--border);stroke-width:1.5;stroke-dasharray:3 4"/><rect x="218.0" y="8" width="84" height="28" rx="7" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1"/><text x="260.0" y="27" text-anchor="middle" style="fill:var(--text);font-size:12.5px;font-weight:700">Cache</text><line x1="260.0" y1="36" x2="260.0" y2="288" style="stroke:var(--border);stroke-width:1.5;stroke-dasharray:3 4"/><rect x="416.0" y="8" width="84" height="28" rx="7" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1"/><text x="458.0" y="27" text-anchor="middle" style="fill:var(--text);font-size:12.5px;font-weight:700">Store</text><line x1="458.0" y1="36" x2="458.0" y2="288" style="stroke:var(--border);stroke-width:1.5;stroke-dasharray:3 4"/><rect x="8" y="60" width="504" height="22" rx="6" style="fill:var(--surface-2)"/><text x="260.0" y="75" text-anchor="middle" style="fill:var(--muted);font-size:12px;font-weight:600">쓰기: 저장소와 캐시를 한 요청에서 모두 갱신</text><line x1="66.0" y1="106" x2="452.0" y2="106" style="stroke:var(--text);stroke-width:1.6;" marker-end="url(#cp-writethrough-m-text)"/><text x="260.0" y="101" text-anchor="middle" style="fill:var(--text);font-size:12.5px">save(p)</text><line x1="454.0" y1="138" x2="68.0" y2="138" style="stroke:var(--muted);stroke-width:1.6;stroke-dasharray:5 4;" marker-end="url(#cp-writethrough-m-muted)"/><text x="260.0" y="133" text-anchor="middle" style="fill:var(--muted);font-size:12.5px">saved</text><line x1="66.0" y1="170" x2="254.0" y2="170" style="stroke:var(--text);stroke-width:1.6;" marker-end="url(#cp-writethrough-m-text)"/><text x="161.0" y="165" text-anchor="middle" style="fill:var(--text);font-size:12.5px">put(id, saved)</text><rect x="8" y="186" width="504" height="22" rx="6" style="fill:var(--surface-2)"/><text x="260.0" y="201" text-anchor="middle" style="fill:var(--muted);font-size:12px;font-weight:600">읽기: 곧바로 hit (store read 0)</text><line x1="66.0" y1="232" x2="254.0" y2="232" style="stroke:var(--text);stroke-width:1.6;" marker-end="url(#cp-writethrough-m-text)"/><text x="161.0" y="227" text-anchor="middle" style="fill:var(--text);font-size:12.5px">get(id)</text><line x1="256.0" y1="264" x2="68.0" y2="264" style="stroke:var(--good);stroke-width:1.6;stroke-dasharray:5 4;" marker-end="url(#cp-writethrough-m-good)"/><text x="161.0" y="259" text-anchor="middle" style="fill:var(--good);font-size:12.5px;font-weight:600">hit</text></svg>
+          <p>저장 직후 캐시에도 최신 값이 있으므로 다음 읽기는 바로 hit. 대신 쓰기 경로가 두 곳을 거쳐 느려지고, 저장 성공 후 캐시 put 실패 같은 <strong>부분 실패</strong>를 처리해야 합니다.</p>
+        </div>
+        <div class="tabpanel card" id="cp-sq-wa">
+          <svg viewBox="0 0 520 452" role="img" aria-label="Write Around 흐름" style="width:100%;max-width:640px;height:auto;display:block;margin:6px auto 10px;font-family:var(--sans)"><title>Write Around 흐름</title><defs><marker id="cp-writearound-m-text" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" style="fill:var(--text)"/></marker><marker id="cp-writearound-m-muted" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" style="fill:var(--muted)"/></marker><marker id="cp-writearound-m-good" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" style="fill:var(--good)"/></marker><marker id="cp-writearound-m-bad" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" style="fill:var(--bad)"/></marker><marker id="cp-writearound-m-accent" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" style="fill:var(--accent)"/></marker></defs><rect x="7.5" y="8" width="109" height="28" rx="7" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1"/><text x="62.0" y="27" text-anchor="middle" style="fill:var(--text);font-size:12.5px;font-weight:700">Service</text><line x1="62.0" y1="36" x2="62.0" y2="446" style="stroke:var(--border);stroke-width:1.5;stroke-dasharray:3 4"/><rect x="218.0" y="8" width="84" height="28" rx="7" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1"/><text x="260.0" y="27" text-anchor="middle" style="fill:var(--text);font-size:12.5px;font-weight:700">Cache</text><line x1="260.0" y1="36" x2="260.0" y2="446" style="stroke:var(--border);stroke-width:1.5;stroke-dasharray:3 4"/><rect x="416.0" y="8" width="84" height="28" rx="7" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1"/><text x="458.0" y="27" text-anchor="middle" style="fill:var(--text);font-size:12.5px;font-weight:700">Store</text><line x1="458.0" y1="36" x2="458.0" y2="446" style="stroke:var(--border);stroke-width:1.5;stroke-dasharray:3 4"/><rect x="8" y="60" width="504" height="22" rx="6" style="fill:var(--surface-2)"/><text x="260.0" y="75" text-anchor="middle" style="fill:var(--muted);font-size:12px;font-weight:600">쓰기: 저장소만 갱신, 캐시는 제거</text><line x1="66.0" y1="106" x2="452.0" y2="106" style="stroke:var(--text);stroke-width:1.6;" marker-end="url(#cp-writearound-m-text)"/><text x="260.0" y="101" text-anchor="middle" style="fill:var(--text);font-size:12.5px">save(p)</text><line x1="66.0" y1="138" x2="254.0" y2="138" style="stroke:var(--text);stroke-width:1.6;" marker-end="url(#cp-writearound-m-text)"/><text x="161.0" y="133" text-anchor="middle" style="fill:var(--text);font-size:12.5px">evict(id)</text><rect x="8" y="154" width="504" height="22" rx="6" style="fill:var(--surface-2)"/><text x="260.0" y="169" text-anchor="middle" style="fill:var(--muted);font-size:12px;font-weight:600">첫 읽기: miss → 저장소 → 적재</text><line x1="66.0" y1="200" x2="254.0" y2="200" style="stroke:var(--text);stroke-width:1.6;" marker-end="url(#cp-writearound-m-text)"/><text x="161.0" y="195" text-anchor="middle" style="fill:var(--text);font-size:12.5px">get(id)</text><line x1="256.0" y1="232" x2="68.0" y2="232" style="stroke:var(--muted);stroke-width:1.6;stroke-dasharray:5 4;" marker-end="url(#cp-writearound-m-muted)"/><text x="161.0" y="227" text-anchor="middle" style="fill:var(--muted);font-size:12.5px">miss</text><line x1="66.0" y1="264" x2="452.0" y2="264" style="stroke:var(--text);stroke-width:1.6;" marker-end="url(#cp-writearound-m-text)"/><text x="260.0" y="259" text-anchor="middle" style="fill:var(--text);font-size:12.5px">findById(id)</text><line x1="454.0" y1="296" x2="68.0" y2="296" style="stroke:var(--muted);stroke-width:1.6;stroke-dasharray:5 4;" marker-end="url(#cp-writearound-m-muted)"/><text x="260.0" y="291" text-anchor="middle" style="fill:var(--muted);font-size:12.5px">Product</text><line x1="66.0" y1="328" x2="254.0" y2="328" style="stroke:var(--text);stroke-width:1.6;" marker-end="url(#cp-writearound-m-text)"/><text x="161.0" y="323" text-anchor="middle" style="fill:var(--text);font-size:12.5px">put</text><rect x="8" y="344" width="504" height="22" rx="6" style="fill:var(--surface-2)"/><text x="260.0" y="359" text-anchor="middle" style="fill:var(--muted);font-size:12px;font-weight:600">두 번째 읽기: hit</text><line x1="66.0" y1="390" x2="254.0" y2="390" style="stroke:var(--text);stroke-width:1.6;" marker-end="url(#cp-writearound-m-text)"/><text x="161.0" y="385" text-anchor="middle" style="fill:var(--text);font-size:12.5px">get(id)</text><line x1="256.0" y1="422" x2="68.0" y2="422" style="stroke:var(--good);stroke-width:1.6;stroke-dasharray:5 4;" marker-end="url(#cp-writearound-m-good)"/><text x="161.0" y="417" text-anchor="middle" style="fill:var(--good);font-size:12.5px;font-weight:600">hit</text></svg>
+          <p>쓰기는 캐시를 "돌아서" 저장소에만. 읽히지 않을 데이터가 캐시를 오염시키지 않습니다. 첫 읽기 요청자가 재적재 비용을 냅니다. 코드는 Cache Aside 서비스와 거의 같고, README는 "관찰 포인트가 달라 이름만 다르다"고 설명합니다.</p>
+        </div>
+        <div class="tabpanel card" id="cp-sq-wb">
+          <svg viewBox="0 0 560 418" role="img" aria-label="Write Behind 흐름" style="width:100%;max-width:680px;height:auto;display:block;margin:6px auto 10px;font-family:var(--sans)"><title>Write Behind 흐름</title><defs><marker id="cp-writebehind-m-text" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" style="fill:var(--text)"/></marker><marker id="cp-writebehind-m-muted" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" style="fill:var(--muted)"/></marker><marker id="cp-writebehind-m-good" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" style="fill:var(--good)"/></marker><marker id="cp-writebehind-m-bad" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" style="fill:var(--bad)"/></marker><marker id="cp-writebehind-m-accent" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" style="fill:var(--accent)"/></marker></defs><rect x="7.5" y="8" width="109" height="28" rx="7" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1"/><text x="62.0" y="27" text-anchor="middle" style="fill:var(--text);font-size:12.5px;font-weight:700">Service</text><line x1="62.0" y1="36" x2="62.0" y2="412" style="stroke:var(--border);stroke-width:1.5;stroke-dasharray:3 4"/><rect x="165.33333333333334" y="8" width="84" height="28" rx="7" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1"/><text x="207.33333333333334" y="27" text-anchor="middle" style="fill:var(--text);font-size:12.5px;font-weight:700">Cache</text><line x1="207.33333333333334" y1="36" x2="207.33333333333334" y2="412" style="stroke:var(--border);stroke-width:1.5;stroke-dasharray:3 4"/><rect x="298.1666666666667" y="8" width="109" height="28" rx="7" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1"/><text x="352.6666666666667" y="27" text-anchor="middle" style="fill:var(--text);font-size:12.5px;font-weight:700">pending</text><line x1="352.6666666666667" y1="36" x2="352.6666666666667" y2="412" style="stroke:var(--border);stroke-width:1.5;stroke-dasharray:3 4"/><rect x="456.0" y="8" width="84" height="28" rx="7" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1"/><text x="498.0" y="27" text-anchor="middle" style="fill:var(--text);font-size:12.5px;font-weight:700">Store</text><line x1="498.0" y1="36" x2="498.0" y2="412" style="stroke:var(--border);stroke-width:1.5;stroke-dasharray:3 4"/><rect x="8" y="60" width="544" height="22" rx="6" style="fill:var(--surface-2)"/><text x="280.0" y="75" text-anchor="middle" style="fill:var(--muted);font-size:12px;font-weight:600">쓰기: 캐시 + 대기열만, 저장소는 아직 이전 값</text><line x1="66.0" y1="106" x2="201.33333333333334" y2="106" style="stroke:var(--text);stroke-width:1.6;" marker-end="url(#cp-writebehind-m-text)"/><text x="134.66666666666669" y="101" text-anchor="middle" style="fill:var(--text);font-size:12.5px">put(id, new)</text><line x1="66.0" y1="138" x2="346.6666666666667" y2="138" style="stroke:var(--text);stroke-width:1.6;" marker-end="url(#cp-writebehind-m-text)"/><text x="207.33333333333334" y="133" text-anchor="middle" style="fill:var(--text);font-size:12.5px">put(id, new)</text><rect x="8" y="154" width="544" height="22" rx="6" style="fill:var(--surface-2)"/><text x="280.0" y="169" text-anchor="middle" style="fill:var(--muted);font-size:12px;font-weight:600">읽기: 캐시의 최신 값 hit</text><line x1="66.0" y1="200" x2="201.33333333333334" y2="200" style="stroke:var(--text);stroke-width:1.6;" marker-end="url(#cp-writebehind-m-text)"/><text x="134.66666666666669" y="195" text-anchor="middle" style="fill:var(--text);font-size:12.5px">get(id)</text><line x1="203.33333333333334" y1="232" x2="68.0" y2="232" style="stroke:var(--good);stroke-width:1.6;stroke-dasharray:5 4;" marker-end="url(#cp-writebehind-m-good)"/><text x="134.66666666666669" y="227" text-anchor="middle" style="fill:var(--good);font-size:12.5px;font-weight:600">hit(new)</text><rect x="8" y="248" width="544" height="22" rx="6" style="fill:var(--surface-2)"/><text x="280.0" y="263" text-anchor="middle" style="fill:var(--muted);font-size:12px;font-weight:600">flush(): 미뤄 둔 쓰기를 반영</text><line x1="66.0" y1="294" x2="346.6666666666667" y2="294" style="stroke:var(--text);stroke-width:1.6;" marker-end="url(#cp-writebehind-m-text)"/><text x="207.33333333333334" y="289" text-anchor="middle" style="fill:var(--text);font-size:12.5px">values()</text><line x1="66.0" y1="326" x2="492.0" y2="326" style="stroke:var(--text);stroke-width:1.6;" marker-end="url(#cp-writebehind-m-text)"/><text x="280.0" y="321" text-anchor="middle" style="fill:var(--text);font-size:12.5px">save(new)</text><line x1="66.0" y1="358" x2="346.6666666666667" y2="358" style="stroke:var(--text);stroke-width:1.6;" marker-end="url(#cp-writebehind-m-text)"/><text x="207.33333333333334" y="353" text-anchor="middle" style="fill:var(--text);font-size:12.5px">remove(id)</text><rect x="8" y="374" width="544" height="22" rx="6" style="fill:var(--bad-soft)"/><text x="280.0" y="389" text-anchor="middle" style="fill:var(--bad);font-size:12px;font-weight:600">flush 전에 프로세스가 죽으면 pending 유실</text></svg>
+          <p>응답이 가장 빠르고 저장소 쓰기를 모을 수 있지만, 이 예제의 <code>pendingWrites</code>는 메모리 Map이라 <strong>flush 전 종료 시 유실</strong>됩니다. README: 실무에서는 영속 큐, retry, idempotency, 실패 보상 흐름이 필요.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="cases">
+      <h2><span class="num">03</span>비교·핵심 구현</h2>
+      <p class="sub">탭을 눌러 케이스별로 봅니다. 코드는 실제 파일에서 발췌했습니다.</p>
+      <div data-tabs>
+        <div class="tabs" role="tablist">
+          <button role="tab" data-target="cp-t-read">읽기 비교</button>
+          <button role="tab" data-target="cp-t-write">쓰기 비교</button>
+          <button role="tab" data-target="cp-t-race">Race · VersionedCache</button>
+          <button role="tab" data-target="cp-t-stampede">Stampede</button>
+          <button role="tab" data-target="cp-t-pen">Penetration</button>
+          <button role="tab" data-target="cp-t-ava">Avalanche</button>
+          <button role="tab" data-target="cp-t-combo">조합 추천</button>
+        </div>
+
+        <div class="tabpanel card" id="cp-t-read">
+          <h3>Cache Aside vs Read Through <span class="badge info">핵심: 누가 저장소를 부르나</span></h3>
+          <div class="grid c2">
+            <div>
+              <p><strong>Cache Aside</strong> — 서비스가 직접</p>
+<pre><code>public Optional&lt;Product&gt; findById(long id) {
+    Optional&lt;Product&gt; cached = cache.get(id);
+    if (cached.isPresent()) {
+        return cached;
+    }
+
+    Optional&lt;Product&gt; loaded = store.findById(id);
+    loaded.ifPresent(product -&gt; cache.put(id, product));
+    return loaded;
+}</code></pre>
+            </div>
+            <div>
+              <p><strong>Read Through</strong> — 캐시 계층이 loader로</p>
+<pre><code>// ReadThroughCache
+public Optional&lt;V&gt; get(K key) {
+    Optional&lt;V&gt; cached = cache.get(key);
+    if (cached.isPresent()) {
+        return cached;
+    }
+
+    Optional&lt;V&gt; loaded = loader.apply(key);
+    loaded.ifPresent(value -&gt; cache.put(key, value));
+    return loaded;
+}
+
+// ReadThroughProductService
+public Optional&lt;Product&gt; findById(long id) {
+    return products.get(id);
+}</code></pre>
+            </div>
+          </div>
+          <dl class="kv">
+            <dt>결과</dt><dd><code>ReadPatternTest</code>: 두 패턴 모두 같은 id를 두 번 읽으면 <code>store.readCount()==1</code>, <code>misses==1</code>, <code>hits==1</code>. 쓰기 후 <code>containsKey(1L)</code>는 false, 다음 읽기에서 <code>readCount()==2</code>.</dd>
+            <dt>트레이드오프</dt><dd>Cache Aside는 단순하지만 서비스마다 miss 코드가 반복. Read Through는 로딩 규칙을 공유하지만 캐시 계층이 저장소 loader를 알아야 하고 계층이 하나 늘어남. 쓰기 정책은 둘 다 별도로 골라야 함.</dd>
+            <dt>코드</dt><dd><code>src/main/java/dev/deepdive/cache/aside/CacheAsideProductService.java</code>, <code>src/main/java/dev/deepdive/cache/readthrough/ReadThroughCache.java</code></dd>
+          </dl>
+        </div>
+
+        <div class="tabpanel card" id="cp-t-write">
+          <h3>Write Through / Around / Behind</h3>
+          <div class="tablewrap"><table>
+            <thead><tr><th>패턴</th><th>save() 안에서</th><th>쓰기 직후 캐시</th><th>저장소 반영</th><th>잘 맞는 상황</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Write Through</strong></td><td><code>store.save</code> → <code>cache.put</code></td><td>최신 값 있음</td><td>요청 안에서 즉시</td><td>쓰기 직후 같은 값을 바로 읽음</td></tr>
+              <tr class="hl"><td><strong>Write Around</strong></td><td><code>store.save</code> → <code>cache.evict</code></td><td>해당 key 없음</td><td>요청 안에서 즉시</td><td>쓴 데이터가 바로 읽힌다는 보장이 없음</td></tr>
+              <tr><td><strong>Write Behind</strong></td><td><code>cache.put</code> → <code>pendingWrites.put</code></td><td>최신 값 있음</td><td><code>flush()</code> 때 나중에</td><td>쓰기 응답 속도·처리량이 중요</td></tr>
+            </tbody>
+          </table></div>
+<pre><code>// WriteThroughProductService
+Product saved = store.save(product);
+cache.put(product.id(), saved);
+
+// WriteAroundProductService
+Product saved = store.save(product);
+cache.evict(product.id());
+
+// WriteBehindProductService
+cache.put(product.id(), product);
+pendingWrites.put(product.id(), product);
+// ...
+public void flush() {
+    for (Product product : new ArrayList&lt;&gt;(pendingWrites.values())) {
+        store.save(product);
+        pendingWrites.remove(product.id());
+    }
+}</code></pre>
+          <dl class="kv">
+            <dt>결과</dt><dd><code>WritePatternTest</code>: Through는 write 1 · read 0 · 바로 hit. Around는 write 1 · 쓰기 직후 캐시 없음 · 두 번 읽어 read 1, hit 1. Behind는 저장 직후 write 0 · pending 1 · 저장소엔 이전 값(180,000) → <code>flush()</code> 후 write 1 · pending 0.</dd>
+            <dt>왜 Around가 evict?</dt><dd>README: 캐시에 새 값을 넣지 않는 전략이라, 기존 캐시 값이 남아 있으면 저장소보다 오래된 값을 반환할 수 있어서 제거한다.</dd>
+          </dl>
+        </div>
+
+        <div class="tabpanel card" id="cp-t-race">
+          <h3>Cache Aside race와 VersionedCache <span class="badge bad">stale 재유입</span></h3>
+          <svg viewBox="0 0 560 326" role="img" aria-label="Cache Aside 읽기·쓰기 교차 race" style="width:100%;max-width:680px;height:auto;display:block;margin:6px auto 10px;font-family:var(--sans)"><title>Cache Aside 읽기·쓰기 교차 race</title><defs><marker id="cp-race-m-text" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" style="fill:var(--text)"/></marker><marker id="cp-race-m-muted" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" style="fill:var(--muted)"/></marker><marker id="cp-race-m-good" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" style="fill:var(--good)"/></marker><marker id="cp-race-m-bad" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" style="fill:var(--bad)"/></marker><marker id="cp-race-m-accent" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" style="fill:var(--accent)"/></marker></defs><rect x="20.0" y="8" width="84" height="28" rx="7" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1"/><text x="62.0" y="27" text-anchor="middle" style="fill:var(--text);font-size:12.5px;font-weight:700">읽기 A</text><line x1="62.0" y1="36" x2="62.0" y2="320" style="stroke:var(--border);stroke-width:1.5;stroke-dasharray:3 4"/><rect x="165.33333333333334" y="8" width="84" height="28" rx="7" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1"/><text x="207.33333333333334" y="27" text-anchor="middle" style="fill:var(--text);font-size:12.5px;font-weight:700">쓰기 B</text><line x1="207.33333333333334" y1="36" x2="207.33333333333334" y2="320" style="stroke:var(--border);stroke-width:1.5;stroke-dasharray:3 4"/><rect x="310.6666666666667" y="8" width="84" height="28" rx="7" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1"/><text x="352.6666666666667" y="27" text-anchor="middle" style="fill:var(--text);font-size:12.5px;font-weight:700">Cache</text><line x1="352.6666666666667" y1="36" x2="352.6666666666667" y2="320" style="stroke:var(--border);stroke-width:1.5;stroke-dasharray:3 4"/><rect x="456.0" y="8" width="84" height="28" rx="7" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1"/><text x="498.0" y="27" text-anchor="middle" style="fill:var(--text);font-size:12.5px;font-weight:700">Store</text><line x1="498.0" y1="36" x2="498.0" y2="320" style="stroke:var(--border);stroke-width:1.5;stroke-dasharray:3 4"/><line x1="66.0" y1="76" x2="346.6666666666667" y2="76" style="stroke:var(--text);stroke-width:1.6;" marker-end="url(#cp-race-m-text)"/><text x="207.33333333333334" y="71" text-anchor="middle" style="fill:var(--text);font-size:12.5px">get → miss</text><line x1="66.0" y1="108" x2="492.0" y2="108" style="stroke:var(--text);stroke-width:1.6;" marker-end="url(#cp-race-m-text)"/><text x="280.0" y="103" text-anchor="middle" style="fill:var(--text);font-size:12.5px">findById</text><line x1="494.0" y1="140" x2="68.0" y2="140" style="stroke:var(--muted);stroke-width:1.6;stroke-dasharray:5 4;" marker-end="url(#cp-race-m-muted)"/><text x="280.0" y="135" text-anchor="middle" style="fill:var(--muted);font-size:12.5px">v1</text><rect x="8" y="156" width="544" height="22" rx="6" style="fill:var(--surface-2)"/><text x="280.0" y="171" text-anchor="middle" style="fill:var(--muted);font-size:12px;font-weight:600">읽기 A가 put 하기 전에 쓰기 B가 끼어듦</text><line x1="211.33333333333334" y1="202" x2="492.0" y2="202" style="stroke:var(--text);stroke-width:1.6;" marker-end="url(#cp-race-m-text)"/><text x="352.6666666666667" y="197" text-anchor="middle" style="fill:var(--text);font-size:12.5px">save(v2)</text><line x1="211.33333333333334" y1="234" x2="346.6666666666667" y2="234" style="stroke:var(--text);stroke-width:1.6;" marker-end="url(#cp-race-m-text)"/><text x="280.0" y="229" text-anchor="middle" style="fill:var(--text);font-size:12.5px">evict(1L)</text><line x1="66.0" y1="266" x2="346.6666666666667" y2="266" style="stroke:var(--bad);stroke-width:1.6;" marker-end="url(#cp-race-m-bad)"/><text x="207.33333333333334" y="261" text-anchor="middle" style="fill:var(--bad);font-size:12.5px;font-weight:600">뒤늦게 put(v1)</text><rect x="8" y="282" width="544" height="22" rx="6" style="fill:var(--bad-soft)"/><text x="280.0" y="297" text-anchor="middle" style="fill:var(--bad);font-size:12px;font-weight:600">결과: Cache = v1 (stale), Store = v2</text></svg>
+<pre><code>// VersionedCache (ConcurrentHashMap.compute로 key 단위 원자적)
+public void put(K key, long version, V value) {
+    values.compute(key, (k, current) -&gt; {
+        if (current != null &amp;&amp; version &lt; current.version()) {
+            rejectedPuts.incrementAndGet();
+            return current;
+        }
+        return new Versioned&lt;&gt;(version, value);
+    });
+}
+
+// evict는 값만 비우고 버전은 남긴다(tombstone)
+public void evict(K key, long version) {
+    values.compute(key, (k, current) -&gt; new Versioned&lt;&gt;(
+            current == null ? version : Math.max(current.version(), version), null));
+}</code></pre>
+          <dl class="kv">
+            <dt>어떻게</dt><dd>값과 함께 단조 증가 버전을 저장하고, 현재보다 <strong>낮은</strong> 버전의 put은 버립니다(같거나 크면 반영).</dd>
+            <dt>결과</dt><dd><code>StaleCachePutRaceTest</code>: 보호 없음 → 캐시 v1, 저장소 v2로 어긋남. VersionedCache → 버전 2(v2) 후 버전 1(v1) put이 거부되어 <code>get==v2</code>, <code>rejectedPuts()==1</code>.</dd>
+            <dt>evict 경쟁</dt><dd><span class="badge good">수정함</span> 예전엔 evict가 버전 정보까지 지워 이후 v1 put이 통과했습니다. 이제 evict는 tombstone(버전만 남김)을 남기고, 쓰기 경로는 <code>evict(key, 새 버전)</code>으로 무효화합니다. 테스트: <code>evict(1L, 2L)</code> 뒤 버전 1 put 거부, 버전 2 put은 허용.</dd>
+            <dt>코드</dt><dd><code>src/main/java/dev/deepdive/cache/consistency/VersionedCache.java</code></dd>
+          </dl>
+        </div>
+
+        <div class="tabpanel card" id="cp-t-stampede">
+          <h3>Cache Stampede — SingleFlightCache / RefreshAheadCache</h3>
+          <svg viewBox="0 0 520 326" role="img" aria-label="보호 없음 vs single-flight" style="width:100%;max-width:640px;height:auto;display:block;margin:6px auto 10px;font-family:var(--sans)"><title>보호 없음 vs single-flight</title><defs><marker id="cp-stampede-m-text" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" style="fill:var(--text)"/></marker><marker id="cp-stampede-m-muted" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" style="fill:var(--muted)"/></marker><marker id="cp-stampede-m-good" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" style="fill:var(--good)"/></marker><marker id="cp-stampede-m-bad" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" style="fill:var(--bad)"/></marker><marker id="cp-stampede-m-accent" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" style="fill:var(--accent)"/></marker></defs><rect x="14.0" y="8" width="96" height="28" rx="7" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1"/><text x="62.0" y="27" text-anchor="middle" style="fill:var(--text);font-size:12.5px;font-weight:700">요청 ×16</text><line x1="62.0" y1="36" x2="62.0" y2="320" style="stroke:var(--border);stroke-width:1.5;stroke-dasharray:3 4"/><rect x="218.0" y="8" width="84" height="28" rx="7" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1"/><text x="260.0" y="27" text-anchor="middle" style="fill:var(--text);font-size:12.5px;font-weight:700">Cache</text><line x1="260.0" y1="36" x2="260.0" y2="320" style="stroke:var(--border);stroke-width:1.5;stroke-dasharray:3 4"/><rect x="416.0" y="8" width="84" height="28" rx="7" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1"/><text x="458.0" y="27" text-anchor="middle" style="fill:var(--text);font-size:12.5px;font-weight:700">Store</text><line x1="458.0" y1="36" x2="458.0" y2="320" style="stroke:var(--border);stroke-width:1.5;stroke-dasharray:3 4"/><rect x="8" y="60" width="504" height="22" rx="6" style="fill:var(--surface-2)"/><text x="260.0" y="75" text-anchor="middle" style="fill:var(--muted);font-size:12px;font-weight:600">보호 없음: 16개가 동시에 miss</text><line x1="66.0" y1="106" x2="254.0" y2="106" style="stroke:var(--text);stroke-width:1.6;" marker-end="url(#cp-stampede-m-text)"/><text x="161.0" y="101" text-anchor="middle" style="fill:var(--text);font-size:12.5px">get ×16</text><line x1="256.0" y1="138" x2="68.0" y2="138" style="stroke:var(--muted);stroke-width:1.6;stroke-dasharray:5 4;" marker-end="url(#cp-stampede-m-muted)"/><text x="161.0" y="133" text-anchor="middle" style="fill:var(--muted);font-size:12.5px">miss ×16</text><line x1="66.0" y1="170" x2="452.0" y2="170" style="stroke:var(--bad);stroke-width:1.6;" marker-end="url(#cp-stampede-m-bad)"/><text x="260.0" y="165" text-anchor="middle" style="fill:var(--bad);font-size:12.5px;font-weight:600">load ×16</text><rect x="8" y="186" width="504" height="22" rx="6" style="fill:var(--surface-2)"/><text x="260.0" y="201" text-anchor="middle" style="fill:var(--muted);font-size:12px;font-weight:600">SingleFlightCache: 키별 락 + double-check</text><line x1="66.0" y1="232" x2="254.0" y2="232" style="stroke:var(--text);stroke-width:1.6;" marker-end="url(#cp-stampede-m-text)"/><text x="161.0" y="227" text-anchor="middle" style="fill:var(--text);font-size:12.5px">get(key, loader) ×16</text><line x1="264.0" y1="264" x2="452.0" y2="264" style="stroke:var(--good);stroke-width:1.6;" marker-end="url(#cp-stampede-m-good)"/><text x="359.0" y="259" text-anchor="middle" style="fill:var(--good);font-size:12.5px;font-weight:600">load ×1</text><line x1="256.0" y1="296" x2="68.0" y2="296" style="stroke:var(--muted);stroke-width:1.6;stroke-dasharray:5 4;" marker-end="url(#cp-stampede-m-muted)"/><text x="161.0" y="291" text-anchor="middle" style="fill:var(--muted);font-size:12.5px">같은 값 공유 ×16</text></svg>
+<pre><code>// SingleFlightCache
+public V get(K key, Function&lt;K, V&gt; loader) {
+    V cached = values.get(key);
+    if (cached != null) {
+        return cached;
+    }
+
+    Object lock = locks.computeIfAbsent(key, k -&gt; new Object());
+    synchronized (lock) {
+        // 락을 잡은 사이 다른 스레드가 이미 채웠을 수 있으므로 다시 확인한다.
+        V again = values.get(key);
+        if (again != null) {
+            return again;
+        }
+
+        V loaded = loader.apply(key);
+        values.put(key, loaded);
+        return loaded;
+    }
+}</code></pre>
+<pre><code>// RefreshAheadCache
+long age = now - entry.loadedAt();
+if (age &gt;= ttlMillis * refreshThreshold) {
+    // 아직 만료 전이므로 가진 값을 바로 주고, 갱신은 백그라운드로 한 번만 건다.
+    scheduleRefresh(key, loader);   // refreshing 집합에 add 성공한 요청만 executor에 제출
+}
+return entry.value();</code></pre>
+          <dl class="kv">
+            <dt>Single-flight</dt><dd>키별 락 객체 + 락 안 double-check. 16스레드 동시 miss여도 load 1회, 나머지는 결과 공유.</dd>
+            <dt>Refresh-ahead</dt><dd>TTL 1000ms, threshold 0.8. t=500 재로드 없음 → t=900 기존 값(v1)을 즉시 주고 갱신을 executor에 제출 → 갱신 완료 후 v2, expireAt이 1900으로 밀려 원래 만료 시점 t=1000에도 hard-miss 없음. threshold 구간에 16스레드가 몰려도 갱신 작업은 1개. <span class="badge good">수정함</span> 예전엔 요청 스레드가 동기로 갱신했고 HashMap이라 동시 요청이 각자 갱신했습니다.</dd>
+            <dt>트레이드오프</dt><dd>single-flight는 대기 스레드가 락에서 막힘(이 구현은 같은 JVM 안에서만 유효). refresh-ahead는 안 읽힐 값도 갱신할 수 있음.</dd>
+            <dt>코드</dt><dd><code>src/main/java/dev/deepdive/cache/stampede/SingleFlightCache.java</code>, <code>src/main/java/dev/deepdive/cache/stampede/RefreshAheadCache.java</code></dd>
+          </dl>
+        </div>
+
+        <div class="tabpanel card" id="cp-t-pen">
+          <h3>Cache Penetration — NegativeCachingCache / BloomFilter</h3>
+          <svg viewBox="0 0 560 388" role="img" aria-label="없는 키 반복 조회와 방어" style="width:100%;max-width:680px;height:auto;display:block;margin:6px auto 10px;font-family:var(--sans)"><title>없는 키 반복 조회와 방어</title><defs><marker id="cp-penetration-m-text" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" style="fill:var(--text)"/></marker><marker id="cp-penetration-m-muted" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" style="fill:var(--muted)"/></marker><marker id="cp-penetration-m-good" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" style="fill:var(--good)"/></marker><marker id="cp-penetration-m-bad" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" style="fill:var(--bad)"/></marker><marker id="cp-penetration-m-accent" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" style="fill:var(--accent)"/></marker></defs><rect x="14.0" y="8" width="96" height="28" rx="7" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1"/><text x="62.0" y="27" text-anchor="middle" style="fill:var(--text);font-size:12.5px;font-weight:700">Client</text><line x1="62.0" y1="36" x2="62.0" y2="382" style="stroke:var(--border);stroke-width:1.5;stroke-dasharray:3 4"/><rect x="165.33333333333334" y="8" width="84" height="28" rx="7" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1"/><text x="207.33333333333334" y="27" text-anchor="middle" style="fill:var(--text);font-size:12.5px;font-weight:700">Bloom</text><line x1="207.33333333333334" y1="36" x2="207.33333333333334" y2="382" style="stroke:var(--border);stroke-width:1.5;stroke-dasharray:3 4"/><rect x="310.6666666666667" y="8" width="84" height="28" rx="7" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1"/><text x="352.6666666666667" y="27" text-anchor="middle" style="fill:var(--text);font-size:12.5px;font-weight:700">Cache</text><line x1="352.6666666666667" y1="36" x2="352.6666666666667" y2="382" style="stroke:var(--border);stroke-width:1.5;stroke-dasharray:3 4"/><rect x="456.0" y="8" width="84" height="28" rx="7" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1"/><text x="498.0" y="27" text-anchor="middle" style="fill:var(--text);font-size:12.5px;font-weight:700">Store</text><line x1="498.0" y1="36" x2="498.0" y2="382" style="stroke:var(--border);stroke-width:1.5;stroke-dasharray:3 4"/><rect x="8" y="60" width="544" height="22" rx="6" style="fill:var(--surface-2)"/><text x="280.0" y="75" text-anchor="middle" style="fill:var(--muted);font-size:12px;font-weight:600">보호 없음: 없는 키 99 → 매번 저장소</text><line x1="66.0" y1="106" x2="346.6666666666667" y2="106" style="stroke:var(--text);stroke-width:1.6;" marker-end="url(#cp-penetration-m-text)"/><text x="207.33333333333334" y="101" text-anchor="middle" style="fill:var(--text);font-size:12.5px">get(99)</text><line x1="348.6666666666667" y1="138" x2="68.0" y2="138" style="stroke:var(--muted);stroke-width:1.6;stroke-dasharray:5 4;" marker-end="url(#cp-penetration-m-muted)"/><text x="207.33333333333334" y="133" text-anchor="middle" style="fill:var(--muted);font-size:12.5px">miss</text><line x1="66.0" y1="170" x2="492.0" y2="170" style="stroke:var(--bad);stroke-width:1.6;" marker-end="url(#cp-penetration-m-bad)"/><text x="280.0" y="165" text-anchor="middle" style="fill:var(--bad);font-size:12.5px;font-weight:600">findById(99) ×5</text><rect x="8" y="186" width="544" height="22" rx="6" style="fill:var(--surface-2)"/><text x="280.0" y="201" text-anchor="middle" style="fill:var(--muted);font-size:12px;font-weight:600">Negative caching: empty도 캐시에 저장</text><line x1="66.0" y1="232" x2="346.6666666666667" y2="232" style="stroke:var(--text);stroke-width:1.6;" marker-end="url(#cp-penetration-m-text)"/><text x="207.33333333333334" y="227" text-anchor="middle" style="fill:var(--text);font-size:12.5px">get(99, loader)</text><line x1="348.6666666666667" y1="264" x2="68.0" y2="264" style="stroke:var(--good);stroke-width:1.6;stroke-dasharray:5 4;" marker-end="url(#cp-penetration-m-good)"/><text x="207.33333333333334" y="259" text-anchor="middle" style="fill:var(--good);font-size:12.5px;font-weight:600">cached empty</text><rect x="8" y="280" width="544" height="22" rx="6" style="fill:var(--surface-2)"/><text x="280.0" y="295" text-anchor="middle" style="fill:var(--muted);font-size:12px;font-weight:600">Bloom filter: &quot;확실히 없음&quot;이면 저장소 생략</text><line x1="66.0" y1="326" x2="201.33333333333334" y2="326" style="stroke:var(--text);stroke-width:1.6;" marker-end="url(#cp-penetration-m-text)"/><text x="134.66666666666669" y="321" text-anchor="middle" style="fill:var(--text);font-size:12.5px">mightContain(99)</text><line x1="203.33333333333334" y1="358" x2="68.0" y2="358" style="stroke:var(--good);stroke-width:1.6;stroke-dasharray:5 4;" marker-end="url(#cp-penetration-m-good)"/><text x="134.66666666666669" y="353" text-anchor="middle" style="fill:var(--good);font-size:12.5px;font-weight:600">false</text></svg>
+          <p>Cache Aside는 <code>loaded.ifPresent(... put)</code>이라 <strong>없는 값은 캐시에 안 남습니다</strong>. 그래서 없는 id를 반복 조회하면 매번 저장소까지 관통합니다.</p>
+<pre><code>// NegativeCachingCache: empty도 저장, 단 negative 엔트리는 TTL 뒤 만료
+Entry&lt;V&gt; cached = values.get(key);
+if (cached != null &amp;&amp; !isExpiredAt(cached, now)) {
+    // empty 마커도 (TTL 안이면) hit으로 취급한다.
+    return cached.value();
+}
+Optional&lt;V&gt; loaded = loader.apply(key);
+values.put(key, new Entry&lt;&gt;(loaded, loaded.isEmpty() ? now + negativeTtlMillis : Long.MAX_VALUE));
+
+// BloomFilter: 하나라도 비트가 0이면 "확실히 없음"
+public boolean mightContain(T value) {
+    for (int seed = 0; seed &lt; hashCount; seed++) {
+        if (!bits.get(indexFor(value, seed))) {
+            return false;
+        }
+    }
+    return true;
+}</code></pre>
+          <dl class="kv">
+            <dt>Negative</dt><dd>첫 조회만 저장소 read, 이후는 empty hit. 짧은 TTL — 나중에 실제 값이 생겨도 empty가 오래 남으면 새 값을 가림. <span class="badge good">수정함</span> 이제 <code>NegativeCachingCache(clock, negativeTtlMillis)</code>로 negative 엔트리에 TTL을 두고, 테스트가 <code>MutableClock</code>으로 TTL 경과 후 새로 생긴 값이 보이는지 확인합니다.</dd>
+            <dt>Bloom</dt><dd><code>false</code>는 "확실히 없음", <code>true</code>는 "있을 수도 있음"(false positive 가능). 테스트는 <code>BloomFilter(1024, 3)</code>에 1L만 넣고 99L을 걸러 저장소 read 0.</dd>
+            <dt>코드</dt><dd><code>src/main/java/dev/deepdive/cache/penetration/NegativeCachingCache.java</code>, <code>src/main/java/dev/deepdive/cache/penetration/BloomFilter.java</code></dd>
+          </dl>
+        </div>
+
+        <div class="tabpanel card" id="cp-t-ava">
+          <h3>Cache Avalanche — ExpiringCache + TTL jitter</h3>
+          <svg viewBox="0 0 520 210" role="img" aria-label="고정 TTL과 지터 TTL의 만료 시각 비교 개념도" style="width:100%;max-width:640px;height:auto;display:block;margin:6px auto 10px;font-family:var(--sans)"><title>고정 TTL vs 지터 TTL 만료 시각 (개념도)</title><text x="8" y="56" style="fill:var(--text);font-size:12.5px;font-weight:700">고정 TTL</text><line x1="70" y1="70" x2="500" y2="70" style="stroke:var(--border);stroke-width:1.5"/><text x="8" y="136" style="fill:var(--text);font-size:12.5px;font-weight:700">지터 TTL</text><line x1="70" y1="150" x2="500" y2="150" style="stroke:var(--border);stroke-width:1.5"/><rect x="333.75" y="22" width="10" height="48" rx="2" style="fill:var(--bad)"/><text x="350.75" y="40" style="fill:var(--bad);font-size:12px;font-weight:600">t=1000에 100개 키 동시 만료</text><rect x="337.25" y="136" width="3" height="14" style="fill:var(--good)"/><rect x="342.625" y="136" width="3" height="14" style="fill:var(--good)"/><rect x="348.0" y="136" width="3" height="14" style="fill:var(--good)"/><rect x="353.375" y="136" width="3" height="14" style="fill:var(--good)"/><rect x="358.75" y="136" width="3" height="14" style="fill:var(--good)"/><rect x="364.125" y="136" width="3" height="14" style="fill:var(--good)"/><rect x="369.5" y="136" width="3" height="14" style="fill:var(--good)"/><rect x="374.875" y="136" width="3" height="14" style="fill:var(--good)"/><rect x="380.25" y="136" width="3" height="14" style="fill:var(--good)"/><rect x="385.625" y="136" width="3" height="14" style="fill:var(--good)"/><rect x="391.0" y="136" width="3" height="14" style="fill:var(--good)"/><rect x="396.375" y="136" width="3" height="14" style="fill:var(--good)"/><rect x="401.75" y="136" width="3" height="14" style="fill:var(--good)"/><rect x="407.125" y="136" width="3" height="14" style="fill:var(--good)"/><rect x="412.5" y="136" width="3" height="14" style="fill:var(--good)"/><rect x="417.875" y="136" width="3" height="14" style="fill:var(--good)"/><rect x="423.25" y="136" width="3" height="14" style="fill:var(--good)"/><rect x="428.625" y="136" width="3" height="14" style="fill:var(--good)"/><rect x="434.0" y="136" width="3" height="14" style="fill:var(--good)"/><rect x="439.375" y="136" width="3" height="14" style="fill:var(--good)"/><rect x="444.75" y="136" width="3" height="14" style="fill:var(--good)"/><rect x="450.125" y="136" width="3" height="14" style="fill:var(--good)"/><rect x="455.5" y="136" width="3" height="14" style="fill:var(--good)"/><rect x="460.875" y="136" width="3" height="14" style="fill:var(--good)"/><rect x="466.25" y="136" width="3" height="14" style="fill:var(--good)"/><text x="338.75" y="128" style="fill:var(--good);font-size:12px;font-weight:600">1000 ≤ 만료 &lt; 1500 로 분산</text><line x1="70.0" y1="172" x2="70.0" y2="178" style="stroke:var(--muted)"/><text x="70.0" y="194" text-anchor="middle" style="fill:var(--muted);font-size:11.5px">t=0</text><line x1="204.375" y1="172" x2="204.375" y2="178" style="stroke:var(--muted)"/><text x="204.375" y="194" text-anchor="middle" style="fill:var(--muted);font-size:11.5px">t=500</text><line x1="338.75" y1="172" x2="338.75" y2="178" style="stroke:var(--muted)"/><text x="338.75" y="194" text-anchor="middle" style="fill:var(--muted);font-size:11.5px">t=1000</text><line x1="405.9375" y1="172" x2="405.9375" y2="178" style="stroke:var(--muted)"/><text x="405.9375" y="194" text-anchor="middle" style="fill:var(--muted);font-size:11.5px">t=1250</text><line x1="473.125" y1="172" x2="473.125" y2="178" style="stroke:var(--muted)"/><text x="473.125" y="194" text-anchor="middle" style="fill:var(--muted);font-size:11.5px">t=1500</text><line x1="70" y1="172" x2="500" y2="172" style="stroke:var(--muted)"/></svg>
+          <p class="source">개념도입니다. 막대 위치는 테스트 데이터의 실제 분포가 아니라 "고정 TTL은 한 점, 지터는 구간"이라는 모양만 보여 줍니다.</p>
+<pre><code>// CacheAvalancheTest
+Random jitter = new Random(42); // 결정론적 지터
+
+for (int i = 0; i &lt; KEYS; i++) {
+    long ttl = BASE_TTL + jitter.nextInt(500); // [1000, 1500)
+    cache.put(i, "v" + i, ttl);
+}</code></pre>
+          <dl class="kv">
+            <dt>어떻게</dt><dd><code>ExpiringCache</code>는 키마다 <code>expireAt</code>를 갖고, 시계(<code>Clock</code>)를 주입받아 테스트에서 <code>MutableClock</code>으로 시간을 흘립니다. 지터는 캐시가 아니라 <strong>호출자가 TTL을 다르게 주는 방식</strong>.</dd>
+            <dt>결과</dt><dd>고정 TTL: t=1000에 active 0 (100개 동시 만료). 지터: t=1000에 &gt;0, t=1250에도 &gt;0 (그리고 ≤ t=1000 값), t=1500에 0.</dd>
+            <dt>코드</dt><dd><code>src/main/java/dev/deepdive/cache/avalanche/ExpiringCache.java</code></dd>
+          </dl>
+        </div>
+
+        <div class="tabpanel card" id="cp-t-combo">
+          <h3>README "조합 예시"</h3>
+          <div class="tablewrap"><table>
+            <thead><tr><th>상황</th><th>추천 조합</th><th>이유</th></tr></thead>
+            <tbody>
+              <tr class="hl"><td>일반적인 조회 캐시</td><td>Cache Aside + Write Around</td><td>구현 단순, 쓰기 후 캐시 제거, 다음 읽기에서 최신 값 재적재</td></tr>
+              <tr><td>캐시 로딩 로직 공통화</td><td>Read Through + Write Around</td><td>서비스별 miss 처리 코드 반복 제거</td></tr>
+              <tr><td>쓰기 직후 바로 읽는 요청 많음</td><td>Cache Aside 또는 Read Through + Write Through</td><td>저장소와 캐시 동시 갱신, 다음 읽기 hit</td></tr>
+              <tr><td>쓰기는 많고 조회는 적음</td><td>Cache Aside 또는 Read Through + Write Around</td><td>읽히지 않을 데이터의 캐시 유입 방지</td></tr>
+              <tr><td>쓰기 처리량이 매우 중요</td><td>Cache Aside 읽기 + Write Behind + 영속 큐</td><td>캐시 우선 반영, 저장소 쓰기 지연. 메모리 큐만 쓰면 유실 위험</td></tr>
+            </tbody>
+          </table></div>
+          <p class="source">출처: <code>README.md</code> "조합 예시" 표</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="results">
+      <h2><span class="num">04</span>결과·수치</h2>
+      <p class="sub">이 모듈에는 성능 측정값(ms, TPS)이 없습니다. 대신 테스트가 단언하는 <strong>호출 횟수</strong>를 봅니다.</p>
+      <div class="callout warn"><strong>측정 수치 없음.</strong> 아래 값은 모두 단위 테스트의 <code>assertThat(...)</code> 단언값(테스트 단언값)이며, 실행할 때마다 같은 결정적인 값입니다.</div>
+      <div class="grid c2">
+        <div class="card">
+          <h3 style="margin-top:0">Stampede — 16스레드 동시 miss 시 load 횟수</h3>
+          <div class="bars">
+            <div class="bar bad" style="--v:1"><span>보호 없음</span><div class="track"><div class="fill"></div></div><span class="val">16</span></div>
+            <div class="bar good" style="--v:.0625"><span>SingleFlight</span><div class="track"><div class="fill"></div></div><span class="val">1</span></div>
+          </div>
+          <div class="source">테스트 단언값: <code>CacheStampedeTest</code> (<code>THREADS = 16</code>)</div>
+        </div>
+        <div class="card">
+          <h3 style="margin-top:0">Penetration — 없는 키 5회 조회 시 저장소 read</h3>
+          <div class="bars">
+            <div class="bar bad" style="--v:1"><span>보호 없음</span><div class="track"><div class="fill"></div></div><span class="val">5</span></div>
+            <div class="bar good" style="--v:.2"><span>Negative cache</span><div class="track"><div class="fill"></div></div><span class="val">1</span></div>
+            <div class="bar good" style="--v:0"><span>Bloom filter</span><div class="track"><div class="fill"></div></div><span class="val">0</span></div>
+          </div>
+          <div class="source">테스트 단언값: <code>CachePenetrationTest</code> (<code>ATTEMPTS = 5</code>). Bloom 테스트는 99L 1회만 확인.</div>
+        </div>
+      </div>
+      <h3>그 밖의 테스트 단언값</h3>
+      <div class="tablewrap"><table>
+        <thead><tr><th>테스트</th><th>시나리오</th><th>단언</th></tr></thead>
+        <tbody>
+          <tr><td><code>ReadPatternTest</code></td><td>같은 id 2회 읽기 (Aside / Read Through)</td><td>store read 1, miss 1, hit 1</td></tr>
+          <tr><td><code>ReadPatternTest</code></td><td>읽기 → 쓰기 → 읽기</td><td>쓰기 직후 캐시에 key 없음, store read 2, 갱신 값 반환</td></tr>
+          <tr><td><code>WritePatternTest</code></td><td>Write Through 저장 후 읽기</td><td>write 1, read 0, 캐시에 key 있음</td></tr>
+          <tr><td><code>WritePatternTest</code></td><td>Write Around 저장 후 2회 읽기</td><td>write 1, 직후 캐시 없음, read 1, hit 1</td></tr>
+          <tr><td><code>WritePatternTest</code></td><td>Write Behind 저장 → flush</td><td>flush 전 write 0 · pending 1 · 저장소 이전 값 / flush 후 write 1 · pending 0</td></tr>
+          <tr><td><code>StaleCachePutRaceTest</code></td><td>v2(버전 2) 뒤 v1(버전 1) put</td><td>get == v2, <code>rejectedPuts()</code> == 1</td></tr>
+          <tr><td><code>CacheStampedeTest</code></td><td>Refresh-ahead (TTL 1000, 0.8)</td><td>loads: t=0 → 1, t=500 → 1, t=900 → 2, t=1000 → 2</td></tr>
+          <tr><td><code>CacheAvalancheTest</code></td><td>100키, 고정 TTL 1000 vs 지터 [1000,1500)</td><td>고정: t=1000에 0개. 지터: t=1000 &gt; 0, t=1250 &gt; 0, t=1500 = 0 (정확한 개수는 단언 안 함)</td></tr>
+        </tbody>
+      </table></div>
+    </section>
+
+    <section id="limits">
+      <h2><span class="num">05</span>한계·약점</h2>
+      <p class="sub"><span class="badge info">README 인정</span> 문서·주석이 스스로 밝힌 한계, <span class="badge warn">코드 확인</span> 코드를 읽어 보면 드러나는 약점.</p>
+      <details id="lim-1" class="qa risk"><summary><span><span class="badge info">README 인정</span> 실제 분산 캐시가 아니다 (Redis 없음)</span></summary><div class="a"><p>"외부 Redis 없이 <code>InMemoryCache</code> 사용", 저장소는 <code>InMemoryProductStore</code>. 네트워크 지연, 직렬화, 캐시 서버 장애, 여러 서버 간 무효화 전파는 다루지 않습니다. Redis 버전은 <code>labs/spring-cache-redis</code>에서 봅니다.</p></div></details>
+      <details id="lim-2" class="qa risk"><summary><span><span class="badge info">README 인정</span> Write Behind 대기열은 메모리 Map — 유실 위험</span></summary><div class="a"><p><code>pendingWrites</code>가 <code>LinkedHashMap</code>이라 flush 전에 프로세스가 죽으면 변경이 사라집니다. flush 실패 시 재시도·부분 실패 처리도 없습니다(저장 1건 실패 시 예외로 루프 중단). README: 영속 큐, retry, idempotency, 보상 흐름 필요.</p></div></details>
+      <details id="lim-3" class="qa risk"><summary><span><span class="badge info">주석 인정</span> <span class="badge good">수정함</span> NegativeCachingCache에 TTL이 없다</span></summary><div class="a"><p>예전 javadoc: "이 예제는 TTL 없이 negative 캐싱의 효과만 보여준다." 한 번 empty가 저장되면 나중에 실제 상품이 생겨도 영원히 empty를 돌려줬습니다.</p><p>수정: 시계를 주입받고(<code>ExpiringCache</code>와 같은 방식) negative 엔트리에만 <code>negativeTtlMillis</code>를 둡니다. TTL이 지나면 다음 조회가 저장소를 다시 확인합니다. 명시적 무효화 메서드(evict)는 여전히 없습니다.</p></div></details>
+      <details id="lim-4" class="qa risk"><summary><span><span class="badge info">주석 인정</span> <span class="badge good">수정함</span> RefreshAheadCache는 "백그라운드"가 아니라 동기 갱신</span></summary><div class="a"><p>예전 javadoc 첫 문단은 "즉시 응답하면서도 백그라운드로 새로 적재"라고 썼지만 실제로는 threshold를 넘긴 요청 스레드가 <code>loader.apply</code>를 직접 기다렸고, 내부가 <code>HashMap</code>이고 락이 없어 동시 요청이 <strong>모두 refresh를 실행</strong>했습니다.</p><p>수정: 갱신을 생성자로 주입받은 <code>Executor</code>에서 실행하고 기존 값을 즉시 반환합니다. <code>ConcurrentHashMap</code> + 키별 "갱신 중" 집합으로 같은 키의 갱신은 한 번만 제출하고, 값이 없거나 만료된 키의 동시 miss는 키별 락 + double-check로 1회 로드합니다. 갱신이 실패하면 기존 값을 유지합니다. 테스트는 작업을 쌓아 두는 <code>ManualExecutor</code>로 갱신 시점을 결정론적으로 제어하고, 16스레드 동시 요청에서 갱신 1회를 확인합니다.</p></div></details>
+      <details id="lim-5" class="qa risk"><summary><span><span class="badge warn">코드 확인</span> <span class="badge good">수정함</span> VersionedCache는 evict 기반 race를 막지 못한다</span></summary><div class="a"><p>예전 <code>evict()</code>는 <code>values.remove(key)</code>로 버전 정보까지 지워, 쓰기 B가 <strong>evict</strong>하면 이후 읽기 A의 버전 1 put이 비교할 값이 없어 그대로 통과했습니다. 기존 테스트는 쓰기 B가 버전 2로 <strong>put</strong>하는 시나리오라 드러나지 않았습니다.</p><p>수정: evict는 값만 비우고 버전을 tombstone으로 남기며, 쓰기 경로용 <code>evict(key, newVersion)</code>을 추가했습니다. evict 경쟁을 재현하는 테스트 2개를 추가했습니다. 남은 점: tombstone이 key마다 남아 메모리를 쓰고(실무는 짧은 TTL), 버전은 여전히 호출자가 넘기며 저장소의 버전 컬럼과 연동되지 않습니다.</p></div></details>
+      <details id="lim-6" class="qa risk"><summary><span><span class="badge warn">코드 확인</span> race 테스트는 실제 동시성이 아니라 순차 호출로 재현</span></summary><div class="a"><p><code>StaleCachePutRaceTest</code>는 서비스를 거치지 않고 <code>store.findById</code> → <code>store.save</code> → <code>cache.evict</code> → <code>cache.put</code>을 한 스레드에서 순서대로 호출해 "교차"를 흉내 냅니다. 결정적이라 이해하기 좋지만, <code>CacheAsideProductService</code> 자체의 race를 스레드로 보여 주지는 않습니다.</p></div></details>
+      <details id="lim-7" class="qa risk"><summary><span><span class="badge warn">코드 확인</span> Stampede "보호 없음" 테스트는 서비스 코드가 아니다</span></summary><div class="a"><p>보호 없음 케이스는 <code>CacheAsideProductService</code>가 아니라 테스트 안의 <code>ConcurrentHashMap</code>과 <code>CountDownLatch</code>로 "모든 스레드가 miss를 확인할 때까지 기다린 뒤 로드"하도록 강제합니다. 그래서 16은 <strong>설계상 최악의 경우</strong>이지 자연 발생 빈도가 아닙니다.</p></div></details>
+      <details id="lim-8" class="qa risk"><summary><span><span class="badge warn">코드 확인</span> 대부분의 캐시 클래스가 thread-safe하지 않다</span></summary><div class="a"><p><code>InMemoryCache</code>(LinkedHashMap, hits/misses int), <code>ExpiringCache</code>(HashMap)는 동기화가 없습니다. 단일 스레드 학습용으로 읽어야 합니다.</p><p><span class="badge good">수정함</span> <code>VersionedCache</code>, <code>NegativeCachingCache</code>, <code>RefreshAheadCache</code>는 <code>ConcurrentHashMap</code>(+ 원자적 카운터)으로 바꿨습니다. 동시성을 고려한 클래스는 이 셋과 <code>SingleFlightCache</code>입니다.</p></div></details>
+      <details id="lim-9" class="qa risk"><summary><span><span class="badge warn">코드 확인</span> SingleFlightCache: 만료·무효화 없음, 락 객체 누적, null 불가</span></summary><div class="a"><ul><li>한 번 넣은 값은 영원히 남습니다(TTL·evict 메서드 없음).</li><li><code>locks</code> 맵의 키별 락 객체를 지우지 않아 키 수만큼 쌓입니다.</li><li><code>ConcurrentHashMap</code>은 null 값을 거부하므로 loader가 null을 반환하면 NPE.</li><li><code>synchronized</code>라 같은 JVM 안에서만 유효. 서버가 여러 대면 분산 락이 필요(→ <code>labs/spring-cache-redis</code>).</li></ul></div></details>
+      <details id="lim-10" class="qa risk"><summary><span><span class="badge warn">코드 확인</span> Bloom filter는 서비스에 통합되지 않았다</span></summary><div class="a"><p>테스트가 직접 <code>if (existingIds.mightContain(MISSING_ID))</code>로 감쌉니다. 서비스·캐시 계층에 끼워 넣은 구현은 없고, false positive 비율이나 상품 추가/삭제 시 필터 갱신은 다루지 않습니다.</p></div></details>
+    </section>
+
+    <section id="interview">
+      <h2><span class="num">06</span>면접 Q&amp;A</h2>
+      <p class="sub">질문을 먼저 읽고 스스로 답해 본 뒤 펼쳐 보세요. <span class="badge info">일반 지식</span>은 이 레포 밖의 널리 알려진 내용입니다.</p>
+      <div class="qa-tools"><button type="button" data-qa="open">모두 펼치기</button><button type="button" data-qa="close">모두 접기</button></div>
+      <details id="iv-1" class="qa"><summary>Cache Aside와 Read Through의 차이는?</summary><div class="a"><ul><li>핵심은 <strong>miss 시 저장소를 누가 호출하느냐</strong>. Aside는 서비스, Read Through는 캐시 계층(loader).</li><li>Aside: 단순·명시적, 대신 서비스마다 miss 코드 반복. Read Through: 로딩 규칙 공유, 대신 캐시 계층이 저장소를 알아야 함.</li><li>이 레포에선 둘 다 2회 읽기에 store read 1 (<code>ReadPatternTest</code>). 결과는 같고 책임 위치가 다름.</li><li>꼬리질문 대비: Redis만 두면 Read Through가 생기지 않는다 → Caffeine LoadingCache나 공통 래퍼로 구현 (README).</li></ul></div></details>
+      <details id="iv-2" class="qa"><summary>쓰기 시 캐시를 갱신(put)하지 않고 삭제(evict)하는 이유는?</summary><div class="a"><ul><li>README의 일반 조회 추천은 Cache Aside + Write Around(evict). 읽히지 않을 데이터로 캐시를 오염시키지 않고, 다음 읽기가 저장소 최신 값을 다시 적재.</li><li><span class="badge info">일반 지식</span> 두 쓰기가 동시에 put하면 DB 커밋 순서와 캐시 put 순서가 뒤집혀 오래된 값이 남을 수 있음. 삭제는 "다음 읽기에서 다시 읽기"로 수렴하므로 상대적으로 안전.</li><li>단, 삭제해도 읽기·쓰기 교차 race는 남음 → 다음 질문.</li></ul></div></details>
+      <details id="iv-3" class="qa"><summary>Cache Aside에서 오래된 값이 캐시에 다시 들어가는 시나리오와 대책은?</summary><div class="a"><ul><li>읽기 A가 miss → v1 조회 → (쓰기 B가 v2 저장 + evict) → A가 뒤늦게 v1 put. 결과: 캐시 v1, 저장소 v2.</li><li>이 레포의 대책: <code>VersionedCache</code> — 낮은 버전 put 거부(<code>rejectedPuts</code>).</li><li>약점까지 말하기: evict가 버전 정보까지 지우면 막지 못함 → 그래서 삭제 대신 "버전 마커(tombstone)"를 남기도록 바꿈 <span class="badge good">수정함</span>. tombstone은 짧은 TTL로 메모리를 제한.</li><li><span class="badge info">일반 지식</span> 짧은 TTL, 지연 이중 삭제(delayed double delete), DB 변경 이벤트(CDC) 기반 무효화도 흔한 대안.</li></ul></div></details>
+      <details id="iv-4" class="qa"><summary>Write Through / Around / Behind는 각각 언제 쓰나?</summary><div class="a"><ul><li>Through: 쓰기 직후 바로 읽음. 쓰기 경로가 느려지고 부분 실패(저장 성공·캐시 실패) 처리 필요.</li><li>Around: 쓴 데이터가 바로 읽힌다는 보장이 없음. 첫 읽기 비용을 읽기 요청자가 부담.</li><li>Behind: 쓰기 처리량이 최우선. 일시적 불일치 + 유실 위험 → 영속 큐, retry, idempotency (README).</li></ul></div></details>
+      <details id="iv-5" class="qa"><summary>Cache Stampede를 설명하고 막는 방법은?</summary><div class="a"><ul><li>인기 키가 동시에 miss/만료되면 요청이 한꺼번에 저장소로. 테스트에선 16스레드 → load 16.</li><li>Single-flight: 키별 락 + 락 안 double-check → load 1. Refresh-ahead: TTL 80% 시점에 미리 갱신해 hard-expiry 자체를 없앰.</li><li>꼬리질문: 이 구현은 <code>synchronized</code>라 JVM 하나에서만 유효. 서버가 여러 대면 Redis <code>SET NX</code> 락 등 분산 락 필요.</li><li><span class="badge info">일반 지식</span> 확률적 조기 만료(PER), 만료 시 stale 값을 주면서 비동기 갱신하는 stale-while-revalidate도 있음.</li></ul></div></details>
+      <details id="iv-6" class="qa"><summary>Cache Penetration 방어: negative caching과 Bloom filter의 장단점은?</summary><div class="a"><ul><li>Negative caching: 구현 쉬움, 첫 조회 1회만 저장소. 대신 없는 키마다 캐시 공간을 쓰고, TTL이 길면 새로 생긴 값을 가림 (이 구현은 negative TTL을 둠 <span class="badge good">수정함</span>).</li><li>Bloom filter: 메모리 적게 쓰고 저장소 조회 전 차단. <code>false</code>=확실히 없음, <code>true</code>=있을 수도. false positive 존재.</li><li><span class="badge info">일반 지식</span> 기본 Bloom filter는 원소 삭제가 불가능해 데이터 삭제가 잦으면 재구축하거나 Counting Bloom filter를 씀. 공격성 랜덤 키는 입력 검증·rate limit도 함께.</li></ul></div></details>
+      <details id="iv-7" class="qa"><summary>Cache Avalanche와 TTL jitter는?</summary><div class="a"><ul><li>같은 TTL로 대량 적재하면 같은 순간에 만료 → 저장소 폭주. 테스트: 고정 TTL 100키가 t=1000에 모두 만료.</li><li>jitter로 TTL을 [1000,1500)로 흩어 만료를 시간에 걸쳐 분산.</li><li><span class="badge info">일반 지식</span> 캐시 서버 자체 장애로 인한 avalanche는 jitter로 못 막음 → 캐시 이중화, 로컬+원격 2단 캐시, 서킷 브레이커·rate limit.</li></ul></div></details>
+      <details id="iv-8" class="qa"><summary>동시성·시간 문제를 테스트에서 어떻게 결정적으로 재현했나?</summary><div class="a"><ul><li>시간: <code>Clock</code> 인터페이스를 주입하고 테스트는 <code>MutableClock.advance/setTo</code>로 시간을 직접 흘림 (TTL·refresh-ahead·avalanche).</li><li>난수: <code>new Random(42)</code>로 지터를 고정.</li><li>동시성: <code>CountDownLatch</code>로 16스레드를 동시에 출발시키고, 보호 없음 케이스는 모든 스레드가 miss를 본 뒤 로드하도록 강제.</li><li>race: 순차 호출로 교차 순서를 고정 (한계: 진짜 스레드 race는 아님).</li></ul></div></details>
+      <details id="iv-9" class="qa"><summary>(꼬리) Refresh-ahead 구현을 운영 수준으로 바꾸려면?</summary><div class="a"><ul><li>예전: 요청 스레드가 동기로 갱신, HashMap·락 없음 → 동시 요청이 각자 refresh.</li><li>지금 <span class="badge good">수정함</span>: 갱신을 주입받은 executor로 비동기 실행하고 기존 값을 즉시 반환, 키별 "갱신 중" 집합으로 1회만 갱신. 운영이면 갱신 실패 로깅·메트릭, executor 크기·거절 정책도 정해야 함.</li><li><span class="badge info">일반 지식</span> Caffeine의 <code>refreshAfterWrite</code>가 이 모델(비동기 갱신 중 기존 값 제공)을 제공.</li></ul></div></details>
+    </section>
+
+    <section id="files">
+      <h2><span class="num">07</span>파일 지도</h2>
+      <p class="sub">경로는 <code>labs/cache-patterns/</code> 기준. 코드를 다시 볼 때 여기서부터.</p>
+      <ul class="files">
+        <li><code>README.md</code><span>학습 순서, 패턴 비교표, 조합 예시, 시퀀스 다이어그램</span></li>
+        <li><code>src/main/java/dev/deepdive/cache/infrastructure/InMemoryCache.java</code><span>캐시 저장소 (hits/misses 카운트) · <code>Cache</code>, <code>Clock</code> 인터페이스도 같은 패키지</span></li>
+        <li><code>src/main/java/dev/deepdive/cache/repository/InMemoryProductStore.java</code><span>DB 역할 저장소 (readCount/writeCount)</span></li>
+        <li><code>src/main/java/dev/deepdive/cache/aside/CacheAsideProductService.java</code><span>Cache Aside 읽기 + evict 쓰기</span></li>
+        <li><code>src/main/java/dev/deepdive/cache/readthrough/ReadThroughCache.java</code><span>loader를 가진 캐시 접근 계층 (+ <code>ReadThroughProductService.java</code>)</span></li>
+        <li><code>src/main/java/dev/deepdive/cache/writethrough/WriteThroughProductService.java</code><span>save → put</span></li>
+        <li><code>src/main/java/dev/deepdive/cache/writearound/WriteAroundProductService.java</code><span>save → evict</span></li>
+        <li><code>src/main/java/dev/deepdive/cache/writebehind/WriteBehindProductService.java</code><span>put + pendingWrites → flush()</span></li>
+        <li><code>src/main/java/dev/deepdive/cache/consistency/VersionedCache.java</code><span>낮은 버전 put 거부, evict는 버전 tombstone 유지</span></li>
+        <li><code>src/main/java/dev/deepdive/cache/stampede/SingleFlightCache.java</code><span>키별 락 + double-check</span></li>
+        <li><code>src/main/java/dev/deepdive/cache/stampede/RefreshAheadCache.java</code><span>TTL 비율 경과 시 기존 값 제공 + executor로 백그라운드 갱신 (키별 1회)</span></li>
+        <li><code>src/main/java/dev/deepdive/cache/penetration/NegativeCachingCache.java</code><span>empty도 캐싱, negative 엔트리는 TTL 뒤 만료</span></li>
+        <li><code>src/main/java/dev/deepdive/cache/penetration/BloomFilter.java</code><span>BitSet 기반 단순 Bloom filter</span></li>
+        <li><code>src/main/java/dev/deepdive/cache/avalanche/ExpiringCache.java</code><span>키별 TTL 캐시 (시계 주입)</span></li>
+        <li><code>src/test/java/dev/deepdive/cache/pattern/ReadPatternTest.java</code><span>읽기 패턴 호출 횟수 (+ <code>WritePatternTest.java</code>)</span></li>
+        <li><code>src/test/java/dev/deepdive/cache/consistency/StaleCachePutRaceTest.java</code><span>race 재현 + 버전 거부 + evict 경쟁(tombstone)</span></li>
+        <li><code>src/test/java/dev/deepdive/cache/stampede/CacheStampedeTest.java</code><span>16스레드 stampede, single-flight, refresh-ahead(비동기 갱신·동시 1회·실패 유지)</span></li>
+        <li><code>src/test/java/dev/deepdive/cache/penetration/CachePenetrationTest.java</code><span>보호 없음 / negative(+TTL 만료) / Bloom</span></li>
+        <li><code>src/test/java/dev/deepdive/cache/avalanche/CacheAvalancheTest.java</code><span>고정 TTL vs 지터 TTL</span></li>
+        <li><code>src/test/java/dev/deepdive/cache/support/MutableClock.java</code><span>테스트용 수동 시계</span></li>
+      </ul>
+    </section>
+
+    <footer>README와 소스 코드를 근거로 정리한 문서입니다. 이 모듈에는 성능 측정값이 없으며, 표시한 숫자는 모두 테스트 단언값입니다.</footer>
+  </main>
+</div>
+<script>
+/* ===== 공통 스크립트 (모든 모듈 overview.html에서 동일하게 유지) ===== */
+(function(){
+  var root=document.documentElement;
+  try{var saved=localStorage.getItem('deepdive-theme');if(saved)root.setAttribute('data-theme',saved);}catch(e){}
+  var tt=document.querySelector('.theme-toggle');
+  if(tt)tt.addEventListener('click',function(){
+    var cur=root.getAttribute('data-theme');
+    if(!cur)cur=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';
+    var next=cur==='dark'?'light':'dark';root.setAttribute('data-theme',next);
+    try{localStorage.setItem('deepdive-theme',next);}catch(e){}
+  });
+  document.querySelectorAll('[data-flow]').forEach(function(flow){
+    var steps=flow.querySelectorAll('.step');var detail=flow.nextElementSibling;
+    function show(btn){
+      steps.forEach(function(s){s.setAttribute('aria-selected',s===btn?'true':'false');});
+      if(detail)detail.querySelectorAll(':scope>div').forEach(function(d){d.classList.toggle('on',d.id===btn.dataset.target);});
+    }
+    steps.forEach(function(s){s.addEventListener('click',function(){show(s);});});
+    if(steps[0])show(steps[0]);
+  });
+  document.querySelectorAll('[data-tabs]').forEach(function(box){
+    var btns=box.querySelectorAll(':scope>.tabs>button');
+    function show(btn){
+      btns.forEach(function(b){b.setAttribute('aria-selected',b===btn?'true':'false');});
+      box.querySelectorAll(':scope>.tabpanel').forEach(function(p){p.classList.toggle('on',p.id===btn.dataset.target);});
+    }
+    btns.forEach(function(b){b.addEventListener('click',function(){show(b);});});
+    if(btns[0])show(btns[0]);
+  });
+  document.querySelectorAll('[data-qa]').forEach(function(b){
+    b.addEventListener('click',function(){
+      var sec=b.closest('section');var open=b.dataset.qa==='open';
+      sec.querySelectorAll('details.qa').forEach(function(d){d.open=open;});
+    });
+  });
+  var links=document.querySelectorAll('nav.toc a[href^="#"]');
+  if('IntersectionObserver' in window){
+    var io=new IntersectionObserver(function(es){es.forEach(function(e){
+      if(e.isIntersecting){links.forEach(function(l){l.classList.toggle('active',l.getAttribute('href')==='#'+e.target.id);});}
+    });},{rootMargin:'-20% 0px -70% 0px'});
+    document.querySelectorAll('main section[id]').forEach(function(s){io.observe(s);});
+  }
+  function openHash(){
+    var id='';try{id=decodeURIComponent(location.hash.slice(1));}catch(e){}
+    if(!id)return;var el=document.getElementById(id);if(!el)return;
+    var d=el.tagName==='DETAILS'?el:el.closest('details');if(d)d.open=true;
+    var p=el.closest('.tabpanel');
+    if(p&&!p.classList.contains('on')){var b=p.parentElement.querySelector(':scope>.tabs>button[data-target="'+p.id+'"]');if(b)b.click();}
+    setTimeout(function(){el.scrollIntoView({block:'start'});},0);
+  }
+  window.addEventListener('hashchange',openHash);openHash();
+})();
+</script>
+</body>
+</html>

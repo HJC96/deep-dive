@@ -1,0 +1,450 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>deep-dive 복습 허브</title>
+<style>
+/* ===== 공통 스타일 (모든 모듈 overview.html에서 동일하게 유지) ===== */
+:root{
+  --bg:#f7f7f5;--surface:#ffffff;--surface-2:#f0efeb;--border:#e2e0da;
+  --text:#1d1d1b;--muted:#6b6a65;--accent:#2f5bd3;--accent-soft:#e6ecfb;
+  --good:#1f8a4c;--good-soft:#e3f4ea;--bad:#c2410c;--bad-soft:#fcebe1;
+  --warn:#a16207;--warn-soft:#fbf3dc;--code-bg:#f3f2ee;
+  --shadow:0 1px 2px rgba(0,0,0,.04),0 4px 16px rgba(0,0,0,.04);
+  --radius:12px;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --sans:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Pretendard","Noto Sans KR","Segoe UI",sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#141413;--surface:#1c1c1a;--surface-2:#252522;--border:#33322e;
+    --text:#ecebe6;--muted:#a09e96;--accent:#7c9cff;--accent-soft:#1f2a47;
+    --good:#4ccf85;--good-soft:#16301f;--bad:#ff8a5c;--bad-soft:#3a1f14;
+    --warn:#e8b84a;--warn-soft:#3a2f12;--code-bg:#22221f;
+    --shadow:none;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#141413;--surface:#1c1c1a;--surface-2:#252522;--border:#33322e;
+  --text:#ecebe6;--muted:#a09e96;--accent:#7c9cff;--accent-soft:#1f2a47;
+  --good:#4ccf85;--good-soft:#16301f;--bad:#ff8a5c;--bad-soft:#3a1f14;
+  --warn:#e8b84a;--warn-soft:#3a2f12;--code-bg:#22221f;
+  --shadow:none;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);line-height:1.65;font-size:15.5px;-webkit-font-smoothing:antialiased}
+a{color:var(--accent)}
+code,.mono{font-family:var(--mono);font-size:.86em;background:var(--code-bg);padding:.1em .35em;border-radius:5px;word-break:break-all}
+pre{background:var(--code-bg);padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.55;margin:10px 0}
+pre code{background:none;padding:0;font-size:inherit;word-break:normal}
+.layout{display:grid;grid-template-columns:220px minmax(0,1fr);gap:40px;max-width:1180px;margin:0 auto;padding:32px 24px 80px}
+@media (max-width:860px){.layout{grid-template-columns:minmax(0,1fr);gap:0;padding:20px 16px 60px}}
+nav.toc{position:sticky;top:24px;align-self:start;font-size:14px}
+nav.toc .home{display:inline-block;margin-bottom:14px;color:var(--muted);text-decoration:none;font-size:13px}
+nav.toc ol{list-style:none;padding:0;margin:0;border-left:2px solid var(--border)}
+nav.toc li a{display:block;padding:5px 0 5px 14px;margin-left:-2px;border-left:2px solid transparent;color:var(--muted);text-decoration:none}
+nav.toc li a.active,nav.toc li a:hover{color:var(--text);border-left-color:var(--accent)}
+@media (max-width:860px){
+  nav.toc{position:static;margin-bottom:18px}
+  nav.toc ol{display:flex;flex-wrap:wrap;gap:6px;border:0}
+  nav.toc li a{padding:4px 10px;margin:0;border:1px solid var(--border);border-radius:999px;font-size:13px}
+  nav.toc li a.active{border-color:var(--accent)}
+}
+header.hero{margin-bottom:28px}
+.eyebrow{font-size:12.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
+h1{font-size:30px;line-height:1.25;margin:6px 0 10px;letter-spacing:-.01em}
+.lead{font-size:17px;color:var(--text);margin:0 0 14px;max-width:62ch}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font-size:12.5px;padding:3px 10px;border-radius:999px;background:var(--surface-2);border:1px solid var(--border);color:var(--muted)}
+section{margin:44px 0 0;scroll-margin-top:20px}
+h2{font-size:21px;margin:0 0 6px;letter-spacing:-.01em}
+h2 .num{color:var(--accent);margin-right:8px;font-variant-numeric:tabular-nums}
+.sub{color:var(--muted);margin:0 0 16px;font-size:14.5px}
+h3{font-size:16.5px;margin:18px 0 6px}
+.card{overflow-wrap:anywhere;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow)}
+.grid{display:grid;gap:12px}
+.grid.c2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.grid.c3{grid-template-columns:repeat(3,minmax(0,1fr))}
+@media (max-width:700px){.grid.c2,.grid.c3{grid-template-columns:minmax(0,1fr)}}
+.tldr .label{font-size:12px;font-weight:700;letter-spacing:.05em;color:var(--muted);text-transform:uppercase;margin-bottom:4px}
+.tldr .card{border-top:3px solid var(--accent)}
+.tldr .card.good{border-top-color:var(--good)}
+.tldr .card.bad{border-top-color:var(--bad)}
+.tldr p{margin:0}
+/* 흐름 다이어그램: 단계 클릭 시 상세 표시 */
+.flow{display:flex;flex-wrap:wrap;align-items:stretch;gap:0;margin:6px 0 10px}
+.flow .step{flex:1 1 140px;min-width:120px;text-align:left;font:inherit;color:inherit;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 12px;cursor:pointer;position:relative;transition:border-color .15s,background .15s}
+.flow .step:hover{border-color:var(--accent)}
+.flow .step[aria-selected="true"]{border-color:var(--accent);background:var(--accent-soft)}
+.flow .step .k{display:block;font-size:11.5px;color:var(--muted);font-weight:600}
+.flow .step .t{display:block;font-weight:600;font-size:14px;line-height:1.35}
+.flow .step.fail{border-style:dashed;border-color:var(--bad)}
+.flow .step.fail[aria-selected="true"]{background:var(--bad-soft)}
+.flow .arrow{display:flex;align-items:center;padding:0 6px;color:var(--muted);font-size:18px}
+@media (max-width:700px){.flow{flex-direction:column}.flow .step{flex:none}.flow .arrow{justify-content:center;padding:2px 0;transform:rotate(90deg)}}
+.flow-detail{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:10px;padding:14px 18px;min-height:64px}
+.flow-detail>div{display:none}
+.flow-detail>div.on{display:block}
+.flow-detail p:first-child{margin-top:0}.flow-detail p:last-child{margin-bottom:0}
+/* 탭 */
+.tabs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.tabs button{font:inherit;font-size:13.5px;padding:6px 12px;border-radius:999px;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{background:var(--text);color:var(--bg);border-color:var(--text)}
+.tabpanel{display:none}.tabpanel.on{display:block}
+.kv{display:grid;grid-template-columns:110px minmax(0,1fr);gap:6px 14px;margin:10px 0 0;font-size:14.5px}
+.kv dt{color:var(--muted);font-weight:600}
+.kv dd{margin:0}
+@media (max-width:520px){.kv{grid-template-columns:1fr}.kv dt{margin-top:6px}}
+/* 표 */
+.tablewrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:top}
+th{background:var(--surface-2);font-weight:600;font-size:13px;color:var(--muted);white-space:nowrap}
+tr:last-child td{border-bottom:0}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+.hl{background:var(--accent-soft)}
+/* 막대 그래프 (값은 --v: 0~1 비율) */
+.bars{display:grid;gap:8px}
+.bar{display:grid;grid-template-columns:150px minmax(0,1fr) 92px;align-items:center;gap:10px;font-size:13.5px}
+.bar .track{height:20px;background:var(--surface-2);border-radius:6px;overflow:hidden}
+.bar .fill{height:100%;width:calc(var(--v) * 100%);background:var(--accent);border-radius:6px;min-width:2px;transition:width .6s ease}
+.bar.good .fill{background:var(--good)}.bar.bad .fill{background:var(--bad)}.bar.warn .fill{background:var(--warn)}
+.bar .val{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--mono);font-size:12.5px}
+@media (max-width:520px){.bar{grid-template-columns:100px minmax(0,1fr) 72px}}
+.source{font-size:12.5px;color:var(--muted);margin-top:10px}
+/* 배지·콜아웃 */
+.badge{display:inline-block;font-size:11.5px;font-weight:700;padding:1px 8px;border-radius:999px;vertical-align:middle}
+.badge.good{background:var(--good-soft);color:var(--good)}
+.badge.bad{background:var(--bad-soft);color:var(--bad)}
+.badge.warn{background:var(--warn-soft);color:var(--warn)}
+.badge.info{background:var(--accent-soft);color:var(--accent)}
+.callout{border-radius:10px;padding:12px 16px;margin:12px 0;font-size:14.5px;border:1px solid var(--border);background:var(--surface)}
+.callout.warn{background:var(--warn-soft);border-color:transparent}
+.callout.bad{background:var(--bad-soft);border-color:transparent}
+.callout.good{background:var(--good-soft);border-color:transparent}
+.callout strong:first-child{margin-right:4px}
+/* 아코디언 (면접 Q&A, 약점) */
+details.qa{background:var(--surface);border:1px solid var(--border);border-radius:10px;margin:8px 0;overflow:hidden}
+details.qa summary{cursor:pointer;padding:12px 16px;font-weight:600;list-style:none;display:flex;gap:10px;align-items:flex-start}
+details.qa summary::-webkit-details-marker{display:none}
+details.qa summary::before{content:"Q";flex:none;width:22px;height:22px;border-radius:6px;background:var(--accent-soft);color:var(--accent);font-size:12px;display:grid;place-items:center;margin-top:1px}
+details.qa.risk summary::before{content:"!";background:var(--bad-soft);color:var(--bad)}
+details.qa[open] summary{border-bottom:1px solid var(--border)}
+details.qa .a{padding:12px 16px 14px 48px;font-size:14.5px}
+details.qa .a p{margin:0 0 8px}details.qa .a ul{margin:0;padding-left:18px}
+.qa-tools{display:flex;gap:8px;margin-bottom:8px}
+.qa-tools button,.theme-toggle{font:inherit;font-size:13px;padding:5px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer}
+.theme-toggle{position:fixed;right:16px;bottom:16px;z-index:5;box-shadow:var(--shadow)}
+/* 파일 지도 */
+ul.files{list-style:none;padding:0;margin:0;display:grid;gap:6px}
+ul.files li{display:grid;grid-template-columns:minmax(0,1fr);gap:2px;padding:9px 12px;background:var(--surface);border:1px solid var(--border);border-radius:9px}
+ul.files li code{background:none;padding:0;font-size:12.5px}
+ul.files li span{color:var(--muted);font-size:13.5px}
+footer{margin-top:56px;padding-top:18px;border-top:1px solid var(--border);color:var(--muted);font-size:13px}
+ul.plain{margin:6px 0;padding-left:20px}ul.plain li{margin:3px 0}
+</style>
+</head>
+<body>
+<button class="theme-toggle" type="button" aria-label="테마 전환">◐ 테마</button>
+<div class="layout">
+  <nav class="toc" aria-label="목차">
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin:0 0 14px">
+      <a class="chip" style="text-decoration:none" href="index.html">전체 지도</a>
+      <a class="chip" style="text-decoration:none" href="changes.html">개선 내역</a>
+      <a class="chip" style="text-decoration:none" href="interview.html">질문·약점 모음</a>
+    </div>
+    <ol>
+      <li><a href="#start">여기서 시작</a></li>
+      <li><a href="#map">학습 지도</a></li>
+      <li><a href="#tr-concurrency">동시성</a></li>
+      <li><a href="#tr-cache">캐시</a></li>
+      <li><a href="#tr-tx">분산 트랜잭션</a></li>
+      <li><a href="#tr-payment">결제 시스템</a></li>
+      <li><a href="#tr-spring">Spring·운영·JVM</a></li>
+      <li><a href="#compare">분산 트랜잭션 비교</a></li>
+      <li><a href="#priority">복습 우선순위</a></li>
+      <li><a href="#concepts">개념 색인</a></li>
+      <li><a href="#repo">레포 공통</a></li>
+    </ol>
+  </nav>
+  <main>
+    <header class="hero">
+      <div class="eyebrow">deep-dive · labs</div>
+      <h1>deep-dive 복습 허브</h1>
+      <p class="lead">공부하다 직접 돌려 보고 싶은 주제를 모듈 하나씩으로 만든 레포입니다. 이 페이지 하나에서 15개 모듈의 요약, 모듈별 상세 페이지의 각 섹션, 개선 내역, 면접 질문 모음, README와 GitHub 소스로 모두 이동할 수 있습니다.</p>
+      <div class="chips"><span class="chip">모듈 15개</span><span class="chip">면접 질문 138개</span><span class="chip">약점·꼬리질문 112개</span><span class="chip">Java 21</span><span class="chip">Spring Boot 3.4.1</span></div>
+    </header>
+
+    <section id="start" class="tldr">
+      <h2><span class="num">00</span>여기서 시작</h2>
+      <p class="sub">목적에 맞는 입구를 고르세요.</p>
+      <div class="grid c3">
+        <a class="card" href="#map" style="text-decoration:none;color:inherit"><div class="label">처음부터 복습</div><p>학습 지도 → 트랙별 카드 → 모듈 페이지 순서로 읽기</p></a>
+        <a class="card good" href="changes.html" style="text-decoration:none;color:inherit"><div class="label">무엇을 고쳤나</div><p>개선 내역: 문제 → 수정 → 검증 테스트 → 커밋</p></a>
+        <a class="card bad" href="interview.html" style="text-decoration:none;color:inherit"><div class="label">면접 직전 점검</div><p>15개 모듈의 면접 질문과 약점·꼬리질문 모음</p></a>
+      </div>
+      <div class="callout"><strong>모듈 페이지 읽는 법</strong> 모든 모듈 페이지는 같은 순서입니다: 한눈에 → 흐름(클릭형 다이어그램) → 비교·핵심 구현(탭) → 결과·수치(출처 표기) → 한계·약점 → 면접 Q&amp;A → 파일 지도. 아래 카드의 버튼은 각 섹션으로 바로 이동합니다.</div>
+    </section>
+
+    <section id="map">
+      <h2><span class="num">01</span>학습 지도</h2>
+      <p class="sub">트랙을 누르면 그 트랙이 묻는 질문과 모듈 목록이 나옵니다.</p>
+      <div class="flow" data-flow><button class="step" data-target="map-concurrency"><span class="k">TRACK 1</span><span class="t">동시성</span></button><span class="arrow">→</span><button class="step" data-target="map-cache"><span class="k">TRACK 2</span><span class="t">캐시</span></button><span class="arrow">→</span><button class="step" data-target="map-tx"><span class="k">TRACK 3</span><span class="t">분산 트랜잭션</span></button><span class="arrow">→</span><button class="step" data-target="map-payment"><span class="k">TRACK 4</span><span class="t">결제 시스템</span></button><span class="arrow">→</span><button class="step" data-target="map-spring"><span class="k">TRACK 5</span><span class="t">Spring·JVM</span></button></div>
+      <div class="flow-detail"><div id="map-concurrency"><p><strong>"여러 요청이 같은 데이터를 동시에 바꾸면 어떻게 지키나?"</strong></p><ul class="plain"><li><a href="coupon-issue/overview.html">coupon-issue</a> — 선착순 쿠폰 재고 차감 — 동시성 제어 9가지를 한 테이블에서 비교</li><li><a href="seat-reservation/overview.html">seat-reservation</a> — 콘서트 좌석 예약 — Redis로 선점하고, Kafka로 DB 쓰기를 떼어 낸다</li></ul><p><a href="#tr-concurrency">이 트랙 카드로 이동 ↓</a></p></div><div id="map-cache"><p><strong>"DB 부하를 캐시로 줄일 때 무엇이 깨지나?"</strong></p><ul class="plain"><li><a href="cache-patterns/overview.html">cache-patterns</a> — 캐시 패턴 실험실 — 읽기·쓰기 패턴 5개와 장애 3대장을 순수 Java로</li><li><a href="spring-cache-local/overview.html">spring-cache-local</a> — Spring Cache 로컬 캐시 — 어노테이션 3종과 캐시 키를 호출 횟수로 확인</li><li><a href="spring-cache-redis/overview.html">spring-cache-redis</a> — Spring Cache + Redis — @Cacheable과 RedisTemplate 직접 구현, 그리고 핫키 분산 락</li></ul><p><a href="#tr-cache">이 트랙 카드로 이동 ↓</a></p></div><div id="map-tx"><p><strong>"DB가 여러 개로 나뉘면 원자성은 어떻게 되나?"</strong></p><ul class="plain"><li><a href="distributed-transaction-monolith/overview.html">distributed-transaction-monolith</a> — Monolith — 하나의 DB, 하나의 @Transactional</li><li><a href="distributed-transaction-msa/overview.html">distributed-transaction-msa</a> — MSA — 서비스를 나누자 부분 커밋이 생겼다</li><li><a href="distributed-transaction-2pc/overview.html">distributed-transaction-2pc</a> — 2PC — 묻고 나서 정한다, 대신 락을 쥐고 기다린다</li><li><a href="distributed-transaction-tcc/overview.html">distributed-transaction-tcc</a> — TCC — 일단 커밋하고, 잘못되면 업무 로직으로 되돌린다</li></ul><p><a href="#tr-tx">이 트랙 카드로 이동 ↓</a></p></div><div id="map-payment"><p><strong>"하나의 트랜잭션으로 묶지 않고도 돈이 맞게 하려면?"</strong></p><ul class="plain"><li><a href="payment-system/overview.html">payment-system</a> — payment-system: 한 트랜잭션으로 묶을 수 없는 결제를 상태·아웃박스·멱등성으로 맞추기</li></ul><p><a href="#tr-payment">이 트랙 카드로 이동 ↓</a></p></div><div id="map-spring"><p><strong>"프레임워크가 뒤에서 무엇을 해 주고, 그걸 어떻게 관찰·검증하나?"</strong></p><ul class="plain"><li><a href="spring/overview.html">spring</a> — @Async · CompletableFuture · @Retryable — 프록시가 해 주는 일과 그 함정</li><li><a href="spring-data-jpa/overview.html">spring-data-jpa</a> — 낙관적 락(@Version)과 요청당 SQL 수 모니터링</li><li><a href="spring-test-infra/overview.html">spring-test-infra</a> — Testcontainers · 동적 프로퍼티 · ArchUnit — 테스트 인프라를 작은 실험으로</li><li><a href="spring-boot-actuator/overview.html">spring-boot-actuator</a> — Spring Boot Actuator — 상태·버전·횟수·현재값·시간을 관측하는 13단계</li><li><a href="java-sandbox/overview.html">java-sandbox</a> — Java 샌드박스 — AES Provider 반복 등록을 JMH로 재고, 언어 기능을 테스트로 확인</li></ul><p><a href="#tr-spring">이 트랙 카드로 이동 ↓</a></p></div></div>
+    </section>
+
+    <section id="tr-concurrency">
+      <h2><span class="num">02</span>동시성</h2>
+      <p class="sub">같은 자원을 동시에 바꿀 때의 정합성과 처리량</p>
+      <div class="card" id="c-coupon-issue" style="margin-bottom:12px">
+          <div class="eyebrow">labs/coupon-issue <span class="badge good">개선 완료</span></div>
+          <h3 style="margin-top:4px"><a href="coupon-issue/overview.html" style="color:inherit">선착순 쿠폰 재고 차감 — 동시성 제어 9가지를 한 테이블에서 비교</a></h3>
+          <p>재고 200개짜리 쿠폰 한 장(row 하나)에 요청 200~250개가 동시에 몰리면, "읽고 → 빼고 → 쓰기" 사이에 끼어들기가 생겨 차감이 사라집니다(lost update). 이 모듈은 그 현상을 테스트로 재현한 뒤, JVM 락·DB 락·Redis 락·원자 연산 9가지로 각각 막아 보고 실행 시간을 나란히 찍어 봅니다.</p>
+          <details class="qa"><summary>30초 요약 펼치기</summary><div class="a"><dl class="kv" style="margin-top:0"><dt>문제</dt><dd>두 요청이 같은 <code>quantity = 200</code>을 읽고 둘 다 <code>199</code>를 저장 → 요청은 2번인데 차감은 1번. 테스트는 200번 발급 후 재고가 <b>0이 아님</b>을 단언합니다.</dd><dt>접근</dt><dd>같은 조건(재고 200, 스레드 풀 32)에서 <b>9가지</b> 방식을 구현: 제어 없음 · <code>synchronized</code> · 원자적 UPDATE · 비관적/낙관적 락 · 네임드 락 · Redis <code>SET NX</code> · Redis Lua · Redisson.</dd><dt>결론</dt><dd>"락으로 줄 세우기"보다 <b>확인+차감을 한 번에 원자적으로</b>(UPDATE … WHERE, Lua) 하는 쪽이 단순하고 빨랐고, 경합이 심한 곳에서 낙관적 락은 재시도 폭주로 가장 느렸습니다(README 예시 출력 기준).</dd></dl></div></details>
+          <div class="chips" style="margin-top:8px"><span class="chip">Java 21</span><span class="chip">Spring Boot 3.4.1</span><span class="chip">Spring Data JPA</span><span class="chip">MySQL 8.0.36</span><span class="chip">Redis 7.2.5</span><span class="chip">Redisson 3.38.1</span><span class="chip">Testcontainers</span></div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px"><a class="chip" style="text-decoration:none" href="coupon-issue/overview.html#tldr">한눈에</a><a class="chip" style="text-decoration:none" href="coupon-issue/overview.html#flow">흐름</a><a class="chip" style="text-decoration:none" href="coupon-issue/overview.html#cases">비교·구현</a><a class="chip" style="text-decoration:none" href="coupon-issue/overview.html#results">결과·수치</a><a class="chip" style="text-decoration:none" href="coupon-issue/overview.html#limits">약점 6</a><a class="chip" style="text-decoration:none" href="coupon-issue/overview.html#interview">면접 9</a><a class="chip" style="text-decoration:none" href="coupon-issue/overview.html#files">파일 지도</a><a class="chip" style="text-decoration:none" href="changes.html#m-coupon-issue">개선 내역</a><a class="chip" style="text-decoration:none" href="coupon-issue/README.md">README</a><a class="chip" style="text-decoration:none" href="https://github.com/HJC96/deep-dive/tree/claude/serene-ritchie-k1wm7j/labs/coupon-issue" target="_blank" rel="noopener">GitHub</a></div>
+        </div><div class="card" id="c-seat-reservation" style="margin-bottom:12px">
+          <div class="eyebrow">labs/seat-reservation <span class="badge good">개선 완료</span></div>
+          <h3 style="margin-top:4px"><a href="seat-reservation/overview.html" style="color:inherit">콘서트 좌석 예약 — Redis로 선점하고, Kafka로 DB 쓰기를 떼어 낸다</a></h3>
+          <p>같은 좌석을 여러 명이 동시에 누르면 한 좌석이 두 명에게 팔리고(동시성 문제), 예매 오픈처럼 요청이 한꺼번에 몰리면 DB가 버티지 못합니다(부하 문제). 이 모듈은 두 문제를 4단계로 쌓아 갑니다: 제어 없음 → Redis <code>SADD</code> 선점 → Redis + Kafka 비동기 확정 → 느린 DB에서 직접 쓰기 vs Kafka 경유 비교.</p>
+          <details class="qa"><summary>30초 요약 펼치기</summary><div class="a"><dl class="kv" style="margin-top:0"><dt>문제</dt><dd>지켜야 할 불변식 두 개: <b>이중 배정 금지</b>(한 좌석 = 한 명), <b>1인 1좌석</b>(한 명 = 한 좌석). 제어 없이 "있나 확인 → 없으면 INSERT"하면 좌석 50개에 예약이 50건보다 많아집니다(README 실행 예 53건).</dd><dt>접근</dt><dd>Redis Set 두 개(<code>seat:applied-users</code>, <code>seat:held-seats</code>)에 <code>SADD</code>해서 "처음 넣은 요청만 1"을 받는 성질로 선점. 선점 성공분만 DB에 확정하되, 3단계에서는 Kafka에 커맨드만 넣고 즉시 응답, Consumer가 DB에 저장.</dd><dt>결론</dt><dd>정합성은 Redis 원자 연산이, 부하 흡수는 Kafka가 맡는 역할 분리. 풀 2·지연 20ms인 느린 DB에서 직접 쓰기는 100건 중 88건 실패, Kafka 경유는 실패 0건으로 즉시 응답하고 결국 100건 모두 확정(README 예시 출력).</dd></dl></div></details>
+          <div class="chips" style="margin-top:8px"><span class="chip">Java 21</span><span class="chip">Spring Boot 3.4.1</span><span class="chip">Spring Data JPA</span><span class="chip">MySQL 8.0.36</span><span class="chip">Redis 7.2.5</span><span class="chip">Kafka 3.8.1</span><span class="chip">spring-kafka</span><span class="chip">Testcontainers</span></div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px"><a class="chip" style="text-decoration:none" href="seat-reservation/overview.html#tldr">한눈에</a><a class="chip" style="text-decoration:none" href="seat-reservation/overview.html#flow">흐름</a><a class="chip" style="text-decoration:none" href="seat-reservation/overview.html#cases">비교·구현</a><a class="chip" style="text-decoration:none" href="seat-reservation/overview.html#results">결과·수치</a><a class="chip" style="text-decoration:none" href="seat-reservation/overview.html#limits">약점 9</a><a class="chip" style="text-decoration:none" href="seat-reservation/overview.html#interview">면접 9</a><a class="chip" style="text-decoration:none" href="seat-reservation/overview.html#files">파일 지도</a><a class="chip" style="text-decoration:none" href="changes.html#m-seat-reservation">개선 내역</a><a class="chip" style="text-decoration:none" href="seat-reservation/README.md">README</a><a class="chip" style="text-decoration:none" href="https://github.com/HJC96/deep-dive/tree/claude/serene-ritchie-k1wm7j/labs/seat-reservation" target="_blank" rel="noopener">GitHub</a></div>
+        </div>
+    </section><section id="tr-cache">
+      <h2><span class="num">03</span>캐시</h2>
+      <p class="sub">읽기/쓰기 패턴, 장애 패턴, Spring Cache 추상화</p>
+      <div class="card" id="c-cache-patterns" style="margin-bottom:12px">
+          <div class="eyebrow">labs/cache-patterns <span class="badge good">개선 완료</span></div>
+          <h3 style="margin-top:4px"><a href="cache-patterns/overview.html" style="color:inherit">캐시 패턴 실험실 — 읽기·쓰기 패턴 5개와 장애 3대장을 순수 Java로</a></h3>
+          <p>캐시는 "넣으면 빨라진다"로 끝나지 않습니다. <strong>언제 채우고, 언제 지우고, 동시에 몰리면 어떻게 되는지</strong>에 따라 오래된 값이 남거나 DB가 터집니다. 이 모듈은 Redis·Spring 없이 <code>InMemoryCache</code>와 <code>InMemoryProductStore</code>만으로 패턴마다 작은 클래스를 만들고, 저장소 read/write 횟수를 세는 단위 테스트로 차이를 확인합니다.</p>
+          <details class="qa"><summary>30초 요약 펼치기</summary><div class="a"><dl class="kv" style="margin-top:0"><dt>문제</dt><dd>캐시를 잘못 채우거나 지우면 <strong>DB와 다른 오래된 값</strong>이 남고, 인기 키 동시 miss·없는 키 반복 조회·동시 만료가 일어나면 <strong>요청이 DB로 몰립니다</strong>.</dd><dt>접근</dt><dd>읽기 2개(Cache Aside, Read Through), 쓰기 3개(Write Through/Around/Behind), race 1개, 3대장(Stampede/Penetration/Avalanche) 방어 클래스를 각각 만들고 <strong>저장소 호출 횟수</strong>로 비교.</dd><dt>결론</dt><dd>일반 조회는 <strong>Cache Aside + Write Around(쓰기 후 evict)</strong>가 기본값. 문제별로 single-flight / refresh-ahead, negative caching / Bloom filter, TTL jitter, 버전 비교를 덧붙입니다.</dd></dl></div></details>
+          <div class="chips" style="margin-top:8px"><span class="chip">Java 21</span><span class="chip">순수 Java (Spring 없음)</span><span class="chip">JUnit 5 + AssertJ</span><span class="chip">InMemoryCache</span><span class="chip">Redis 없음</span></div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px"><a class="chip" style="text-decoration:none" href="cache-patterns/overview.html#tldr">한눈에</a><a class="chip" style="text-decoration:none" href="cache-patterns/overview.html#flow">흐름</a><a class="chip" style="text-decoration:none" href="cache-patterns/overview.html#cases">비교·구현</a><a class="chip" style="text-decoration:none" href="cache-patterns/overview.html#results">결과·수치</a><a class="chip" style="text-decoration:none" href="cache-patterns/overview.html#limits">약점 10</a><a class="chip" style="text-decoration:none" href="cache-patterns/overview.html#interview">면접 9</a><a class="chip" style="text-decoration:none" href="cache-patterns/overview.html#files">파일 지도</a><a class="chip" style="text-decoration:none" href="changes.html#m-cache-patterns">개선 내역</a><a class="chip" style="text-decoration:none" href="cache-patterns/README.md">README</a><a class="chip" style="text-decoration:none" href="https://github.com/HJC96/deep-dive/tree/claude/serene-ritchie-k1wm7j/labs/cache-patterns" target="_blank" rel="noopener">GitHub</a></div>
+        </div><div class="card" id="c-spring-cache-local" style="margin-bottom:12px">
+          <div class="eyebrow">labs/spring-cache-local <span class="badge good">개선 완료</span></div>
+          <h3 style="margin-top:4px"><a href="spring-cache-local/overview.html" style="color:inherit">Spring Cache 로컬 캐시 — 어노테이션 3종과 캐시 키를 호출 횟수로 확인</a></h3>
+          <p>Spring Cache는 "DB를 자동으로 캐시"하는 기능이 아니라, <strong>Bean 메서드 호출 앞뒤에 프록시를 끼워</strong> 캐시 조회·저장·삭제를 대신해 주는 추상화입니다. 이 모듈은 외부 Redis 없이 <code>ConcurrentMapCacheManager</code>(JVM 안 <code>ConcurrentHashMap</code>)로 <code>@Cacheable</code>/<code>@CachePut</code>/<code>@CacheEvict</code>와 캐시 키 규칙을 관찰하고, 로컬 캐시가 왜 여러 서버에서 한계가 있는지 정리합니다.</p>
+          <details class="qa"><summary>30초 요약 펼치기</summary><div class="a"><dl class="kv" style="margin-top:0"><dt>문제</dt><dd>같은 조회마다 DB를 치면 느리고, 캐시 코드를 직접 쓰면 반복됩니다. 게다가 <strong>캐시 키를 잘못 잡으면</strong> 다른 요청이 같은 값을 공유하거나 매번 miss가 나고, 로컬 캐시는 <strong>서버마다 따로</strong> 존재합니다.</dd><dt>접근</dt><dd><code>StudyBookService</code>로 어노테이션 4가지 동작, <code>BookLookupService</code>로 cacheName 분리·<code>key="#id"</code>·DTO equals·테이블 버전 키를 실험. MySQL(Testcontainers)에 데이터를 넣고 <code>@MockitoSpyBean BookRepository</code> 호출 횟수로 검증.</dd><dt>결론</dt><dd>캐시 동작은 <strong>프록시 + CacheManager + 키 설계</strong>로 결정됩니다. 로컬 캐시는 빠르지만 재시작 시 소멸·서버 간 불일치·JVM 메모리 부담이 있어, 분산 환경이면 Redis 같은 리모트 캐시를 고려합니다.</dd></dl></div></details>
+          <div class="chips" style="margin-top:8px"><span class="chip">Java 21</span><span class="chip">Spring Boot 3.4.1</span><span class="chip">Spring Cache</span><span class="chip">ConcurrentMapCacheManager</span><span class="chip">MySQL 8.0.36 · JPA</span><span class="chip">Testcontainers</span><span class="chip">@MockitoSpyBean</span></div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px"><a class="chip" style="text-decoration:none" href="spring-cache-local/overview.html#tldr">한눈에</a><a class="chip" style="text-decoration:none" href="spring-cache-local/overview.html#flow">흐름</a><a class="chip" style="text-decoration:none" href="spring-cache-local/overview.html#cases">비교·구현</a><a class="chip" style="text-decoration:none" href="spring-cache-local/overview.html#results">결과·수치</a><a class="chip" style="text-decoration:none" href="spring-cache-local/overview.html#limits">약점 7</a><a class="chip" style="text-decoration:none" href="spring-cache-local/overview.html#interview">면접 8</a><a class="chip" style="text-decoration:none" href="spring-cache-local/overview.html#files">파일 지도</a><a class="chip" style="text-decoration:none" href="changes.html#m-spring-cache-local">개선 내역</a><a class="chip" style="text-decoration:none" href="spring-cache-local/README.md">README</a><a class="chip" style="text-decoration:none" href="https://github.com/HJC96/deep-dive/tree/claude/serene-ritchie-k1wm7j/labs/spring-cache-local" target="_blank" rel="noopener">GitHub</a></div>
+        </div><div class="card" id="c-spring-cache-redis" style="margin-bottom:12px">
+          <div class="eyebrow">labs/spring-cache-redis <span class="badge good">개선 완료</span></div>
+          <h3 style="margin-top:4px"><a href="spring-cache-redis/overview.html" style="color:inherit">Spring Cache + Redis — @Cacheable과 RedisTemplate 직접 구현, 그리고 핫키 분산 락</a></h3>
+          <p>로컬 캐시는 서버마다 따로라서, 여러 서버가 같은 캐시를 보려면 Redis 같은 공용 캐시가 필요합니다. 하지만 Redis로 옮기면 <strong>직렬화</strong>, <strong>없는 키 반복 조회</strong>, <strong>동시 만료</strong>, <strong>핫키 동시 miss</strong>를 직접 고민해야 합니다. 이 모듈은 MySQL/JPA를 원본으로 두고 <code>@Cacheable</code>(RedisCacheManager)과 <code>StringRedisTemplate</code> 직접 구현을 비교하며, Null caching · TTL Jitter · <code>SET NX</code> + Lua 분산 락을 Testcontainers로 검증합니다.</p>
+          <details class="qa"><summary>30초 요약 펼치기</summary><div class="a"><dl class="kv" style="margin-top:0"><dt>문제</dt><dd>공용 캐시에도 함정이 있습니다. 없는 id는 캐시에 안 남아 <strong>매번 DB로 관통</strong>, 인기 키가 비어 있는 순간 <strong>40개 요청이 동시에 DB 조회</strong>, 같은 TTL로 넣으면 <strong>동시에 만료</strong>.</dd><dt>접근</dt><dd>세 서비스를 비교: <code>SpringCacheBookService</code>(@Cacheable), <code>RedisTemplateBookCacheService</code>(수동 Cache Aside · <code>__NULL__</code> sentinel · TTL Jitter), <code>RedisHotKeyBookCacheService</code>(락 없음 vs <code>SET NX</code> 락 + double-check). <code>BookOriginService.readCount</code>로 원본 조회 횟수를 셈.</dd><dt>결론</dt><dd>일반 메서드 결과 캐싱은 Spring Cache로 단순하게, <code>SET NX</code>·Lua·sentinel·jitter처럼 <strong>Redis 고유 기능이 필요하면 RedisTemplate</strong>. 기본 <code>RedisCacheManager</code>는 non-locking이라 <code>@Cacheable</code>이 분산 락을 대신하지 않습니다.</dd></dl></div></details>
+          <div class="chips" style="margin-top:8px"><span class="chip">Java 21</span><span class="chip">Spring Boot 3.4.1</span><span class="chip">Spring Data Redis</span><span class="chip">Redis 7.2.5</span><span class="chip">MySQL 8.0.36 · JPA</span><span class="chip">Testcontainers</span><span class="chip">Jackson JSON</span></div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px"><a class="chip" style="text-decoration:none" href="spring-cache-redis/overview.html#tldr">한눈에</a><a class="chip" style="text-decoration:none" href="spring-cache-redis/overview.html#flow">흐름</a><a class="chip" style="text-decoration:none" href="spring-cache-redis/overview.html#cases">비교·구현</a><a class="chip" style="text-decoration:none" href="spring-cache-redis/overview.html#results">결과·수치</a><a class="chip" style="text-decoration:none" href="spring-cache-redis/overview.html#limits">약점 8</a><a class="chip" style="text-decoration:none" href="spring-cache-redis/overview.html#interview">면접 9</a><a class="chip" style="text-decoration:none" href="spring-cache-redis/overview.html#files">파일 지도</a><a class="chip" style="text-decoration:none" href="changes.html#m-spring-cache-redis">개선 내역</a><a class="chip" style="text-decoration:none" href="spring-cache-redis/README.md">README</a><a class="chip" style="text-decoration:none" href="https://github.com/HJC96/deep-dive/tree/claude/serene-ritchie-k1wm7j/labs/spring-cache-redis" target="_blank" rel="noopener">GitHub</a></div>
+        </div>
+    </section><section id="tr-tx">
+      <h2><span class="num">04</span>분산 트랜잭션</h2>
+      <p class="sub">같은 실패 시나리오(잔액 50,000으로 2석×30,000 예약)를 네 단계로 비교</p>
+      <div class="card" id="c-distributed-transaction-monolith" style="margin-bottom:12px">
+          <div class="eyebrow">labs/distributed-transaction-monolith <span class="badge good">개선 완료</span></div>
+          <h3 style="margin-top:4px"><a href="distributed-transaction-monolith/overview.html" style="color:inherit">Monolith — 하나의 DB, 하나의 @Transactional</a></h3>
+          <p>분산 트랜잭션 시리즈의 기준선. 워크숍 좌석 예약·크레딧 차감·원장 기록·예약 확정을 <b>하나의 애플리케이션, 하나의 데이터베이스, 하나의 로컬 트랜잭션</b>으로 처리한다. 잔액이 모자라면 좌석까지 함께 롤백된다는 것을 확인하고, 이 보장이 DB를 나누는 순간 사라진다는 것을 다음 단계로 넘긴다.</p>
+          <details class="qa"><summary>30초 요약 펼치기</summary><div class="a"><dl class="kv" style="margin-top:0"><dt>문제</dt><dd>좌석 예약·크레딧 차감·원장 기록·예약 확정 중 <b>일부만 반영</b>되면 "좌석은 잡혔는데 결제가 안 된" 상태가 생긴다.</dd><dt>접근</dt><dd>네 변경을 <code>ReservationTransaction.place()</code> 하나의 <code>@Transactional</code>로 묶고, 예약 행을 <code>SELECT … FOR UPDATE</code>로 잠가 재실행·동시 실행을 한 번만 처리한다.</dd><dt>결론</dt><dd>DB가 하나면 원자성은 DB가 공짜로 준다. 잔액 부족이면 좌석까지 롤백되어 <b>reserved_count 0</b>. 이 "공짜"가 DB를 쪼개는 순간 사라진다는 것이 다음 단계(MSA)의 출발점.</dd></dl></div></details>
+          <div class="chips" style="margin-top:8px"><span class="chip">Java 21</span><span class="chip">Spring Boot 3.4.1</span><span class="chip">Spring Data JPA</span><span class="chip">MySQL (운영 설정)</span><span class="chip">H2 MODE=MySQL (테스트)</span><span class="chip">SELECT … FOR UPDATE</span></div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px"><a class="chip" style="text-decoration:none" href="distributed-transaction-monolith/overview.html#tldr">한눈에</a><a class="chip" style="text-decoration:none" href="distributed-transaction-monolith/overview.html#flow">흐름</a><a class="chip" style="text-decoration:none" href="distributed-transaction-monolith/overview.html#cases">비교·구현</a><a class="chip" style="text-decoration:none" href="distributed-transaction-monolith/overview.html#results">결과·수치</a><a class="chip" style="text-decoration:none" href="distributed-transaction-monolith/overview.html#limits">약점 5</a><a class="chip" style="text-decoration:none" href="distributed-transaction-monolith/overview.html#interview">면접 9</a><a class="chip" style="text-decoration:none" href="distributed-transaction-monolith/overview.html#files">파일 지도</a><a class="chip" style="text-decoration:none" href="changes.html#m-distributed-transaction-monolith">개선 내역</a><a class="chip" style="text-decoration:none" href="distributed-transaction-monolith/README.md">README</a><a class="chip" style="text-decoration:none" href="https://github.com/HJC96/deep-dive/tree/claude/serene-ritchie-k1wm7j/labs/distributed-transaction-monolith" target="_blank" rel="noopener">GitHub</a></div>
+        </div><div class="card" id="c-distributed-transaction-msa" style="margin-bottom:12px">
+          <div class="eyebrow">labs/distributed-transaction-msa <span class="badge good">개선 완료</span></div>
+          <h3 style="margin-top:4px"><a href="distributed-transaction-msa/overview.html" style="color:inherit">MSA — 서비스를 나누자 부분 커밋이 생겼다</a></h3>
+          <p>모놀리스의 예약·좌석·지갑을 <b>서비스 3개와 DB 3개</b>로 분리한 기준선. 기능 순서(좌석 예약 → 크레딧 차감 → 예약 확정)는 같지만 각 작업이 서로 다른 앱·DB에서 커밋된다. 좌석 커밋 뒤 지갑이 실패하면 좌석만 남는 <b>부분 커밋</b>을 실제 HTTP 통합 테스트로 재현한다.</p>
+          <details class="qa"><summary>30초 요약 펼치기</summary><div class="a"><dl class="kv" style="margin-top:0"><dt>문제</dt><dd>예약·좌석·지갑을 <b>서비스 3개 · DB 3개</b>로 나누자 하나의 로컬 트랜잭션으로 묶을 수 없게 됐다. 좌석이 커밋된 뒤 지갑이 실패하면 <b>좌석만 잡힌 채</b> 남는다.</dd><dt>접근</dt><dd>세 Spring 앱을 실제 HTTP(<code>RestClient</code>)로 연결하고, 각 서비스는 자기 DB에만 <code>@Transactional</code>. 통합 테스트가 세 앱을 랜덤 포트·독립 H2로 띄워 부분 커밋을 <b>재현·고정</b>한다.</dd><dt>결론</dt><dd>Reservation Service의 롤백은 <code>reservation_db</code>에만 적용된다. 잔액 50,000 실패 시 <b>reserved_count 2</b>, 이력 1건이 남는다. 이 부분 커밋이 2PC·TCC가 풀어야 할 문제다.</dd></dl></div></details>
+          <div class="chips" style="margin-top:8px"><span class="chip">Java 21</span><span class="chip">Spring Boot 3.4.1</span><span class="chip">RestClient</span><span class="chip">앱 3개 · DB 3개</span><span class="chip">MySQL (운영 설정)</span><span class="chip">H2 ×3 (테스트)</span></div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px"><a class="chip" style="text-decoration:none" href="distributed-transaction-msa/overview.html#tldr">한눈에</a><a class="chip" style="text-decoration:none" href="distributed-transaction-msa/overview.html#flow">흐름</a><a class="chip" style="text-decoration:none" href="distributed-transaction-msa/overview.html#cases">비교·구현</a><a class="chip" style="text-decoration:none" href="distributed-transaction-msa/overview.html#results">결과·수치</a><a class="chip" style="text-decoration:none" href="distributed-transaction-msa/overview.html#limits">약점 8</a><a class="chip" style="text-decoration:none" href="distributed-transaction-msa/overview.html#interview">면접 8</a><a class="chip" style="text-decoration:none" href="distributed-transaction-msa/overview.html#files">파일 지도</a><a class="chip" style="text-decoration:none" href="changes.html#m-distributed-transaction-msa">개선 내역</a><a class="chip" style="text-decoration:none" href="distributed-transaction-msa/README.md">README</a><a class="chip" style="text-decoration:none" href="https://github.com/HJC96/deep-dive/tree/claude/serene-ritchie-k1wm7j/labs/distributed-transaction-msa" target="_blank" rel="noopener">GitHub</a></div>
+        </div><div class="card" id="c-distributed-transaction-2pc" style="margin-bottom:12px">
+          <div class="eyebrow">labs/distributed-transaction-2pc <span class="badge good">개선 완료</span></div>
+          <h3 style="margin-top:4px"><a href="distributed-transaction-2pc/overview.html" style="color:inherit">2PC — 묻고 나서 정한다, 대신 락을 쥐고 기다린다</a></h3>
+          <p>MSA의 부분 커밋을 <b>2단계 커밋</b>으로 막는다. MySQL의 <code>XA</code> SQL 문을 서로 다른 MySQL 서버 두 대에 직접 실행해 prepare(투표) → commit/rollback(결정)을 눈으로 확인한다. 부분 커밋은 사라지지만, prepare한 참여자가 결정을 기다리며 쥔 락이 다른 요청을 막는 비용을 테스트로 보여 준다.</p>
+          <details class="qa"><summary>30초 요약 펼치기</summary><div class="a"><dl class="kv" style="margin-top:0"><dt>문제</dt><dd>MSA에서는 좌석이 먼저 <b>커밋</b>돼 버려서 지갑이 실패해도 되돌릴 수 없었다(부분 커밋).</dd><dt>접근</dt><dd>"커밋하기 전에 전원에게 커밋할 수 있는지 묻는다." MySQL <b>XA SQL 문</b>(<code>XA START/END/PREPARE/COMMIT/ROLLBACK</code>)을 <b>서로 다른 MySQL 컨테이너 2대</b>에 직접 실행. 코디네이터는 테스트 메서드의 제어 흐름이다(JTA·코디네이터 클래스 없음).</dd><dt>결론</dt><dd>부분 커밋이 사라진다(좌석 0). 대가: prepare한 참여자는 결정이 올 때까지 <b>락을 쥐고 기다린다</b>. 코디네이터가 죽으면 같은 행 UPDATE·같은 키 INSERT가 <code>Lock wait timeout</code>으로 막히고, 결정을 아는 쪽이 <code>XA COMMIT/ROLLBACK</code>해야 풀린다.</dd></dl></div></details>
+          <div class="chips" style="margin-top:8px"><span class="chip">Java 21</span><span class="chip">테스트 전용 모듈 (main 없음)</span><span class="chip">MySQL 8.0.36 × 2</span><span class="chip">Testcontainers</span><span class="chip">XA SQL 직접 실행</span><span class="chip">JDBC</span></div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px"><a class="chip" style="text-decoration:none" href="distributed-transaction-2pc/overview.html#tldr">한눈에</a><a class="chip" style="text-decoration:none" href="distributed-transaction-2pc/overview.html#flow">흐름</a><a class="chip" style="text-decoration:none" href="distributed-transaction-2pc/overview.html#cases">비교·구현</a><a class="chip" style="text-decoration:none" href="distributed-transaction-2pc/overview.html#results">결과·수치</a><a class="chip" style="text-decoration:none" href="distributed-transaction-2pc/overview.html#limits">약점 7</a><a class="chip" style="text-decoration:none" href="distributed-transaction-2pc/overview.html#interview">면접 10</a><a class="chip" style="text-decoration:none" href="distributed-transaction-2pc/overview.html#files">파일 지도</a><a class="chip" style="text-decoration:none" href="changes.html#m-distributed-transaction-2pc">개선 내역</a><a class="chip" style="text-decoration:none" href="distributed-transaction-2pc/README.md">README</a><a class="chip" style="text-decoration:none" href="https://github.com/HJC96/deep-dive/tree/claude/serene-ritchie-k1wm7j/labs/distributed-transaction-2pc" target="_blank" rel="noopener">GitHub</a></div>
+        </div><div class="card" id="c-distributed-transaction-tcc" style="margin-bottom:12px">
+          <div class="eyebrow">labs/distributed-transaction-tcc <span class="badge good">개선 완료</span></div>
+          <h3 style="margin-top:4px"><a href="distributed-transaction-tcc/overview.html" style="color:inherit">TCC — 일단 커밋하고, 잘못되면 업무 로직으로 되돌린다</a></h3>
+          <p>2PC가 남긴 블로킹을 없애는 방법. <b>Try</b>에서 자원을 잡아 두고 곧바로 커밋하고, 전원 성공하면 <b>Confirm</b>, 아니면 <b>Cancel</b>로 반대 방향 UPDATE를 한다. 같은 실패 시나리오에서 결과는 2PC와 같지만 락을 쥐지 않는다. 그 대가로 생기는 중간 상태 노출과 멱등·빈 취소·매달림 문제를 참여자 로그로 처리한다.</p>
+          <details class="qa"><summary>30초 요약 펼치기</summary><div class="a"><dl class="kv" style="margin-top:0"><dt>문제</dt><dd>2PC는 부분 커밋을 막았지만 prepare한 참여자가 <b>락을 쥐고 기다리는</b> 블로킹이 남았다. 코디네이터가 늦거나 죽으면 다른 요청까지 멈춘다.</dd><dt>접근</dt><dd><b>Try</b>에서 자원을 잡아 두고 <b>바로 커밋</b>(<code>held_count</code>·<code>frozen</code>), 이후 <b>Confirm</b>으로 확정하거나 <b>Cancel</b>로 반대 방향 UPDATE. XA 없이 참여자별 로컬 트랜잭션(DataSource·EMF·TxManager 두 벌) + 참여자 소유 로그 <code>*_tcc_log</code>.</dd><dt>결론</dt><dd>결과는 2PC와 같다(<b>reserved_count 0</b>, balance 50,000). Try 직후에도 다른 요청이 <b>막히지 않는다</b>. 대신 중간 상태가 보이고(격리 포기), 멱등·빈 취소·매달림을 <b>참여자 코드</b>가 감당한다.</dd></dl></div></details>
+          <div class="chips" style="margin-top:8px"><span class="chip">Java 21</span><span class="chip">Spring Boot 3.4.1</span><span class="chip">Spring Data JPA × 2</span><span class="chip">MySQL 8.0.36 × 2</span><span class="chip">Testcontainers</span><span class="chip">XA 없음</span></div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px"><a class="chip" style="text-decoration:none" href="distributed-transaction-tcc/overview.html#tldr">한눈에</a><a class="chip" style="text-decoration:none" href="distributed-transaction-tcc/overview.html#flow">흐름</a><a class="chip" style="text-decoration:none" href="distributed-transaction-tcc/overview.html#cases">비교·구현</a><a class="chip" style="text-decoration:none" href="distributed-transaction-tcc/overview.html#results">결과·수치</a><a class="chip" style="text-decoration:none" href="distributed-transaction-tcc/overview.html#limits">약점 7</a><a class="chip" style="text-decoration:none" href="distributed-transaction-tcc/overview.html#interview">면접 10</a><a class="chip" style="text-decoration:none" href="distributed-transaction-tcc/overview.html#files">파일 지도</a><a class="chip" style="text-decoration:none" href="changes.html#m-distributed-transaction-tcc">개선 내역</a><a class="chip" style="text-decoration:none" href="distributed-transaction-tcc/README.md">README</a><a class="chip" style="text-decoration:none" href="https://github.com/HJC96/deep-dive/tree/claude/serene-ritchie-k1wm7j/labs/distributed-transaction-tcc" target="_blank" rel="noopener">GitHub</a></div>
+        </div>
+    </section><section id="tr-payment">
+      <h2><span class="num">05</span>결제 시스템</h2>
+      <p class="sub">앞의 트랙을 모두 합친 종합 실험</p>
+      <div class="card" id="c-payment-system" style="margin-bottom:12px">
+          <div class="eyebrow">labs/payment-system <span class="badge good">개선 완료</span></div>
+          <h3 style="margin-top:4px"><a href="payment-system/overview.html" style="color:inherit">payment-system: 한 트랜잭션으로 묶을 수 없는 결제를 상태·아웃박스·멱등성으로 맞추기</a></h3>
+          <p>결제(Payment) → 정산(Wallet) → 장부(Ledger)를 서로 다른 DB와 Kafka로 나눈 결제 시스템입니다. 외부 PSP(Toss) 호출이 끼어 있어서 전체를 한 트랜잭션으로 묶을 수 없습니다. 그래서 각 서비스는 <strong>로컬 트랜잭션만</strong> 쓰고, 그 사이를 <strong>트랜잭셔널 아웃박스·재시도·멱등 소비자</strong>로 이어 "결국에는 맞는" 상태를 만들려고 합니다.</p>
+          <details class="qa"><summary>30초 요약 펼치기</summary><div class="a"><dl class="kv" style="margin-top:0"><dt>문제</dt><dd>PSP 승인, 결제 DB 커밋, Kafka 발행, 정산, 장부는 서로 다른 시스템에서 일어납니다. 그래서 하나만 실패해도 <strong>돈은 빠졌는데 주문은 실패</strong>하거나 <strong>정산은 됐는데 장부가 비는</strong> 어긋남이 생길 수 있습니다.</dd><dt>접근</dt><dd>결제 상태를 5개로 나눕니다(NOT_STARTED·EXECUTING·SUCCESS·FAILURE·<strong>UNKNOWN</strong>). 성공하면 같은 트랜잭션 안에서 <strong>outbox</strong>에 이벤트를 쓰고, 커밋된 뒤에 Kafka로 보냅니다. 받는 쪽은 orderId로 중복을 거르고, 지갑은 <strong>낙관적 락</strong>, 장부는 <strong>복식부기</strong>로 기록합니다.</dd><dt>결론</dt><dd>핵심 흐름(승인 → 아웃박스 → 정산·장부 → 완료)은 <strong>실제로 구현되어 있습니다</strong>. 처음 분석에서 찾은 구멍(돌지 않던 복구·릴레이 스케줄러, 상태 전이 경쟁, 완료 판정 레이스, 비어 있던 정산 데이터, check-then-act 멱등성 등)은 <span class="badge good">수정함</span> 표시처럼 고쳤고, 테스트는 Testcontainers로 CI에서 돕니다. DLQ 재처리·Bulkhead·대사는 아직 없습니다. 면접에서는 "설계 의도 + 찾은 구멍 + 어떻게 고쳤나"를 한 세트로 말하면 됩니다.</dd></dl></div></details>
+          <div class="chips" style="margin-top:8px"><span class="chip">Java 21</span><span class="chip">Spring Boot 3.4.1</span><span class="chip">Spring Cloud 2024.0.0</span><span class="chip">WebFlux + R2DBC (payment)</span><span class="chip">MVC + JPA (wallet·ledger)</span><span class="chip">Kafka · Spring Cloud Stream</span><span class="chip">MySQL</span><span class="chip">Toss Payments</span></div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px"><a class="chip" style="text-decoration:none" href="payment-system/overview.html#tldr">한눈에</a><a class="chip" style="text-decoration:none" href="payment-system/overview.html#flow">흐름</a><a class="chip" style="text-decoration:none" href="payment-system/overview.html#cases">비교·구현</a><a class="chip" style="text-decoration:none" href="payment-system/overview.html#results">결과·수치</a><a class="chip" style="text-decoration:none" href="payment-system/overview.html#limits">약점 14</a><a class="chip" style="text-decoration:none" href="payment-system/overview.html#interview">면접 14</a><a class="chip" style="text-decoration:none" href="payment-system/overview.html#files">파일 지도</a><a class="chip" style="text-decoration:none" href="changes.html#m-payment-system">개선 내역</a><a class="chip" style="text-decoration:none" href="payment-system/README.md">README</a><a class="chip" style="text-decoration:none" href="https://github.com/HJC96/deep-dive/tree/claude/serene-ritchie-k1wm7j/labs/payment-system" target="_blank" rel="noopener">GitHub</a></div>
+        </div>
+    </section><section id="tr-spring">
+      <h2><span class="num">06</span>Spring·운영·JVM</h2>
+      <p class="sub">프레임워크 동작과 관측성, 테스트 인프라, 성능 측정</p>
+      <div class="card" id="c-spring" style="margin-bottom:12px">
+          <div class="eyebrow">labs/spring <span class="badge good">개선 완료</span></div>
+          <h3 style="margin-top:4px"><a href="spring/overview.html" style="color:inherit">@Async · CompletableFuture · @Retryable — 프록시가 해 주는 일과 그 함정</a></h3>
+          <p>주문 확인 메일 후처리를 예로 <code>@Async</code>와 <code>ExecutorService</code>를 비교하고, 같은 빈 안에서 호출하면 왜 비동기가 안 되는지(self-invocation) 테스트로 확인합니다. 독립 작업 3개를 순차/병렬로 돌려 시간 차이를 보고, README에는 없지만 코드에 있는 <code>@Retryable</code> 결제 재시도 실험까지 담겨 있습니다.</p>
+          <details class="qa"><summary>30초 요약 펼치기</summary><div class="a"><dl class="kv" style="margin-top:0"><dt>문제</dt><dd>메일 같은 부가 작업이 요청 스레드를 붙잡고, 서로 무관한 작업 3개(결제 250ms·재고 200ms·배송 220ms)를 줄줄이 기다리면 시간이 합산됩니다. 외부 결제 API는 가끔 일시적으로 실패합니다.</dd><dt>접근</dt><dd>① <code>@Async</code>와 <code>ExecutorService</code>로 같은 작업을 넘겨 실행 스레드 이름을 비교 ② 같은 빈 내부 호출 ③ 순차 vs 병렬 시간 ④ <code>@Retryable</code>에서 예외 종류별로 재시도할지, 복구(@Recover)할지 나누기.</dd><dt>결론</dt><dd><code>@Async</code>·<code>@Retryable</code>은 <b>프록시</b>를 거쳐야만 동작합니다. 병렬화는 “먼저 전부 시작하고 마지막에 <code>join()</code>”해야 효과가 있습니다. 재시도는 예외를 <b>재시도 / 즉시 거절 / 복구 금지</b>로 나누는 것이 핵심입니다.</dd></dl></div></details>
+          <div class="chips" style="margin-top:8px"><span class="chip">Java 21</span><span class="chip">Spring Boot 3.4.1</span><span class="chip">spring-retry</span><span class="chip">JUnit 5 · Mockito</span><span class="chip">DB 없음</span></div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px"><a class="chip" style="text-decoration:none" href="spring/overview.html#tldr">한눈에</a><a class="chip" style="text-decoration:none" href="spring/overview.html#flow">흐름</a><a class="chip" style="text-decoration:none" href="spring/overview.html#cases">비교·구현</a><a class="chip" style="text-decoration:none" href="spring/overview.html#results">결과·수치</a><a class="chip" style="text-decoration:none" href="spring/overview.html#limits">약점 5</a><a class="chip" style="text-decoration:none" href="spring/overview.html#interview">면접 8</a><a class="chip" style="text-decoration:none" href="spring/overview.html#files">파일 지도</a><a class="chip" style="text-decoration:none" href="changes.html#m-spring">개선 내역</a><a class="chip" style="text-decoration:none" href="spring/README.md">README</a><a class="chip" style="text-decoration:none" href="https://github.com/HJC96/deep-dive/tree/claude/serene-ritchie-k1wm7j/labs/spring" target="_blank" rel="noopener">GitHub</a></div>
+        </div><div class="card" id="c-spring-data-jpa" style="margin-bottom:12px">
+          <div class="eyebrow">labs/spring-data-jpa <span class="badge good">개선 완료</span></div>
+          <h3 style="margin-top:4px"><a href="spring-data-jpa/overview.html" style="color:inherit">낙관적 락(@Version)과 요청당 SQL 수 모니터링</a></h3>
+          <p>두 사람이 같은 재고를 읽고 각자 수정하면 한쪽 수정이 사라집니다(lost update). 이 모듈은 <code>@Version</code>으로 “나중에 저장한 쪽을 거부”하는 동작을 스레드 없이 결정적으로 재현하고, 별도로 Hibernate <code>StatementInspector</code>로 HTTP 요청 하나가 SQL을 몇 개 날리는지 세어 Micrometer 메트릭으로 내보냅니다.</p>
+          <details class="qa"><summary>30초 요약 펼치기</summary><div class="a"><dl class="kv" style="margin-top:0"><dt>문제</dt><dd>A가 재고 10을 읽어 둔 사이 B가 9로 바꿔 커밋. A가 옛 값 기준으로 9를 저장하면 B의 수정이 덮여 사라집니다. 또, N+1처럼 “요청 하나에 쿼리가 폭발”해도 지표가 없으면 모릅니다.</dd><dt>접근</dt><dd><code>Product</code>에 <code>@Version Long version</code>. <code>@Transactional</code> 서비스 메서드로 트랜잭션 경계를 끊어 “옛 스냅샷”과 “먼저 커밋한 수정”을 순서대로 만들어 충돌 재현. 쿼리 수는 인터셉터 + ThreadLocal + StatementInspector.</dd><dt>결론</dt><dd><b>먼저 커밋한 쪽이 이기고</b> 나중 쪽은 <code>ObjectOptimisticLockingFailureException</code> (stock 9, version 1). 재시도는 호출자 몫. 쿼리 메트릭은 <b>URI 패턴으로 태깅</b>하고 <b>ThreadLocal은 finally에서 clear</b>.</dd></dl></div></details>
+          <div class="chips" style="margin-top:8px"><span class="chip">Java 21</span><span class="chip">Spring Boot 3.4.1</span><span class="chip">Spring Data JPA · Hibernate</span><span class="chip">MySQL 8.0.36 (Testcontainers)</span><span class="chip">Micrometer · Prometheus</span></div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px"><a class="chip" style="text-decoration:none" href="spring-data-jpa/overview.html#tldr">한눈에</a><a class="chip" style="text-decoration:none" href="spring-data-jpa/overview.html#flow">흐름</a><a class="chip" style="text-decoration:none" href="spring-data-jpa/overview.html#cases">비교·구현</a><a class="chip" style="text-decoration:none" href="spring-data-jpa/overview.html#results">결과·수치</a><a class="chip" style="text-decoration:none" href="spring-data-jpa/overview.html#limits">약점 7</a><a class="chip" style="text-decoration:none" href="spring-data-jpa/overview.html#interview">면접 9</a><a class="chip" style="text-decoration:none" href="spring-data-jpa/overview.html#files">파일 지도</a><a class="chip" style="text-decoration:none" href="changes.html#m-spring-data-jpa">개선 내역</a><a class="chip" style="text-decoration:none" href="spring-data-jpa/README.md">README</a><a class="chip" style="text-decoration:none" href="https://github.com/HJC96/deep-dive/tree/claude/serene-ritchie-k1wm7j/labs/spring-data-jpa" target="_blank" rel="noopener">GitHub</a></div>
+        </div><div class="card" id="c-spring-test-infra" style="margin-bottom:12px">
+          <div class="eyebrow">labs/spring-test-infra <span class="badge good">개선 완료</span></div>
+          <h3 style="margin-top:4px"><a href="spring-test-infra/overview.html" style="color:inherit">Testcontainers · 동적 프로퍼티 · ArchUnit — 테스트 인프라를 작은 실험으로</a></h3>
+          <p>실제 MySQL로 테스트하려면 실행할 때마다 바뀌는 랜덤 포트·JDBC URL을 Spring 설정에 넣어야 합니다. 이 모듈은 정적 yml을 <b>일부러 틀리게</b> 두고 <code>@DynamicPropertySource</code>가 덮어써 진짜 컨테이너 DB에 붙는지 검증합니다. 또 컨테이너 생명주기(<code>@Container</code> vs 수동), ArchUnit으로 계층 의존 방향과 필드 주입 금지를 테스트로 고정합니다.</p>
+          <details class="qa"><summary>30초 요약 펼치기</summary><div class="a"><dl class="kv" style="margin-top:0"><dt>문제</dt><dd>컨테이너 DB 주소는 실행 시점에야 정해져 yml에 미리 쓸 수 없습니다. 컨테이너 시작/종료 책임이 흩어지기 쉽고, “Controller→Service→Repository”나 “생성자 주입” 같은 규칙은 코드 리뷰만으로는 무너집니다.</dd><dt>접근</dt><dd>① 틀린 정적 datasource + 동적 등록 → <code>select database()</code>로 실제 연결 확인 ② <code>@Container</code> 유무·수동 start/stop 비교 ③ ArchUnit <code>layeredArchitecture()</code> ④ <code>NO_CLASSES_SHOULD_USE_FIELD_INJECTION</code>.</dd><dt>결론</dt><dd>동적 프로퍼티가 정적 yml보다 <b>우선</b>합니다. <code>@Container</code>는 JUnit이 생명주기를 맡고, 같은 <code>@Testcontainers</code> 클래스의 필드라도 어노테이션이 없으면 시작되지 않습니다. 아키텍처 규칙은 <b>바이트코드 기준 테스트</b>로 깨지면 실패하게 만들 수 있습니다.</dd></dl></div></details>
+          <div class="chips" style="margin-top:8px"><span class="chip">Java 21</span><span class="chip">Spring Boot 3.4.1</span><span class="chip">Testcontainers (MySQL 8.0.36)</span><span class="chip">ArchUnit 1.4.1</span><span class="chip">Docker 필요</span></div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px"><a class="chip" style="text-decoration:none" href="spring-test-infra/overview.html#tldr">한눈에</a><a class="chip" style="text-decoration:none" href="spring-test-infra/overview.html#flow">흐름</a><a class="chip" style="text-decoration:none" href="spring-test-infra/overview.html#cases">비교·구현</a><a class="chip" style="text-decoration:none" href="spring-test-infra/overview.html#results">결과·수치</a><a class="chip" style="text-decoration:none" href="spring-test-infra/overview.html#limits">약점 6</a><a class="chip" style="text-decoration:none" href="spring-test-infra/overview.html#interview">면접 8</a><a class="chip" style="text-decoration:none" href="spring-test-infra/overview.html#files">파일 지도</a><a class="chip" style="text-decoration:none" href="changes.html#m-spring-test-infra">개선 내역</a><a class="chip" style="text-decoration:none" href="spring-test-infra/README.md">README</a><a class="chip" style="text-decoration:none" href="https://github.com/HJC96/deep-dive/tree/claude/serene-ritchie-k1wm7j/labs/spring-test-infra" target="_blank" rel="noopener">GitHub</a></div>
+        </div><div class="card" id="c-spring-boot-actuator" style="margin-bottom:12px">
+          <div class="eyebrow">labs/spring-boot-actuator <span class="badge good">개선 완료</span></div>
+          <h3 style="margin-top:4px"><a href="spring-boot-actuator/overview.html" style="color:inherit">Spring Boot Actuator — 상태·버전·횟수·현재값·시간을 관측하는 13단계</a></h3>
+          <p>운영 중인 앱이 살아 있는지, 어떤 빌드가 떠 있는지, 무엇이 몇 번 일어났고 얼마나 느린지 모르면 장애에 대응할 수 없습니다. 이 모듈은 Postman 폴더 0~12를 따라 Health·Info·Counter·Gauge·Timer 3종·Percentile·HTTP 메트릭·커스텀 엔드포인트를 각각 가장 작은 예제로 만들어 <code>/actuator</code> 응답으로 확인합니다.</p>
+          <details class="qa"><summary>30초 요약 펼치기</summary><div class="a"><dl class="kv" style="margin-top:0"><dt>문제</dt><dd>로그만으로는 “지금 트래픽을 받아도 되나”, “어느 버전이 떠 있나”, “p99가 얼마나 느린가”에 답할 수 없습니다.</dd><dt>접근</dt><dd>관리 포트 9090에 health·info·metrics·features만 노출. 섹션마다 앱 API를 호출 → <code>/actuator/metrics/{name}?tag=k:v</code>로 값 변화를 관찰(README + Postman). 대표 동작은 <code>ActuatorEndpointTest</code>·<code>CustomMetricsTest</code>가 HTTP로 검증.</dd><dt>결론</dt><dd>질문에 맞는 타입을 고르는 것이 핵심: <b>상태</b>=Health, <b>버전</b>=Info, <b>횟수</b>=Counter, <b>현재 개수</b>=Gauge, <b>시간</b>=Timer, <b>꼬리 지연</b>=Percentile. 태그는 값 종류가 적은 것만.</dd></dl></div></details>
+          <div class="chips" style="margin-top:8px"><span class="chip">Java 21</span><span class="chip">Spring Boot 3.4.1</span><span class="chip">Micrometer</span><span class="chip">AOP (@Timed/@Counted)</span><span class="chip">App :8080 · Actuator :9090</span><span class="chip">Postman 컬렉션</span></div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px"><a class="chip" style="text-decoration:none" href="spring-boot-actuator/overview.html#tldr">한눈에</a><a class="chip" style="text-decoration:none" href="spring-boot-actuator/overview.html#flow">흐름</a><a class="chip" style="text-decoration:none" href="spring-boot-actuator/overview.html#cases">비교·구현</a><a class="chip" style="text-decoration:none" href="spring-boot-actuator/overview.html#results">결과·수치</a><a class="chip" style="text-decoration:none" href="spring-boot-actuator/overview.html#limits">약점 7</a><a class="chip" style="text-decoration:none" href="spring-boot-actuator/overview.html#interview">면접 9</a><a class="chip" style="text-decoration:none" href="spring-boot-actuator/overview.html#files">파일 지도</a><a class="chip" style="text-decoration:none" href="changes.html#m-spring-boot-actuator">개선 내역</a><a class="chip" style="text-decoration:none" href="spring-boot-actuator/README.md">README</a><a class="chip" style="text-decoration:none" href="https://github.com/HJC96/deep-dive/tree/claude/serene-ritchie-k1wm7j/labs/spring-boot-actuator" target="_blank" rel="noopener">GitHub</a></div>
+        </div><div class="card" id="c-java-sandbox" style="margin-bottom:12px">
+          <div class="eyebrow">labs/java-sandbox <span class="badge good">개선 완료</span></div>
+          <h3 style="margin-top:4px"><a href="java-sandbox/overview.html" style="color:inherit">Java 샌드박스 — AES Provider 반복 등록을 JMH로 재고, 언어 기능을 테스트로 확인</a></h3>
+          <p>메인 실험은 "AES 암호화할 때마다 <code>Security.addProvider(new BouncyCastleProvider())</code>를 부르면 얼마나 느린가"를 JMH로 측정하고, <code>-prof gc</code>/<code>-prof stack</code>으로 원인까지 확인한 것입니다. 결과에 반전이 있습니다: 빠른 쪽(1회 등록)이 8스레드에서 거의 확장되지 않았습니다. 그 밖에 제네릭·가변인자·컬렉션 팩토리·record·리플렉션·싱글턴·파사드를 작은 테스트로 정리해 두었습니다.</p>
+          <details class="qa"><summary>30초 요약 펼치기</summary><div class="a"><dl class="kv" style="margin-top:0"><dt>문제</dt><dd>레거시 유틸이 <code>encrypt()</code>마다 <code>new BouncyCastleProvider()</code>를 만들어 등록을 시도. 알고리즘·키·IV·평문은 같고 <b>Provider 반복 등록 여부만</b> 다릅니다.</dd><dt>접근</dt><dd><code>AesUtilBefore</code>(매번 등록, static) vs <code>AesUtilAfter</code>(Provider 생성자 주입). JMH Throughput, 워밍업 3×1s, 측정 5×1s, fork 1, 1스레드·8스레드. 원인은 gc·stack 프로파일러로 확인.</dd><dt>결론</dt><dd>1스레드 약 <b>1,526배</b> 차이(README 18코어 실측). repeated는 op당 약 2.85MB 할당이 범인. 반전: once는 8스레드에서 ×1.4만 확장 — 공유 Provider의 <code>synchronized getService</code>에서 줄을 섬(암달의 법칙).</dd></dl></div></details>
+          <div class="chips" style="margin-top:8px"><span class="chip">Java 21</span><span class="chip">JMH 1.37</span><span class="chip">me.champeau.jmh 0.7.2</span><span class="chip">BouncyCastle bcprov-jdk18on 1.78.1</span><span class="chip">JUnit 5 · AssertJ</span></div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px"><a class="chip" style="text-decoration:none" href="java-sandbox/overview.html#tldr">한눈에</a><a class="chip" style="text-decoration:none" href="java-sandbox/overview.html#flow">흐름</a><a class="chip" style="text-decoration:none" href="java-sandbox/overview.html#cases">비교·구현</a><a class="chip" style="text-decoration:none" href="java-sandbox/overview.html#results">결과·수치</a><a class="chip" style="text-decoration:none" href="java-sandbox/overview.html#limits">약점 6</a><a class="chip" style="text-decoration:none" href="java-sandbox/overview.html#interview">면접 9</a><a class="chip" style="text-decoration:none" href="java-sandbox/overview.html#files">파일 지도</a><a class="chip" style="text-decoration:none" href="changes.html#m-java-sandbox">개선 내역</a><a class="chip" style="text-decoration:none" href="java-sandbox/README.md">README</a><a class="chip" style="text-decoration:none" href="https://github.com/HJC96/deep-dive/tree/claude/serene-ritchie-k1wm7j/labs/java-sandbox" target="_blank" rel="noopener">GitHub</a></div>
+        </div>
+    </section>
+
+    <section id="compare">
+      <h2><span class="num">07</span>분산 트랜잭션 4단계 한 장 비교</h2>
+      <p class="sub">같은 실패 시나리오(잔액 50,000으로 2석×30,000 예약)에서 좌석이 어떻게 남나</p>
+      <div class="tablewrap"><table>
+        <thead><tr><th>단계</th><th class="num">실패 후 좌석(reserved)</th><th>얻은 것</th><th>대가</th></tr></thead>
+        <tbody>
+          <tr><td><a href="distributed-transaction-monolith/overview.html">Monolith</a></td><td class="num">0</td><td>로컬 트랜잭션 하나로 원자성</td><td>DB를 나눌 수 없음</td></tr>
+          <tr class="hl"><td><a href="distributed-transaction-msa/overview.html">MSA</a></td><td class="num"><strong>2</strong></td><td>서비스·DB 분리</td><td>부분 커밋, 보상·멱등성 없음</td></tr>
+          <tr><td><a href="distributed-transaction-2pc/overview.html">2PC (MySQL XA)</a></td><td class="num">0</td><td>원자성 회복</td><td>prepared 상태 락 유지, 코디네이터 장애 시 블로킹</td></tr>
+          <tr><td><a href="distributed-transaction-tcc/overview.html">TCC</a></td><td class="num">0</td><td>락 없이 정합성</td><td>중간 상태 노출(격리 포기), 멱등·빈 취소·매달림 직접 처리</td></tr>
+          <tr><td><a href="payment-system/overview.html">결제 시스템</a></td><td class="num">—</td><td>로컬 트랜잭션 + 아웃박스 + 재시도로 최종 일관성</td><td>중간 상태와 재처리를 설계해야 함</td></tr>
+        </tbody>
+      </table></div>
+      <p class="source">출처: 각 모듈 README와 테스트(ReservationServiceTest, MsaLocalTransactionTest, TwoPhaseCommitTest, TryConfirmCancelTest). 지연·성능 수치는 측정하지 않았습니다.</p>
+    </section>
+
+    <section id="priority">
+      <h2><span class="num">08</span>복습 우선순위</h2>
+      <p class="sub">시간이 없을 때 먼저 볼 순서 (추천)</p>
+      <div class="tablewrap"><table>
+        <thead><tr><th>순서</th><th>모듈</th><th>이유</th><th>바로가기</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td><a href="payment-system/overview.html">payment-system</a></td><td>가장 크고 실무와 가까움. 꼬리질문이 몰릴 곳</td><td><a href="payment-system/overview.html#limits">약점</a> · <a href="interview.html#m-payment-system">질문</a></td></tr>
+          <tr><td>2</td><td><a href="distributed-transaction-msa/overview.html">분산 트랜잭션 4단계</a></td><td>"왜 2PC 대신 아웃박스인가"의 근거</td><td><a href="#compare">비교표</a> · <a href="interview.html#tr-tx">질문</a></td></tr>
+          <tr><td>3</td><td><a href="coupon-issue/overview.html">coupon-issue</a></td><td>동시성 단골 질문. 9가지 방식을 수치와 함께</td><td><a href="coupon-issue/overview.html#results">수치</a> · <a href="interview.html#m-coupon-issue">질문</a></td></tr>
+          <tr><td>4</td><td><a href="seat-reservation/overview.html">seat-reservation</a></td><td>Redis + Kafka, 동기 vs 비동기 트레이드오프</td><td><a href="changes.html#m-seat-reservation">개선 내역</a> · <a href="interview.html#m-seat-reservation">질문</a></td></tr>
+          <tr><td>5</td><td><a href="spring-cache-redis/overview.html">캐시 3종</a></td><td>캐시 장애 패턴과 핫키 대응</td><td><a href="interview.html#tr-cache">질문</a></td></tr>
+          <tr><td>6</td><td><a href="java-sandbox/overview.html">java-sandbox</a></td><td>"측정으로 원인을 찾은 경험" 질문용</td><td><a href="java-sandbox/overview.html#results">수치</a></td></tr>
+        </tbody>
+      </table></div>
+    </section>
+
+    <section id="concepts">
+      <h2><span class="num">09</span>개념 색인</h2>
+      <p class="sub">개념 → 그 개념을 직접 다루는 모듈</p>
+      <div class="tablewrap"><table>
+        <thead><tr><th>개념</th><th>어디서</th></tr></thead>
+        <tbody>
+          <tr><td>Lost Update · 원자적 UPDATE</td><td><a href="coupon-issue/overview.html#cases">coupon-issue</a></td></tr>
+          <tr><td>비관적 락 · 낙관적 락(@Version)</td><td><a href="coupon-issue/overview.html#cases">coupon-issue</a> · <a href="spring-data-jpa/overview.html">spring-data-jpa</a> · <a href="payment-system/overview.html#cases">payment-system(지갑)</a></td></tr>
+          <tr><td>분산 락(SET NX, Lua, Redisson)</td><td><a href="coupon-issue/overview.html#cases">coupon-issue</a> · <a href="spring-cache-redis/overview.html#cases">spring-cache-redis(핫키)</a></td></tr>
+          <tr><td>Redis 원자 연산 · Lua</td><td><a href="coupon-issue/overview.html">coupon-issue</a> · <a href="seat-reservation/overview.html">seat-reservation</a></td></tr>
+          <tr><td>Kafka 비동기 확정 · at-least-once · 멱등 소비</td><td><a href="seat-reservation/overview.html">seat-reservation</a> · <a href="payment-system/overview.html">payment-system</a></td></tr>
+          <tr><td>캐시 패턴(Aside/Through/Around/Behind)</td><td><a href="cache-patterns/overview.html">cache-patterns</a></td></tr>
+          <tr><td>Stampede · Penetration · Avalanche</td><td><a href="cache-patterns/overview.html">cache-patterns</a> · <a href="spring-cache-redis/overview.html">spring-cache-redis</a></td></tr>
+          <tr><td>Spring Cache · 캐시 키 설계</td><td><a href="spring-cache-local/overview.html">spring-cache-local</a> · <a href="spring-cache-redis/overview.html">spring-cache-redis</a></td></tr>
+          <tr><td>부분 커밋 · 2PC(XA) · TCC</td><td><a href="distributed-transaction-msa/overview.html">msa</a> · <a href="distributed-transaction-2pc/overview.html">2pc</a> · <a href="distributed-transaction-tcc/overview.html">tcc</a></td></tr>
+          <tr><td>트랜잭셔널 아웃박스 · 최종 일관성</td><td><a href="payment-system/overview.html">payment-system</a></td></tr>
+          <tr><td>복식부기 · 불변 장부</td><td><a href="payment-system/overview.html">payment-system(ledger)</a></td></tr>
+          <tr><td>@Async · 프록시 · self-invocation · @Retryable</td><td><a href="spring/overview.html">spring</a></td></tr>
+          <tr><td>Testcontainers · @DynamicPropertySource · ArchUnit</td><td><a href="spring-test-infra/overview.html">spring-test-infra</a></td></tr>
+          <tr><td>Actuator · Micrometer(Counter/Gauge/Timer/Percentile)</td><td><a href="spring-boot-actuator/overview.html">spring-boot-actuator</a> · <a href="spring-data-jpa/overview.html">spring-data-jpa(쿼리 수 메트릭)</a></td></tr>
+          <tr><td>JMH · 프로파일러 · 락 경합(암달의 법칙)</td><td><a href="java-sandbox/overview.html">java-sandbox</a></td></tr>
+        </tbody>
+      </table></div>
+    </section>
+
+    <section id="repo">
+      <h2><span class="num">10</span>레포 공통</h2>
+      <p class="sub">빌드·테스트·CI</p>
+      <div class="grid c2">
+        <div class="card"><div class="label">실행</div><p>루트에서 <code>./gradlew test</code>(전체) 또는 <code>./gradlew :모듈명:test</code>. Testcontainers가 MySQL·Redis·Kafka를 직접 띄우므로 Docker가 필요합니다.</p></div>
+        <div class="card"><div class="label">CI</div><p>GitHub Actions(<code>.github/workflows/test.yml</code>)가 push·PR마다 JDK 21로 전체 테스트를 돌립니다.</p></div>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px"><a class="chip" style="text-decoration:none" href="../README.md">루트 README</a><a class="chip" style="text-decoration:none" href="README.md">labs README</a><a class="chip" style="text-decoration:none" href="https://github.com/HJC96/deep-dive/tree/claude/serene-ritchie-k1wm7j" target="_blank" rel="noopener">GitHub 브랜치</a></div>
+    </section>
+
+    <footer>각 모듈 overview.html에서 제목·요약·섹션 수를 자동으로 가져와 만든 페이지입니다.</footer>
+  </main>
+</div>
+<script>
+/* ===== 공통 스크립트 (모든 모듈 overview.html에서 동일하게 유지) ===== */
+(function(){
+  var root=document.documentElement;
+  try{var saved=localStorage.getItem('deepdive-theme');if(saved)root.setAttribute('data-theme',saved);}catch(e){}
+  var tt=document.querySelector('.theme-toggle');
+  if(tt)tt.addEventListener('click',function(){
+    var cur=root.getAttribute('data-theme');
+    if(!cur)cur=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';
+    var next=cur==='dark'?'light':'dark';root.setAttribute('data-theme',next);
+    try{localStorage.setItem('deepdive-theme',next);}catch(e){}
+  });
+  document.querySelectorAll('[data-flow]').forEach(function(flow){
+    var steps=flow.querySelectorAll('.step');var detail=flow.nextElementSibling;
+    function show(btn){
+      steps.forEach(function(s){s.setAttribute('aria-selected',s===btn?'true':'false');});
+      if(detail)detail.querySelectorAll(':scope>div').forEach(function(d){d.classList.toggle('on',d.id===btn.dataset.target);});
+    }
+    steps.forEach(function(s){s.addEventListener('click',function(){show(s);});});
+    if(steps[0])show(steps[0]);
+  });
+  document.querySelectorAll('[data-tabs]').forEach(function(box){
+    var btns=box.querySelectorAll(':scope>.tabs>button');
+    function show(btn){
+      btns.forEach(function(b){b.setAttribute('aria-selected',b===btn?'true':'false');});
+      box.querySelectorAll(':scope>.tabpanel').forEach(function(p){p.classList.toggle('on',p.id===btn.dataset.target);});
+    }
+    btns.forEach(function(b){b.addEventListener('click',function(){show(b);});});
+    if(btns[0])show(btns[0]);
+  });
+  document.querySelectorAll('[data-qa]').forEach(function(b){
+    b.addEventListener('click',function(){
+      var sec=b.closest('section');var open=b.dataset.qa==='open';
+      sec.querySelectorAll('details.qa').forEach(function(d){d.open=open;});
+    });
+  });
+  var links=document.querySelectorAll('nav.toc a[href^="#"]');
+  if('IntersectionObserver' in window){
+    var io=new IntersectionObserver(function(es){es.forEach(function(e){
+      if(e.isIntersecting){links.forEach(function(l){l.classList.toggle('active',l.getAttribute('href')==='#'+e.target.id);});}
+    });},{rootMargin:'-20% 0px -70% 0px'});
+    document.querySelectorAll('main section[id]').forEach(function(s){io.observe(s);});
+  }
+  function openHash(){
+    var id='';try{id=decodeURIComponent(location.hash.slice(1));}catch(e){}
+    if(!id)return;var el=document.getElementById(id);if(!el)return;
+    var d=el.tagName==='DETAILS'?el:el.closest('details');if(d)d.open=true;
+    var p=el.closest('.tabpanel');
+    if(p&&!p.classList.contains('on')){var b=p.parentElement.querySelector(':scope>.tabs>button[data-target="'+p.id+'"]');if(b)b.click();}
+    setTimeout(function(){el.scrollIntoView({block:'start'});},0);
+  }
+  window.addEventListener('hashchange',openHash);openHash();
+})();
+</script>
+</body>
+</html>

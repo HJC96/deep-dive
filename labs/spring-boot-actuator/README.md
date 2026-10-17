@@ -11,7 +11,6 @@ Spring Boot Actuator 운영 관찰 실험실.
 프로젝트 루트 기준.
 
 ```bash
-cd /Users/hanjichan/Desktop/git/deep-dive
 ./gradlew :spring-boot-actuator:run
 ```
 
@@ -90,6 +89,13 @@ management:
       application: actuator-lab
       environment: local
       region: kr
+
+info:
+  app:
+    name: spring-boot-actuator
+    version: 0.1.0-SNAPSHOT
+    description: Spring Boot Actuator learning lab
+  team: backend-lab
 ```
 
 설정 의미:
@@ -105,6 +111,7 @@ management:
 | `management.info.env.enabled=true` | `info.*` 설정 노출 | `/actuator/info`에 `app`, `team` 표시 |
 | `management.info.git.mode=simple` | git 정보 간단 노출 | branch, commit id/time |
 | `management.metrics.tags.*` | 공통 metric tag | 모든 metric의 `availableTags`에 공통 tag |
+| `info.app.*`, `info.team` | info에 그대로 실릴 값 | `/actuator/info`의 `app`, `team` |
 
 ## Response 읽기
 
@@ -715,8 +722,7 @@ sequenceDiagram
 
     Postman->>Controller: POST /notifications/email
     Controller->>Service: send("email", ...)
-    Service->>Registry: app.notification.sent 증가
-    Service->>Registry: channel=email counter 증가
+    Service->>Registry: app.notification.sent{channel=email} 증가
     Service-->>Postman: NotificationReceipt
     Postman->>Actuator: GET /actuator/metrics/app.notification.sent
     Actuator->>Registry: metric 조회
@@ -762,25 +768,25 @@ public class NotificationController {
 @Service
 public class NotificationService {
 
-    private final Counter notificationSentCounter;
+    private static final String SENT_METRIC = "app.notification.sent";
+
     private final Counter emailNotificationCounter;
     private final Counter smsNotificationCounter;
+    private final Counter otherNotificationCounter;
 
     public NotificationService(MeterRegistry meterRegistry) {
-        // tag 없는 counter: 전체 발송 성공 횟수를 볼 때 사용
-        this.notificationSentCounter = Counter.builder("app.notification.sent")
-                .description("성공적으로 발송된 알림 수")
-                .register(meterRegistry);
-        // 같은 metric 이름에 channel/region tag를 붙이면 필터링 가능한 시계열이 된다.
-        this.emailNotificationCounter = Counter.builder("app.notification.sent")
-                .description("성공적으로 발송된 알림 수")
-                .tag("channel", "email")
-                .tag("region", "kr")
-                .register(meterRegistry);
+        // 같은 metric 이름의 시계열은 모두 channel/region tag를 가진다. tag 없는 "전체" counter는 따로 두지 않는다.
+        this.emailNotificationCounter = sentCounter(meterRegistry, "email");
         // channel=sms만 보고 싶으면 /actuator/metrics/app.notification.sent?tag=channel:sms
-        this.smsNotificationCounter = Counter.builder("app.notification.sent")
+        this.smsNotificationCounter = sentCounter(meterRegistry, "sms");
+        // 요청 파라미터 channel 값을 그대로 tag로 쓰면 값 종류가 끝없이 늘 수 있어(cardinality) 나머지는 other로 묶는다.
+        this.otherNotificationCounter = sentCounter(meterRegistry, "other");
+    }
+
+    private static Counter sentCounter(MeterRegistry meterRegistry, String channel) {
+        return Counter.builder(SENT_METRIC)
                 .description("성공적으로 발송된 알림 수")
-                .tag("channel", "sms")
+                .tag("channel", channel)
                 .tag("region", "kr")
                 .register(meterRegistry);
     }
@@ -789,18 +795,20 @@ public class NotificationService {
     public NotificationReceipt send(String channel, String recipient, String message) {
         // @Counted는 메서드 호출 횟수를 AOP로 기록하고, 아래 Counter는 성공 처리 후 직접 증가시킨다.
         NotificationReceipt receipt = new NotificationReceipt(channel, recipient, message, "SENT");
-        notificationSentCounter.increment();
-
-        if ("email".equals(channel)) {
-            emailNotificationCounter.increment();
-        } else if ("sms".equals(channel)) {
-            smsNotificationCounter.increment();
-        }
-
+        counterFor(channel).increment();
         return receipt;
     }
 }
 ```
+
+**tag 없는 counter를 따로 두지 않는 이유.** `/actuator/metrics/{name}`을 tag 필터 없이 조회하면 actuator는 같은 이름의 시계열을 **모두 더한** 값을 보여 준다. 예전 코드처럼 tag 없는 "전체" counter와 channel별 counter를 함께 올리면 한 번 발송이 두 번 세진다. `CustomMetricsTest`로 확인한 값은 아래와 같다.
+
+| 구조 | 3건 발송 후 `app.notification.sent` (필터 없음) |
+| --- | ---: |
+| tag 없는 counter + channel별 counter (예전) | `6.0` |
+| channel별 counter만 (지금) | `3.0` |
+
+Prometheus 같은 백엔드에서도 같은 이름에 tag 키 구성이 다른 시계열이 섞이면 `sum()`이 이중으로 세거나 등록 자체가 거부된다. 전체가 필요하면 tag 없이 조회하거나 `sum`으로 합친다.
 
 `@Counted`가 동작하려면 Aspect Bean 필요.
 
@@ -819,7 +827,7 @@ public class MetricsAspectConfig {
 
 | 순서 | 요청 | API | 효과 |
 | --- | --- | --- | --- |
-| 1 | `Send Generic Notification` | `POST {{appUrl}}/notifications/send` | 전체 counter 증가 |
+| 1 | `Send Generic Notification` | `POST {{appUrl}}/notifications/send` | 기본 `channel=email`이라 email counter 증가 |
 | 2 | `Send Email Notification` | `POST {{appUrl}}/notifications/email` | `channel=email` counter 증가 |
 | 3 | `Send SMS Notification` | `POST {{appUrl}}/notifications/sms` | `channel=sms` counter 증가 |
 | 4 | `Notification Sent Counter` | `GET {{actuatorUrl}}/actuator/metrics/app.notification.sent` | 전체 count, tag 후보 |
@@ -850,11 +858,13 @@ Metric:
     { "statistic": "COUNT", "value": 3.0 }
   ],
   "availableTags": [
-    { "tag": "channel", "values": ["email", "sms"] },
+    { "tag": "channel", "values": ["email", "sms", "other"] },
     { "tag": "region", "values": ["kr"] }
   ]
 }
 ```
+
+1~3번 요청 직후 기준. `?tag=channel:email`은 `2.0`, `?tag=channel:sms`는 `1.0`. `other`는 생성자에서 미리 등록해 두어 0이어도 tag 후보에 보인다. 실제 응답에는 공통 tag(`application`, `environment`, `hostname`)도 함께 나온다.
 
 비교:
 
@@ -862,7 +872,7 @@ Metric:
 | --- | --- |
 | `Counter` | 성공한 경우만 직접 증가 |
 | `@Counted` | 메서드 호출 횟수 자동 기록 |
-| tag | 낮은 종류의 분류 기준 |
+| tag | 낮은 종류의 분류 기준. 입력값을 그대로 쓰지 않고 정해진 값(`email`/`sms`/`other`)으로 바꿔 붙인다 |
 
 ## 5. Common Tags
 
@@ -1215,7 +1225,7 @@ Postman 폴더: `8. Timer.Sample`
 - `DocumentValidationService`
 - `Timer.Sample sample = Timer.start(meterRegistry)`
 - `sample.stop(timer)`
-- `result=success|fail`
+- `result=success|fail|error`
 
 흐름:
 
@@ -1240,8 +1250,8 @@ sequenceDiagram
     Postman->>Controller: POST /documents/validate?valid=false
     Controller->>Service: validate(documentType, valid)
     Service->>Registry: Timer.Sample start
-    Service->>Service: 문서 검증
-    Service->>Registry: timer tag result=fail
+    Service->>Service: 문서 검증 (결과 false)
+    Service->>Registry: timer tag result=fail (예외였다면 error)
     Service->>Registry: sample.stop(timer)
     Service-->>Postman: DocumentValidationResult
     Postman->>Actuator: GET /actuator/metrics/app.document.validation.time?tag=result:fail
@@ -1275,13 +1285,15 @@ public class DocumentValidationService {
     public DocumentValidationResult validate(String documentType, boolean valid) {
         // Timer.Sample은 시작 시점과 기록 시점을 분리할 때 사용한다.
         Timer.Sample sample = Timer.start(meterRegistry);
-        String result = valid ? "success" : "fail";
+        // 검증이 끝나기 전에는 결과를 모른다. 도중에 예외가 나면 이 값이 그대로 tag가 된다.
+        String result = "error";
 
         try {
-            sleep(valid ? 350 : 600);
-            return new DocumentValidationResult(documentType, valid, result);
+            boolean passed = callExternalValidator(documentType, valid);
+            result = passed ? "success" : "fail";
+            return new DocumentValidationResult(documentType, passed, result);
         } finally {
-            // 결과를 알고 난 뒤 result tag를 정해서 같은 timer 이름에 success/fail을 분리한다.
+            // 결과를 알고 난 뒤 result tag를 정해서 같은 timer 이름에 success/fail/error를 분리한다.
             Timer timer = Timer.builder("app.document.validation.time")
                     .description("외부 문서 검증 작업 소요 시간")
                     .tag("result", result)
@@ -1289,8 +1301,19 @@ public class DocumentValidationService {
             sample.stop(timer);
         }
     }
+
+    private boolean callExternalValidator(String documentType, boolean valid) {
+        // 외부 검증 시스템 흉내. 문서 종류가 비어 있으면 예외 → result=error
+        if (documentType == null || documentType.isBlank()) {
+            throw new IllegalArgumentException("문서 종류가 비어 있어 검증할 수 없다.");
+        }
+        sleep(valid ? 350 : 600);
+        return valid;
+    }
 }
 ```
+
+`result`는 요청 파라미터가 아니라 **검증 호출이 실제로 돌려준 값**으로 정한다. 검증 전에 파라미터로 tag를 정하면, 검증 도중 예외가 나도 `success`나 `fail`로 기록된다. 초깃값을 `error`로 두고 정상 종료했을 때만 덮어써서, 예외로 끝난 호출도 시간과 함께 `result=error`로 남긴다. HTTP API의 `documentType`은 기본값이 있어 비울 수 없으므로, `error` 경로는 `CustomMetricsTest`가 서비스를 직접 불러 확인한다.
 
 요청 순서:
 
@@ -1330,10 +1353,12 @@ Metric:
 }
 ```
 
+예외가 한 번이라도 났다면 `result` 후보에 `error`도 보인다.
+
 쓰는 때:
 
 - 시작과 종료 위치가 다름
-- 결과를 본 뒤 tag 결정
+- 결과를 본 뒤 tag 결정 (예외면 `error`)
 - `try/finally`로 `stop()` 보장
 
 ## 9. @Timed
@@ -1544,10 +1569,10 @@ public class ContentSearchService {
 
 | 순서 | 요청 | API | 효과 |
 | --- | --- | --- | --- |
-| 1 | `Search Content - Actuator` | `GET {{appUrl}}/contents/search?keyword=actuator` | 검색 API 호출 |
-| 2 | `Search Content - Observability` | `GET {{appUrl}}/contents/search?keyword=observability` | 다른 지연 케이스 |
+| 1 | `Search Content - Actuator` | `GET {{appUrl}}/contents/search?keyword=actuator` | `actuator`는 8글자 → `8 % 3 = 2` → 900ms |
+| 2 | `Search Content - Observability` | `GET {{appUrl}}/contents/search?keyword=observability` | 13글자 → `13 % 3 = 1` → 450ms |
 | 3 | `Content Search Timer` | `GET {{actuatorUrl}}/actuator/metrics/app.content.search.time` | 일반 timer |
-| 4 | `Content Search Percentile` | `GET {{actuatorUrl}}/actuator/metrics/app.content.search.time.percentile` | percentile metric |
+| 4 | `Content Search Percentile` | `GET {{actuatorUrl}}/actuator/metrics/app.content.search.time.percentile` | `phi` tag 후보 확인용. VALUE는 해석하지 않는다 (아래) |
 | 5 | `Content Search Percentile - p95` | `GET ...?tag=phi:0.95` | p95만 |
 | 6 | `Content Search Percentile - p99` | `GET ...?tag=phi:0.99` | p99만 |
 
@@ -1566,20 +1591,28 @@ App API:
 }
 ```
 
-Metric:
+Metric (`?tag=phi:0.95`, 1~2번 요청 직후):
 
 ```json
 {
   "name": "app.content.search.time.percentile",
   "baseUnit": "seconds",
   "measurements": [
-    { "statistic": "VALUE", "value": 0.45 }
-  ],
-  "availableTags": [
-    { "tag": "phi", "values": ["0.5", "0.95", "0.99"] }
+    { "statistic": "VALUE", "value": 0.92274688 }
   ]
 }
 ```
+
+표본이 900ms·450ms 두 개라 p95와 p99는 900ms 쪽, p50은 450ms 쪽이다. 값은 히스토그램 버킷으로 계산한 근삿값이라 sleep 시간과 딱 맞지 않는다. `CustomMetricsTest`에서 실측한 값:
+
+| 조회 | VALUE (초) | 뜻 |
+| --- | ---: | --- |
+| `?tag=phi:0.5` | 약 `0.44` ~ `0.50` | 450ms 요청 |
+| `?tag=phi:0.95` | 약 `0.92` | 900ms 요청 |
+| `?tag=phi:0.99` | 약 `0.92` | 900ms 요청 |
+| 필터 없음 | 약 `2.35` | **세 값의 합.** 지연 시간이 아니다 |
+
+`phi` tag 없이 조회하면 actuator는 p50·p95·p99 gauge의 VALUE를 그냥 더해서 보여 준다. percentile은 반드시 `phi`로 하나씩 조회한다. 필터 없는 응답은 `availableTags`에서 `phi` 후보(`0.5`, `0.95`, `0.99`)를 확인하는 용도로만 쓴다.
 
 | 지표 | 의미 |
 | --- | --- |
@@ -1827,6 +1860,20 @@ Request body:
 | tag 필터 결과가 이상함 | 필터 없는 metric의 `availableTags` |
 | `COUNT`가 기대보다 큼 | 이전 실행에서 누적된 호출 포함 여부 |
 | `MAX`가 갑자기 낮음 | Micrometer time window 리셋 가능성 |
+
+## 테스트
+
+```bash
+./gradlew :spring-boot-actuator:test
+```
+
+앱 포트와 actuator 포트를 둘 다 랜덤으로 띄우고(`management.server.port=0`) HTTP로 확인한다. 같은 컨텍스트 안에서는 metric이 누적되므로 값은 호출 전후 차이로 검증한다.
+
+| 테스트 | 확인하는 것 |
+| --- | --- |
+| `ActuatorEndpointTest` | partnerSystem DOWN → `/actuator/health/partnerSystem`·`/actuator/health` 503, info의 `app`·`team`·`build`·`release`, `features` endpoint 쓰기/읽기/삭제 |
+| `CustomMetricsTest` | 3건 발송 → 필터 없는 COUNT `3`(email `2`, sms `1`), 정해지지 않은 channel은 `other`, Gauge `+2 → +1`, `Timer.record`·`@Timed` COUNT와 TOTAL_TIME, `Timer.Sample`의 `success`/`fail`/`error`, percentile은 `phi`별 값과 필터 없는 합 |
+| `ActuatorLabApplicationTest` | 컨텍스트 기동 |
 
 ## curl
 

@@ -560,11 +560,15 @@ Integer releaseLock(@Param("key") String key);
 // getLock/releaseLock을 같은 커넥션에 고정(@Transactional)
 @Transactional
 public void issue(Long couponId) {
+    String lockKey = couponId.toString();
+    Integer acquired = namedLockRepository.getLock(lockKey);   // 성공 1, 타임아웃 0, 에러 NULL
+    if (!Integer.valueOf(1).equals(acquired)) {
+        throw new IllegalStateException("네임드 락 획득에 실패했습니다. ...");   // 락 없이 차감하지 않음
+    }
     try {
-        namedLockRepository.getLock(couponId.toString());
         self.issueOnce(couponId);   // REQUIRES_NEW, 프록시 경유
     } finally {
-        namedLockRepository.releaseLock(couponId.toString());
+        namedLockRepository.releaseLock(lockKey);   // 잡은 락만 해제
     }
 }
 
@@ -587,12 +591,15 @@ public void issueOnce(Long couponId) {
 - `GET_LOCK`은 row가 아닌 **문자열 키**에 거는 락 → 같은 키를 노리는 다른 세션은 대기
 - 비관적 락과 달리 테이블·row와 무관 → 락 대상을 애플리케이션이 자유롭게 지정
 - 차감을 `REQUIRES_NEW`로 분리해 **락 풀기 전에 커밋** → 안 그러면 다음 스레드가 안 보이는 재고를 읽어 lost update
+- `GET_LOCK` 반환값을 확인 → `1`(획득)일 때만 차감, `0`(10초 타임아웃)·`NULL`(에러)이면 예외로 발급 실패
 
 한계:
 
 - 비관적 락처럼 전 구간 직렬화 → 처리량 저하
 - 락 대기 스레드도 커넥션 점유 → 동시 요청 몰리면 풀 고갈 위험
 - `GET_LOCK`은 MySQL 전용 → DB 종속
+- 대기가 10초를 넘으면 그 요청은 실패(`IllegalStateException`) → 호출부가 재시도할지 실패 응답할지 정해야 함
+- (수정함) 예전 코드는 `GET_LOCK` 반환값을 무시해서, 타임아웃(`0`)이나 에러(`NULL`)로 락을 못 잡아도 그대로 차감하고 남의 락까지 `RELEASE_LOCK`을 호출했다. 지금은 `1`이 아니면 차감 없이 실패하고, 잡은 락만 해제한다. (테스트: `NamedLockCouponIssueServiceUnitTest`)
 
 주의 (커넥션 2개 + `self` 호출):
 
@@ -667,22 +674,31 @@ Redis 락 획득 -> SELECT -> 메모리에서 -1 -> flush/commit 시 UPDATE -> R
 public void issue(Long couponId) {
     String lockKey = "coupon:issue:lock:" + couponId;
 
-    lock(lockKey);
+    String token = lock(lockKey);          // 요청마다 고유 UUID 토큰
     try {
         couponIssueService.issue(couponId);
     } finally {
-        redisTemplate.delete(lockKey);
+        unlock(lockKey, token);            // 내 토큰일 때만 삭제 (Lua)
     }
 }
 
-private void lock(String lockKey) {
+String lock(String lockKey) {
+    String token = UUID.randomUUID().toString();
     while (true) {
-        if (Boolean.TRUE.equals(redisTemplate.opsForValue().setIfAbsent(lockKey, "LOCK", Duration.ofSeconds(30)))) {
-            return;
+        if (Boolean.TRUE.equals(redisTemplate.opsForValue().setIfAbsent(lockKey, token, Duration.ofSeconds(30)))) {
+            return token;
         }
         Thread.sleep(10);
     }
 }
+
+// GET과 DEL 사이에 다른 명령이 끼지 않도록 Lua 한 번으로 비교 후 삭제
+private static final RedisScript<Long> UNLOCK_SCRIPT = RedisScript.of("""
+        if redis.call('GET', KEYS[1]) == ARGV[1] then
+            return redis.call('DEL', KEYS[1])
+        end
+        return 0
+        """, Long.class);
 ```
 
 결과:
@@ -697,11 +713,13 @@ private void lock(String lockKey) {
 - `key 있음`: 잠김
 - `key 없음`: 락 없음
 - 재고 차감은 기존 `CouponIssueService`가 담당
+- 락 값은 요청마다 다른 UUID 토큰 → 해제는 "값이 내 토큰일 때만 DEL"을 Lua로 원자 실행
 
 한계:
 
-- 락 TTL이 너무 짧으면 작업 중 락 만료 위험
+- 락 TTL이 너무 짧으면 작업 중 락 만료 위험 (만료 뒤엔 다른 요청이 같이 임계 구역에 들어올 수 있음 → 갱신이 필요하면 Redisson watchdog 같은 lease 연장)
 - 락 TTL이 너무 길면 장애 시 대기 시간 증가
+- (수정함) 예전 코드는 락 값이 고정 `"LOCK"`이고 해제를 그냥 `DEL`로 해서, 내 락이 TTL로 만료된 뒤 다른 요청이 잡은 락을 내 `finally`가 지워 버릴 수 있었다. 지금은 UUID 토큰 + Lua compare-and-delete로 자기 락만 해제한다. (테스트: `redis_분산락은_TTL_만료_후_다른_요청이_잡은_락을_지우지_않는다`)
 
 ```mermaid
 sequenceDiagram
@@ -736,7 +754,7 @@ sequenceDiagram
     StartLatch-->>B: 대기 해제
 
     A->>RedisService: issue(1L)
-    RedisService->>Redis: SET coupon:issue:lock:1 LOCK NX EX 30
+    RedisService->>Redis: SET coupon:issue:lock:1 (요청별 UUID) NX EX 30
     Redis-->>RedisService: OK
     RedisService->>CouponService: issue(1L)
     CouponService->>DB: SELECT quantity = 200
@@ -744,20 +762,20 @@ sequenceDiagram
     CouponService->>DB: UPDATE quantity = 199
 
     B->>RedisService: issue(1L)
-    RedisService->>Redis: SET coupon:issue:lock:1 LOCK NX EX 30
+    RedisService->>Redis: SET coupon:issue:lock:1 (요청별 UUID) NX EX 30
     Redis-->>RedisService: 실패
     Note over B,Redis: key가 있어서 락 획득 실패, 잠깐 대기 후 재시도
 
-    RedisService->>Redis: DEL coupon:issue:lock:1
+    RedisService->>Redis: EVAL 내 토큰이면 DEL coupon:issue:lock:1
     A->>DoneLatch: countDown()
 
-    RedisService->>Redis: SET coupon:issue:lock:1 LOCK NX EX 30
+    RedisService->>Redis: SET coupon:issue:lock:1 (요청별 UUID) NX EX 30
     Redis-->>RedisService: OK
     RedisService->>CouponService: issue(1L)
     CouponService->>DB: SELECT quantity = 199
     CouponService->>CouponService: 199 - 1 = 198
     CouponService->>DB: UPDATE quantity = 198
-    RedisService->>Redis: DEL coupon:issue:lock:1
+    RedisService->>Redis: EVAL 내 토큰이면 DEL coupon:issue:lock:1
     B->>DoneLatch: countDown()
 
     Test->>DoneLatch: await()

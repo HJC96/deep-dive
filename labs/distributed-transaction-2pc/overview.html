@@ -1,0 +1,371 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>distributed-transaction-2pc 한눈에</title>
+<style>
+/* ===== 공통 스타일 (모든 모듈 overview.html에서 동일하게 유지) ===== */
+:root{
+  --bg:#f7f7f5;--surface:#ffffff;--surface-2:#f0efeb;--border:#e2e0da;
+  --text:#1d1d1b;--muted:#6b6a65;--accent:#2f5bd3;--accent-soft:#e6ecfb;
+  --good:#1f8a4c;--good-soft:#e3f4ea;--bad:#c2410c;--bad-soft:#fcebe1;
+  --warn:#a16207;--warn-soft:#fbf3dc;--code-bg:#f3f2ee;
+  --shadow:0 1px 2px rgba(0,0,0,.04),0 4px 16px rgba(0,0,0,.04);
+  --radius:12px;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --sans:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Pretendard","Noto Sans KR","Segoe UI",sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#141413;--surface:#1c1c1a;--surface-2:#252522;--border:#33322e;
+    --text:#ecebe6;--muted:#a09e96;--accent:#7c9cff;--accent-soft:#1f2a47;
+    --good:#4ccf85;--good-soft:#16301f;--bad:#ff8a5c;--bad-soft:#3a1f14;
+    --warn:#e8b84a;--warn-soft:#3a2f12;--code-bg:#22221f;
+    --shadow:none;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#141413;--surface:#1c1c1a;--surface-2:#252522;--border:#33322e;
+  --text:#ecebe6;--muted:#a09e96;--accent:#7c9cff;--accent-soft:#1f2a47;
+  --good:#4ccf85;--good-soft:#16301f;--bad:#ff8a5c;--bad-soft:#3a1f14;
+  --warn:#e8b84a;--warn-soft:#3a2f12;--code-bg:#22221f;
+  --shadow:none;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);line-height:1.65;font-size:15.5px;-webkit-font-smoothing:antialiased}
+a{color:var(--accent)}
+code,.mono{font-family:var(--mono);font-size:.86em;background:var(--code-bg);padding:.1em .35em;border-radius:5px;word-break:break-all}
+pre{background:var(--code-bg);padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.55;margin:10px 0}
+pre code{background:none;padding:0;font-size:inherit;word-break:normal}
+.layout{display:grid;grid-template-columns:220px minmax(0,1fr);gap:40px;max-width:1180px;margin:0 auto;padding:32px 24px 80px}
+@media (max-width:860px){.layout{grid-template-columns:minmax(0,1fr);gap:0;padding:20px 16px 60px}}
+nav.toc{position:sticky;top:24px;align-self:start;font-size:14px}
+nav.toc .home{display:inline-block;margin-bottom:14px;color:var(--muted);text-decoration:none;font-size:13px}
+nav.toc ol{list-style:none;padding:0;margin:0;border-left:2px solid var(--border)}
+nav.toc li a{display:block;padding:5px 0 5px 14px;margin-left:-2px;border-left:2px solid transparent;color:var(--muted);text-decoration:none}
+nav.toc li a.active,nav.toc li a:hover{color:var(--text);border-left-color:var(--accent)}
+@media (max-width:860px){
+  nav.toc{position:static;margin-bottom:18px}
+  nav.toc ol{display:flex;flex-wrap:wrap;gap:6px;border:0}
+  nav.toc li a{padding:4px 10px;margin:0;border:1px solid var(--border);border-radius:999px;font-size:13px}
+  nav.toc li a.active{border-color:var(--accent)}
+}
+header.hero{margin-bottom:28px}
+.eyebrow{font-size:12.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
+h1{font-size:30px;line-height:1.25;margin:6px 0 10px;letter-spacing:-.01em}
+.lead{font-size:17px;color:var(--text);margin:0 0 14px;max-width:62ch}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font-size:12.5px;padding:3px 10px;border-radius:999px;background:var(--surface-2);border:1px solid var(--border);color:var(--muted)}
+section{margin:44px 0 0;scroll-margin-top:20px}
+h2{font-size:21px;margin:0 0 6px;letter-spacing:-.01em}
+h2 .num{color:var(--accent);margin-right:8px;font-variant-numeric:tabular-nums}
+.sub{color:var(--muted);margin:0 0 16px;font-size:14.5px}
+h3{font-size:16.5px;margin:18px 0 6px}
+.card{overflow-wrap:anywhere;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow)}
+.grid{display:grid;gap:12px}
+.grid.c2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.grid.c3{grid-template-columns:repeat(3,minmax(0,1fr))}
+@media (max-width:700px){.grid.c2,.grid.c3{grid-template-columns:minmax(0,1fr)}}
+.tldr .label{font-size:12px;font-weight:700;letter-spacing:.05em;color:var(--muted);text-transform:uppercase;margin-bottom:4px}
+.tldr .card{border-top:3px solid var(--accent)}
+.tldr .card.good{border-top-color:var(--good)}
+.tldr .card.bad{border-top-color:var(--bad)}
+.tldr p{margin:0}
+/* 흐름 다이어그램: 단계 클릭 시 상세 표시 */
+.flow{display:flex;flex-wrap:wrap;align-items:stretch;gap:0;margin:6px 0 10px}
+.flow .step{flex:1 1 140px;min-width:120px;text-align:left;font:inherit;color:inherit;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 12px;cursor:pointer;position:relative;transition:border-color .15s,background .15s}
+.flow .step:hover{border-color:var(--accent)}
+.flow .step[aria-selected="true"]{border-color:var(--accent);background:var(--accent-soft)}
+.flow .step .k{display:block;font-size:11.5px;color:var(--muted);font-weight:600}
+.flow .step .t{display:block;font-weight:600;font-size:14px;line-height:1.35}
+.flow .step.fail{border-style:dashed;border-color:var(--bad)}
+.flow .step.fail[aria-selected="true"]{background:var(--bad-soft)}
+.flow .arrow{display:flex;align-items:center;padding:0 6px;color:var(--muted);font-size:18px}
+@media (max-width:700px){.flow{flex-direction:column}.flow .step{flex:none}.flow .arrow{justify-content:center;padding:2px 0;transform:rotate(90deg)}}
+.flow-detail{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:10px;padding:14px 18px;min-height:64px}
+.flow-detail>div{display:none}
+.flow-detail>div.on{display:block}
+.flow-detail p:first-child{margin-top:0}.flow-detail p:last-child{margin-bottom:0}
+/* 탭 */
+.tabs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.tabs button{font:inherit;font-size:13.5px;padding:6px 12px;border-radius:999px;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{background:var(--text);color:var(--bg);border-color:var(--text)}
+.tabpanel{display:none}.tabpanel.on{display:block}
+.kv{display:grid;grid-template-columns:110px minmax(0,1fr);gap:6px 14px;margin:10px 0 0;font-size:14.5px}
+.kv dt{color:var(--muted);font-weight:600}
+.kv dd{margin:0}
+@media (max-width:520px){.kv{grid-template-columns:1fr}.kv dt{margin-top:6px}}
+/* 표 */
+.tablewrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:top}
+th{background:var(--surface-2);font-weight:600;font-size:13px;color:var(--muted);white-space:nowrap}
+tr:last-child td{border-bottom:0}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+.hl{background:var(--accent-soft)}
+/* 막대 그래프 (값은 --v: 0~1 비율) */
+.bars{display:grid;gap:8px}
+.bar{display:grid;grid-template-columns:150px minmax(0,1fr) 92px;align-items:center;gap:10px;font-size:13.5px}
+.bar .track{height:20px;background:var(--surface-2);border-radius:6px;overflow:hidden}
+.bar .fill{height:100%;width:calc(var(--v) * 100%);background:var(--accent);border-radius:6px;min-width:2px;transition:width .6s ease}
+.bar.good .fill{background:var(--good)}.bar.bad .fill{background:var(--bad)}.bar.warn .fill{background:var(--warn)}
+.bar .val{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--mono);font-size:12.5px}
+@media (max-width:520px){.bar{grid-template-columns:100px minmax(0,1fr) 72px}}
+.source{font-size:12.5px;color:var(--muted);margin-top:10px}
+/* 배지·콜아웃 */
+.badge{display:inline-block;font-size:11.5px;font-weight:700;padding:1px 8px;border-radius:999px;vertical-align:middle}
+.badge.good{background:var(--good-soft);color:var(--good)}
+.badge.bad{background:var(--bad-soft);color:var(--bad)}
+.badge.warn{background:var(--warn-soft);color:var(--warn)}
+.badge.info{background:var(--accent-soft);color:var(--accent)}
+.callout{border-radius:10px;padding:12px 16px;margin:12px 0;font-size:14.5px;border:1px solid var(--border);background:var(--surface)}
+.callout.warn{background:var(--warn-soft);border-color:transparent}
+.callout.bad{background:var(--bad-soft);border-color:transparent}
+.callout.good{background:var(--good-soft);border-color:transparent}
+.callout strong:first-child{margin-right:4px}
+/* 아코디언 (면접 Q&A, 약점) */
+details.qa{background:var(--surface);border:1px solid var(--border);border-radius:10px;margin:8px 0;overflow:hidden}
+details.qa summary{cursor:pointer;padding:12px 16px;font-weight:600;list-style:none;display:flex;gap:10px;align-items:flex-start}
+details.qa summary::-webkit-details-marker{display:none}
+details.qa summary::before{content:"Q";flex:none;width:22px;height:22px;border-radius:6px;background:var(--accent-soft);color:var(--accent);font-size:12px;display:grid;place-items:center;margin-top:1px}
+details.qa.risk summary::before{content:"!";background:var(--bad-soft);color:var(--bad)}
+details.qa[open] summary{border-bottom:1px solid var(--border)}
+details.qa .a{padding:12px 16px 14px 48px;font-size:14.5px}
+details.qa .a p{margin:0 0 8px}details.qa .a ul{margin:0;padding-left:18px}
+.qa-tools{display:flex;gap:8px;margin-bottom:8px}
+.qa-tools button,.theme-toggle{font:inherit;font-size:13px;padding:5px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer}
+.theme-toggle{position:fixed;right:16px;bottom:16px;z-index:5;box-shadow:var(--shadow)}
+/* 파일 지도 */
+ul.files{list-style:none;padding:0;margin:0;display:grid;gap:6px}
+ul.files li{display:grid;grid-template-columns:minmax(0,1fr);gap:2px;padding:9px 12px;background:var(--surface);border:1px solid var(--border);border-radius:9px}
+ul.files li code{background:none;padding:0;font-size:12.5px}
+ul.files li span{color:var(--muted);font-size:13.5px}
+footer{margin-top:56px;padding-top:18px;border-top:1px solid var(--border);color:var(--muted);font-size:13px}
+ul.plain{margin:6px 0;padding-left:20px}ul.plain li{margin:3px 0}
+</style>
+</head>
+<body>
+<button class="theme-toggle" type="button" aria-label="테마 전환">◐ 테마</button>
+<div class="layout">
+  <nav class="toc" aria-label="목차">
+    <a class="home" href="../index.html">← 전체 모듈</a>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin:0 0 14px"><a class="chip" style="text-decoration:none" href="../changes.html#m-distributed-transaction-2pc">개선 내역</a><a class="chip" style="text-decoration:none" href="../interview.html#m-distributed-transaction-2pc">질문 모음</a></div>
+    <ol>
+      <li><a href="#tldr">한눈에</a></li>
+      <li><a href="#flow">흐름</a></li>
+      <li><a href="#cases">비교·핵심 구현</a></li>
+      <li><a href="#results">결과·수치</a></li>
+      <li><a href="#limits">한계·약점</a></li>
+      <li><a href="#interview">면접 Q&amp;A</a></li>
+      <li><a href="#files">파일 지도</a></li>
+    </ol>
+  </nav>
+  <main>
+    <header class="hero">
+      <div class="eyebrow">deep-dive · labs/distributed-transaction-2pc</div>
+      <h1>2PC — 묻고 나서 정한다, 대신 락을 쥐고 기다린다</h1>
+      <p class="lead">MSA의 부분 커밋을 <b>2단계 커밋</b>으로 막는다. MySQL의 <code>XA</code> SQL 문을 서로 다른 MySQL 서버 두 대에 직접 실행해 prepare(투표) → commit/rollback(결정)을 눈으로 확인한다. 부분 커밋은 사라지지만, prepare한 참여자가 결정을 기다리며 쥔 락이 다른 요청을 막는 비용을 테스트로 보여 준다.</p>
+      <div class="chips"><span class="chip">Java 21</span><span class="chip">테스트 전용 모듈 (main 없음)</span><span class="chip">MySQL 8.0.36 × 2</span><span class="chip">Testcontainers</span><span class="chip">XA SQL 직접 실행</span><span class="chip">JDBC</span></div>
+    </header>
+    <section id="tldr" class="tldr">
+      <h2><span class="num">01</span>한눈에</h2>
+      <p class="sub">30초 요약 — 왜 2PC인가</p>
+<div class="label" style="margin:4px 0 6px">시리즈에서의 위치 — 4단계가 같은 실패 시나리오를 다룹니다</div>
+<nav class="flow" aria-label="분산 트랜잭션 4단계">
+<a class="step" href="../distributed-transaction-monolith/overview.html" aria-selected="false" style="text-decoration:none"><span class="k">STEP 1 · 기준선</span><span class="t">Monolith</span><span class="k" style="font-weight:400">DB 1개 · @Transactional 1개</span></a>
+<span class="arrow">→</span>
+<a class="step fail" href="../distributed-transaction-msa/overview.html" aria-selected="false" style="text-decoration:none"><span class="k">STEP 2 · 문제</span><span class="t">MSA</span><span class="k" style="font-weight:400">서비스 3개 · 부분 커밋</span></a>
+<span class="arrow">→</span>
+<a class="step" href="overview.html" aria-selected="true" aria-current="page" style="text-decoration:none"><span class="k">STEP 3 · 해법 A · 지금 여기</span><span class="t">2PC (XA)</span><span class="k" style="font-weight:400">prepare 후 결정 · 락 대기</span></a>
+<span class="arrow">→</span>
+<a class="step" href="../distributed-transaction-tcc/overview.html" aria-selected="false" style="text-decoration:none"><span class="k">STEP 4 · 해법 B</span><span class="t">TCC</span><span class="k" style="font-weight:400">Try 커밋 · Cancel 보상</span></a>
+</nav>
+<div class="grid c3" style="margin-top:14px"><div class="card bad"><div class="label">문제</div><p>MSA에서는 좌석이 먼저 <b>커밋</b>돼 버려서 지갑이 실패해도 되돌릴 수 없었다(부분 커밋).</p></div><div class="card"><div class="label">접근</div><p>"커밋하기 전에 전원에게 커밋할 수 있는지 묻는다." MySQL <b>XA SQL 문</b>(<code>XA START/END/PREPARE/COMMIT/ROLLBACK</code>)을 <b>서로 다른 MySQL 컨테이너 2대</b>에 직접 실행. 코디네이터는 테스트 메서드의 제어 흐름이다(JTA·코디네이터 클래스 없음).</p></div><div class="card good"><div class="label">결론</div><p>부분 커밋이 사라진다(좌석 0). 대가: prepare한 참여자는 결정이 올 때까지 <b>락을 쥐고 기다린다</b>. 코디네이터가 죽으면 같은 행 UPDATE·같은 키 INSERT가 <code>Lock wait timeout</code>으로 막히고, 결정을 아는 쪽이 <code>XA COMMIT/ROLLBACK</code>해야 풀린다.</p></div></div>
+<div class="callout warn"><strong>공통 실패 시나리오</strong> 정원 10석 워크숍에서 좌석 2석 × 30,000 = <b>60,000</b> 크레딧이 필요한데 지갑 잔액은 <b>50,000</b>. 좌석은 잡히지만 지갑이 실패한다. <b>이미 잡힌 좌석이 되돌아가는가?</b> 네 모듈이 모두 이 질문에 답한다.</div>
+    </section>
+
+    <section id="flow">
+      <h2><span class="num">02</span>흐름</h2>
+      <p class="sub">단계를 클릭하면 상세 설명이 나옵니다. 아래는 실패 시 시퀀스.</p>
+<div class="flow" data-flow>
+<button class="step" data-target="xa-f1"><span class="k">1단계 · 좌석</span><span class="t">XA START … XA END</span></button>
+<span class="arrow">→</span>
+<button class="step" data-target="xa-f2"><span class="k">1단계 · 좌석</span><span class="t">XA PREPARE = YES</span></button>
+<span class="arrow">→</span>
+<button class="step" data-target="xa-f3"><span class="k">1단계 · 지갑</span><span class="t">UPDATE 0건 → NO</span></button>
+<span class="arrow">→</span>
+<button class="step" data-target="xa-f4"><span class="k">2단계</span><span class="t">결정: XA ROLLBACK</span></button>
+<span class="arrow">→</span>
+<button class="step fail" data-target="xa-f5"><span class="k">대가</span><span class="t">코디네이터가 죽으면</span></button>
+</div>
+<div class="flow-detail">
+<div id="xa-f1"><p>코디네이터(테스트 메서드)가 <code>seat_db</code> 커넥션에서 <code>XA START 'reservation-1','seat'</code> → <code>UPDATE workshop_seat … WHERE id = 100 AND reserved_count + 2 &lt;= total_seats</code> → 이력 INSERT → <code>XA END</code>.</p><p><code>XA END</code> 뒤에도 <b>락은 풀리지 않는다</b>.</p></div>
+<div id="xa-f2"><p><code>XA PREPARE</code> 성공 = "무슨 일이 있어도 커밋할 수 있다"는 약속(YES 투표). 디스크에 기록하고, 약속을 지키려고 <b>행 락을 계속 쥔다</b>. 아직 커밋은 아니다 → 다른 세션은 옛 값을 본다.</p></div>
+<div id="xa-f3"><p><code>UPDATE wallet SET balance = balance - 60000 WHERE user_id = 1 AND balance &gt;= 60000</code> → 잔액 50,000이라 <b>0건</b>. <code>XA END</code> 후 prepare하지 않고 그 자리에서 <code>XA ROLLBACK</code>, NO 반환.</p><p>지갑은 prepare 전이라 결정을 기다릴 필요가 없다. 기다리는 쪽은 YES를 던진 좌석뿐(README).</p></div>
+<div id="xa-f4"><p>한 명이라도 NO → 전원 롤백. 코디네이터가 좌석에 <code>XA ROLLBACK 'reservation-1','seat'</code>. 결과: reserved_count <b>0</b>, 이력 0건, balance 50,000. 전원 YES였다면 둘 다 <code>XA COMMIT</code>(reserved 2, balance 40,000).</p></div>
+<div id="xa-f5"><p>좌석이 prepare한 직후 코디네이터가 죽고 커넥션이 끊겨도 prepared 트랜잭션은 남는다(<code>XA RECOVER</code> 1건).</p><p>그동안 다른 커넥션의 같은 행 UPDATE는 <code>innodb_lock_wait_timeout = 3</code> 후 <code>Lock wait timeout</code>. 새 커넥션이 <code>XA COMMIT</code>해야 풀린다.</p></div>
+</div>
+<h3>시퀀스 — 잔액 50,000 실패 시 (좌석은 락을 쥔 채 결정을 기다린다)</h3>
+<div class="tablewrap" style="padding:10px 8px;margin:10px 0"><svg viewBox="0 0 800 384" role="img" aria-label="2PC: 지갑이 NO를 내면 prepare한 좌석도 XA ROLLBACK되는 시퀀스" style="display:block;width:100%;min-width:560px;height:auto;font-family:var(--sans)"><rect x="65.0" y="8.0" width="110.0" height="46.0" rx="8" style="fill:var(--surface-2);stroke:var(--border);stroke-width:1.2"/><text x="120.0" y="27.0" text-anchor="middle" style="fill:var(--text);font-size:13px;font-weight:700">코디네이터</text><text x="120.0" y="44.0" text-anchor="middle" style="fill:var(--muted);font-size:11px">테스트 메서드</text><line x1="120" y1="54" x2="120" y2="378" style="stroke:var(--border);stroke-width:1.4;stroke-dasharray:4 4"/><rect x="345.0" y="8.0" width="110.0" height="46.0" rx="8" style="fill:var(--surface-2);stroke:var(--border);stroke-width:1.2"/><text x="400.0" y="27.0" text-anchor="middle" style="fill:var(--text);font-size:13px;font-weight:700">seat_db</text><text x="400.0" y="44.0" text-anchor="middle" style="fill:var(--muted);font-size:11px">MySQL #1</text><line x1="400" y1="54" x2="400" y2="378" style="stroke:var(--border);stroke-width:1.4;stroke-dasharray:4 4"/><rect x="625.0" y="8.0" width="110.0" height="46.0" rx="8" style="fill:var(--surface-2);stroke:var(--border);stroke-width:1.2"/><text x="680.0" y="27.0" text-anchor="middle" style="fill:var(--text);font-size:13px;font-weight:700">wallet_db</text><text x="680.0" y="44.0" text-anchor="middle" style="fill:var(--muted);font-size:11px">MySQL #2</text><line x1="680" y1="54" x2="680" y2="378" style="stroke:var(--border);stroke-width:1.4;stroke-dasharray:4 4"/><rect x="394.0" y="112.0" width="12" height="220.0" rx="3" style="fill:var(--warn-soft);stroke:var(--warn);stroke-width:1"/><text x="410.0" y="124.0" text-anchor="start" style="fill:var(--warn);font-size:11px;font-weight:700">락</text><line x1="6" y1="86.0" x2="794" y2="86.0" style="stroke:var(--border);stroke-width:1;stroke-dasharray:2 4"/><rect x="8" y="78.0" width="79.7" height="16" rx="3" style="fill:var(--surface)"/><text x="14.0" y="90.0" text-anchor="start" style="fill:var(--muted);font-size:11.5px;font-weight:700">1단계 — 투표</text><line x1="125.0" y1="120.0" x2="385.0" y2="120.0" style="stroke:var(--text);stroke-width:1.5"/><polygon points="394.0,120.0 385.0,124.5 385.0,115.5" style="fill:var(--text)"/><rect x="145.2" y="101.0" width="229.6" height="16" rx="3" style="fill:var(--surface)"/><text x="260.0" y="114.0" text-anchor="middle" style="fill:var(--text);font-size:12px">XA START · UPDATE · INSERT · XA END</text><line x1="125.0" y1="150.0" x2="385.0" y2="150.0" style="stroke:var(--text);stroke-width:1.5"/><polygon points="394.0,150.0 385.0,154.5 385.0,145.5" style="fill:var(--text)"/><rect x="221.7" y="131.0" width="76.6" height="16" rx="3" style="fill:var(--surface)"/><text x="260.0" y="144.0" text-anchor="middle" style="fill:var(--text);font-size:12px">XA PREPARE</text><line x1="395.0" y1="180.0" x2="135.0" y2="180.0" style="stroke:var(--good);stroke-width:1.5;stroke-dasharray:5 4"/><polygon points="126.0,180.0 135.0,175.5 135.0,184.5" style="fill:var(--good)"/><rect x="187.6" y="161.0" width="144.9" height="16" rx="3" style="fill:var(--surface)"/><text x="260.0" y="174.0" text-anchor="middle" style="fill:var(--good);font-size:12px">YES (커밋 안 됨, 락 유지)</text><line x1="125.0" y1="210.0" x2="665.0" y2="210.0" style="stroke:var(--text);stroke-width:1.5"/><polygon points="674.0,210.0 665.0,214.5 665.0,205.5" style="fill:var(--text)"/><rect x="233.3" y="191.0" width="333.4" height="16" rx="3" style="fill:var(--surface)"/><text x="400.0" y="204.0" text-anchor="middle" style="fill:var(--text);font-size:12px">XA START · UPDATE … balance &gt;= 60000 → 0건 · XA END</text><line x1="125.0" y1="240.0" x2="665.0" y2="240.0" style="stroke:var(--text);stroke-width:1.5"/><polygon points="674.0,240.0 665.0,244.5 665.0,235.5" style="fill:var(--text)"/><rect x="312.2" y="221.0" width="175.6" height="16" rx="3" style="fill:var(--surface)"/><text x="400.0" y="234.0" text-anchor="middle" style="fill:var(--text);font-size:12px">XA ROLLBACK (prepare 안 함)</text><line x1="675.0" y1="270.0" x2="135.0" y2="270.0" style="stroke:var(--bad);stroke-width:1.5;stroke-dasharray:5 4"/><polygon points="126.0,270.0 135.0,265.5 135.0,274.5" style="fill:var(--bad)"/><rect x="352.7" y="251.0" width="94.6" height="16" rx="3" style="fill:var(--surface)"/><text x="400.0" y="264.0" text-anchor="middle" style="fill:var(--bad);font-size:12px">NO — 잔액 부족</text><line x1="6" y1="294.0" x2="794" y2="294.0" style="stroke:var(--border);stroke-width:1;stroke-dasharray:2 4"/><rect x="8" y="286.0" width="82.6" height="16" rx="3" style="fill:var(--surface)"/><text x="14.0" y="298.0" text-anchor="start" style="fill:var(--muted);font-size:11.5px;font-weight:700">2단계 — 결정</text><line x1="125.0" y1="328.0" x2="385.0" y2="328.0" style="stroke:var(--text);stroke-width:1.5"/><polygon points="394.0,328.0 385.0,332.5 385.0,323.5" style="fill:var(--text)"/><rect x="218.2" y="309.0" width="83.6" height="16" rx="3" style="fill:var(--surface)"/><text x="260.0" y="322.0" text-anchor="middle" style="fill:var(--text);font-size:12px">XA ROLLBACK</text><rect x="304.3" y="341.0" width="191.4" height="24.0" rx="6" style="fill:var(--good-soft);stroke:transparent;stroke-width:1.2"/><text x="400.0" y="357.5" text-anchor="middle" style="fill:var(--good);font-size:12px">reserved_count 0 · 이력 0건</text></svg></div><div class="source">README "지갑이 못 내면" 시퀀스 + <code>TwoPhaseCommitTest.지갑이_못_내면_prepare한_좌석도_롤백된다</code>. 주황 막대 = 좌석 행 락이 걸려 있는 구간.</div>
+    </section>
+
+    <section id="cases">
+      <h2><span class="num">03</span>비교·핵심 구현</h2>
+      <p class="sub">탭을 눌러 봅니다. SQL·코드는 README와 테스트에서 발췌.</p>
+<div data-tabs>
+<div class="tabs" role="tablist">
+<button role="tab" data-target="xa-t1">XA 문법</button>
+<button role="tab" data-target="xa-t2">투표 코드</button>
+<button role="tab" data-target="xa-t3">코디네이터 죽음</button>
+<button role="tab" data-target="xa-t4">락 범위</button>
+<button role="tab" data-target="xa-t5">JTA·설계 선택</button>
+</div>
+<div class="tabpanel card" id="xa-t1"><h3>XA 문법 — 두 단계 <span class="badge info">프로토콜</span></h3><pre><code>-- 1단계: 각 참여자가 자기 작업을 하고 prepare까지 간다 (투표)
+XA START 'reservation-1','seat';
+UPDATE workshop_seat SET reserved_count = reserved_count + 2 WHERE id = 100;
+XA END 'reservation-1','seat';
+XA PREPARE 'reservation-1','seat';
+
+-- 2단계: 코디네이터가 답을 모아 결정한다
+XA COMMIT 'reservation-1','seat';     -- 전원 YES
+XA ROLLBACK 'reservation-1','seat';   -- 한 명이라도 NO</code></pre><div class="tablewrap"><table><thead><tr><th>단계</th><th>SQL</th><th>뜻</th></tr></thead><tbody><tr><td>1</td><td><code>XA START</code></td><td>이 브랜치의 작업 시작</td></tr><tr><td>1</td><td><code>XA END</code></td><td>작업 끝. 락은 아직 안 풀린다</td></tr><tr><td>1</td><td><code>XA PREPARE</code></td><td>"무슨 일이 있어도 커밋할 수 있다"는 약속 = YES 투표</td></tr><tr><td>2</td><td><code>XA COMMIT</code> / <code>XA ROLLBACK</code></td><td>코디네이터의 결정 적용</td></tr></tbody></table></div><dl class="kv"><dt>XID</dt><dd><code>'reservation-1','seat'</code> = 글로벌 트랜잭션 ID(<code>gtrid</code>) + 참여자 브랜치(<code>bqual</code>). 예약 하나 = 글로벌 트랜잭션 하나, 좌석·지갑 = 브랜치 둘.</dd><dt>왜 DB 2대</dt><dd>한 서버 안에서 스키마만 나누면 커밋이 원래 하나로 묶여 2PC가 풀 문제가 없다. 그래서 <b>MySQL 컨테이너 2대</b>(README).</dd><dt>코드</dt><dd><code>src/test/java/dev/deepdive/transaction/twopc/TwoDatabases.java</code> (<code>SEAT_XID</code>, <code>WALLET_XID</code>)</dd></dl></div>
+<div class="tabpanel card" id="xa-t2"><h3>참여자 브랜치 — 투표 로직 <span class="badge good">YES/NO</span></h3><pre><code>private boolean reserveSeatsAndPrepare(Connection seat) throws SQLException {
+    execute(seat, "XA START " + SEAT_XID);
+    int updated = executeUpdate(seat, """
+            UPDATE workshop_seat
+               SET reserved_count = reserved_count + %d
+             WHERE id = %d AND reserved_count + %d &lt;= total_seats"""
+            .formatted(SEAT_COUNT, WORKSHOP_ID, SEAT_COUNT));
+    if (updated == 1) {
+        execute(seat, "INSERT INTO seat_reservation_history VALUES (%d, %d, %d, %d)"
+                .formatted(REQUEST_ID, WORKSHOP_ID, SEAT_COUNT, AMOUNT));
+    }
+    execute(seat, "XA END " + SEAT_XID);
+
+    if (updated != 1) {
+        execute(seat, "XA ROLLBACK " + SEAT_XID);
+        return false;
+    }
+    execute(seat, "XA PREPARE " + SEAT_XID);
+    return true;
+}</code></pre><dl class="kv"><dt>어떻게</dt><dd>검사를 UPDATE의 WHERE에 넣어 "영향 행 수 1 = 가능"으로 판단. 지갑(<code>debitAndPrepare</code>)도 같은 모양: <code>WHERE balance &gt;= 60000</code>.</dd><dt>결정</dt><dd><code>양쪽_참여자_투표_찬성_모두_커밋한다</code>: 둘 다 <code>XA COMMIT</code>. <code>지갑이_못_내면_…</code>: 좌석만 <code>XA ROLLBACK</code>.</dd><dt>코드</dt><dd><code>src/test/java/dev/deepdive/transaction/twopc/TwoPhaseCommitTest.java</code></dd></dl></div>
+<div class="tabpanel card" id="xa-t3"><h3>코디네이터가 죽으면 <span class="badge bad">블로킹</span></h3><p>투표를 받고도 결정을 못 들으면 참여자는 혼자 커밋도 롤백도 판단할 수 없다. 커밋하자니 다른 참여자가 NO였을 수 있고, 롤백하자니 이미 YES를 약속했다.</p><div class="tablewrap" style="padding:10px 8px;margin:10px 0"><svg viewBox="0 0 770 360" role="img" aria-label="2PC: prepare 직후 코디네이터가 죽으면 다른 커넥션이 막히고, 새 커넥션의 XA COMMIT으로 풀리는 시퀀스" style="display:block;width:100%;min-width:560px;height:auto;font-family:var(--sans)"><rect x="45.0" y="8.0" width="110.0" height="46.0" rx="8" style="fill:var(--surface-2);stroke:var(--border);stroke-width:1.2"/><text x="100.0" y="27.0" text-anchor="middle" style="fill:var(--text);font-size:13px;font-weight:700">코디네이터</text><text x="100.0" y="44.0" text-anchor="middle" style="fill:var(--muted);font-size:11px">좌석 커넥션</text><line x1="100" y1="54" x2="100" y2="354" style="stroke:var(--border);stroke-width:1.4;stroke-dasharray:4 4"/><rect x="235.0" y="8.0" width="110.0" height="46.0" rx="8" style="fill:var(--surface-2);stroke:var(--border);stroke-width:1.2"/><text x="290.0" y="27.0" text-anchor="middle" style="fill:var(--text);font-size:13px;font-weight:700">seat_db</text><text x="290.0" y="44.0" text-anchor="middle" style="fill:var(--muted);font-size:11px">prepared 1건</text><line x1="290" y1="54" x2="290" y2="354" style="stroke:var(--border);stroke-width:1.4;stroke-dasharray:4 4"/><rect x="425.0" y="8.0" width="110.0" height="46.0" rx="8" style="fill:var(--surface-2);stroke:var(--border);stroke-width:1.2"/><text x="480.0" y="27.0" text-anchor="middle" style="fill:var(--text);font-size:13px;font-weight:700">다른 커넥션</text><text x="480.0" y="44.0" text-anchor="middle" style="fill:var(--muted);font-size:11px">lock_wait 3초</text><line x1="480" y1="54" x2="480" y2="354" style="stroke:var(--border);stroke-width:1.4;stroke-dasharray:4 4"/><rect x="615.0" y="8.0" width="110.0" height="46.0" rx="8" style="fill:var(--surface-2);stroke:var(--border);stroke-width:1.2"/><text x="670.0" y="27.0" text-anchor="middle" style="fill:var(--text);font-size:13px;font-weight:700">새 커넥션</text><text x="670.0" y="44.0" text-anchor="middle" style="fill:var(--muted);font-size:11px">복구 담당</text><line x1="670" y1="54" x2="670" y2="354" style="stroke:var(--border);stroke-width:1.4;stroke-dasharray:4 4"/><rect x="284.0" y="84.0" width="12" height="224.0" rx="3" style="fill:var(--warn-soft);stroke:var(--warn);stroke-width:1"/><text x="300.0" y="96.0" text-anchor="start" style="fill:var(--warn);font-size:11px;font-weight:700">락</text><line x1="105.0" y1="92.0" x2="275.0" y2="92.0" style="stroke:var(--text);stroke-width:1.5"/><polygon points="284.0,92.0 275.0,96.5 275.0,87.5" style="fill:var(--text)"/><rect x="120.5" y="73.0" width="149.0" height="16" rx="3" style="fill:var(--surface)"/><text x="195.0" y="86.0" text-anchor="middle" style="fill:var(--text);font-size:12px">XA START … XA PREPARE</text><line x1="285.0" y1="122.0" x2="115.0" y2="122.0" style="stroke:var(--good);stroke-width:1.5;stroke-dasharray:5 4"/><polygon points="106.0,122.0 115.0,117.5 115.0,126.5" style="fill:var(--good)"/><rect x="179.6" y="103.0" width="30.9" height="16" rx="3" style="fill:var(--surface)"/><text x="195.0" y="116.0" text-anchor="middle" style="fill:var(--good);font-size:12px">YES</text><rect x="4.4" y="135.0" width="191.2" height="24.0" rx="6" style="fill:var(--bad-soft);stroke:transparent;stroke-width:1.2"/><text x="100.0" y="151.5" text-anchor="middle" style="fill:var(--bad);font-size:12px">코디네이터 죽음 (커넥션 close)</text><line x1="665.0" y1="184.0" x2="305.0" y2="184.0" style="stroke:var(--text);stroke-width:1.5"/><polygon points="296.0,184.0 305.0,179.5 305.0,188.5" style="fill:var(--text)"/><rect x="441.7" y="165.0" width="76.6" height="16" rx="3" style="fill:var(--surface)"/><text x="480.0" y="178.0" text-anchor="middle" style="fill:var(--text);font-size:12px">XA RECOVER</text><line x1="295.0" y1="214.0" x2="655.0" y2="214.0" style="stroke:var(--text);stroke-width:1.5;stroke-dasharray:5 4"/><polygon points="664.0,214.0 655.0,218.5 655.0,209.5" style="fill:var(--text)"/><rect x="397.6" y="195.0" width="164.8" height="16" rx="3" style="fill:var(--surface)"/><text x="480.0" y="208.0" text-anchor="middle" style="fill:var(--text);font-size:12px">1건 (reservation-1 + seat)</text><line x1="475.0" y1="244.0" x2="305.0" y2="244.0" style="stroke:var(--text);stroke-width:1.5"/><polygon points="296.0,244.0 305.0,239.5 305.0,248.5" style="fill:var(--text)"/><rect x="335.3" y="225.0" width="99.4" height="16" rx="3" style="fill:var(--surface)"/><text x="385.0" y="238.0" text-anchor="middle" style="fill:var(--text);font-size:12px">UPDATE id = 100</text><line x1="295.0" y1="274.0" x2="465.0" y2="274.0" style="stroke:var(--bad);stroke-width:1.5;stroke-dasharray:5 4"/><polygon points="474.0,274.0 465.0,278.5 465.0,269.5" style="fill:var(--bad)"/><rect x="324.2" y="255.0" width="121.6" height="16" rx="3" style="fill:var(--surface)"/><text x="385.0" y="268.0" text-anchor="middle" style="fill:var(--bad);font-size:12px">Lock wait timeout</text><line x1="665.0" y1="304.0" x2="305.0" y2="304.0" style="stroke:var(--text);stroke-width:1.5"/><polygon points="296.0,304.0 305.0,299.5 305.0,308.5" style="fill:var(--text)"/><rect x="380.4" y="285.0" width="199.1" height="16" rx="3" style="fill:var(--surface)"/><text x="480.0" y="298.0" text-anchor="middle" style="fill:var(--text);font-size:12px">XA COMMIT reservation-1, seat</text><rect x="172.7" y="317.0" width="234.5" height="24.0" rx="6" style="fill:var(--good-soft);stroke:transparent;stroke-width:1.2"/><text x="290.0" y="333.5" text-anchor="middle" style="fill:var(--good);font-size:12px">XA RECOVER 0건 · reserved_count 2</text></svg></div><pre><code>// 좌석이 YES를 던진 직후 코디네이터가 죽었다. 커넥션까지 끊긴다.
+try (Connection seat = TwoDatabases.seat()) {
+    assertThat(reserveSeatsAndPrepare(seat)).isTrue();
+}
+assertThat(TwoDatabases.preparedSeatCount()).isEqualTo(1);   // XA RECOVER
+
+try (Connection other = TwoDatabases.seat()) {
+    execute(other, "SET SESSION innodb_lock_wait_timeout = 3");
+    assertThatThrownBy(() -&gt; executeUpdate(other,
+            "UPDATE workshop_seat SET reserved_count = reserved_count + 1 WHERE id = " + WORKSHOP_ID))
+            .isInstanceOf(SQLException.class)
+            .hasMessageContaining("Lock wait timeout");
+}
+
+// 결정을 아는 쪽이 나타나야 풀린다.
+try (Connection resolver = TwoDatabases.seat()) {
+    execute(resolver, "XA COMMIT " + SEAT_XID);
+}
+assertThat(TwoDatabases.preparedSeatCount()).isZero();</code></pre><dl class="kv"><dt>XA RECOVER</dt><dd>"지금 prepare된 채 결정을 기다리는 트랜잭션"을 서버에 직접 묻는 명령. 만든 커넥션과 무관하게 찾아 주므로 새 커넥션에서 마무리할 수 있다. MySQL 8에서 <code>XA_RECOVER_ADMIN</code> 권한 필요 → 테스트는 <code>root</code>로 접속.</dd><dt>실무</dt><dd>트랜잭션 매니저가 결정을 자기 로그에 적어 두고, 재기동 시 로그를 읽어 이 정리를 한다(README).</dd><dt>코드</dt><dd><code>src/test/java/dev/deepdive/transaction/twopc/TwoPhaseCommitTest.java</code> — <code>prepare_직후_코디네이터가_죽으면_결정이_올_때까지_락이_남는다</code></dd></dl></div>
+<div class="tabpanel card" id="xa-t4"><h3>prepared 락은 어디까지 막나 <span class="badge warn">PreparedLockTest</span></h3><p><code>@BeforeEach</code>가 매번 좌석 행 UPDATE + 이력(request_id = 1) INSERT 후 <code>XA PREPARE</code>한 트랜잭션을 남기고 커넥션을 닫는다. 그 상태에서 다른 커넥션이 시도:</p><div class="tablewrap"><table><thead><tr><th>다른 커넥션이 하려는 것</th><th>결과</th><th>테스트</th></tr></thead><tbody><tr><td>같은 좌석 행(id 100) UPDATE</td><td><span class="badge bad">막힘</span> Lock wait timeout</td><td><code>같은_좌석_행을_업데이트하면_막힌다</code></td></tr><tr><td>같은 <code>request_id</code>(1)로 이력 INSERT</td><td><span class="badge bad">막힘</span> 중복 키 에러가 아니라 락 대기</td><td><code>같은_요청_ID로_이력을_삽입하면_막힌다</code></td></tr><tr><td>다른 워크숍 행(id 200) UPDATE</td><td><span class="badge good">통과</span></td><td><code>다른_좌석_행을_업데이트하면_막히지_않는다</code></td></tr><tr><td>다른 <code>request_id</code>(2)로 INSERT</td><td><span class="badge good">통과</span></td><td><code>다른_요청_ID로_이력을_삽입하면_막히지_않는다</code></td></tr><tr><td>SELECT</td><td><span class="badge warn">통과, 옛 값</span> reserved_count 0, 이력 0건</td><td><code>읽기는_막히지_않지만_아직_옛_값이_보인다</code></td></tr></tbody></table></div><ul class="plain"><li><b>락은 테이블이 아니라 행</b>에 걸린다. 2PC가 DB를 통째로 세우는 건 아니다.</li><li><b>같은 키 INSERT도 막힌다</b>: 앞 트랜잭션이 커밋될지 모르니 중복인지조차 확정 못 하고 기다린다. 실패한 요청이 재시도로 다시 들어오는 모양이 정확히 이것.</li><li><b>읽기는 MVCC 스냅샷</b>이라 안 막히지만, 이미 잡힌 좌석을 남아 있다고 보여 주게 된다.</li></ul><dl class="kv"><dt>코드</dt><dd><code>src/test/java/dev/deepdive/transaction/twopc/PreparedLockTest.java</code></dd></dl></div>
+<div class="tabpanel card" id="xa-t5"><h3>실무 매핑 · 설계 선택 <span class="badge info">JTA</span></h3><div class="tablewrap"><table><thead><tr><th>이 실험실</th><th>실무</th></tr></thead><tbody><tr><td>테스트 메서드의 제어 흐름</td><td>JTA 트랜잭션 매니저 (Narayana, Atomikos)</td></tr><tr><td><code>XA START</code> … <code>XA PREPARE</code> SQL</td><td><code>XAResource.start()</code> … <code>prepare()</code></td></tr><tr><td>결정을 어디에도 안 적음</td><td>트랜잭션 로그 (Narayana ObjectStore, Atomikos <code>tmlog</code>)</td></tr><tr><td>손으로 <code>XA RECOVER</code></td><td>매니저가 재기동 시 자동 복구</td></tr></tbody></table></div><div class="callout warn"><strong>README 핵심 문장</strong> "편해지는 건 코드지 성질이 아니다. 블로킹은 그대로 남는다." — JTA를 쓰면 <code>@Transactional</code> 한 줄이지만 prepare 락·in-doubt 성질은 같다.</div><div class="tablewrap"><table><thead><tr><th>갈림길</th><th>고른 것</th><th>버린 것과 이유 (README)</th></tr></thead><tbody><tr><td>2PC 실행 방식</td><td>XA SQL 직접 실행</td><td>JTA 라이브러리 — prepare·commit이 라이브러리 안에 숨는다. Spring Boot 3.0에서 두 스타터가 빠진 점도</td></tr><tr><td>코디네이터</td><td>테스트 메서드 제어 흐름</td><td>XAResource 감싼 자바 클래스 — 파일만 늘고 보이는 건 SQL 네 줄</td></tr><tr><td>코디네이터 로그</td><td>남기지 않음</td><td>파일 기반 결정 로그 — "결정을 아는 쪽이 없으면 못 푼다"까지만 보이면 됨</td></tr><tr><td>DB</td><td>MySQL 8 (Testcontainers)</td><td>H2 — 끊긴 뒤에도 살아 있는 prepared 트랜잭션·XA RECOVER 미지원</td></tr><tr><td>서비스 분리</td><td>안 함 (한 프로세스가 두 DB에 직접)</td><td>HTTP 3서비스 — prepare를 요청 사이에 열어 둬야 함 = 바로 MSA에서 안 쓰는 이유</td></tr></tbody></table></div></div>
+</div>
+    </section>
+
+    <section id="results">
+      <h2><span class="num">04</span>결과·수치</h2>
+      <p class="sub">모두 테스트 assert 값입니다. 지연 측정은 없습니다.</p>
+<h3>TwoPhaseCommitTest</h3><div class="tablewrap"><table><thead><tr><th>테스트</th><th>시드 잔액</th><th>투표</th><th>결정</th><th class="num">reserved_count</th><th>이력</th><th class="num">balance</th></tr></thead><tbody><tr><td><code>양쪽_참여자_투표_찬성_모두_커밋한다</code></td><td>100,000</td><td>좌석 YES · 지갑 YES</td><td>XA COMMIT ×2</td><td class="num">2</td><td>1건</td><td class="num">40,000</td></tr><tr class="hl"><td><code>지갑이_못_내면_prepare한_좌석도_롤백된다</code></td><td><b>50,000</b></td><td>좌석 YES · 지갑 <b>NO</b></td><td>좌석 XA ROLLBACK</td><td class="num"><b>0</b></td><td>0건</td><td class="num">50,000</td></tr><tr><td><code>prepare_직후_코디네이터가_죽으면_…</code></td><td>100,000</td><td>좌석 YES 후 끊김</td><td>새 커넥션 XA COMMIT</td><td class="num">2</td><td>-</td><td class="num">-</td></tr></tbody></table></div><div class="source">출처: <code>src/test/java/dev/deepdive/transaction/twopc/TwoPhaseCommitTest.java</code> assert 값. 세 번째 테스트는 그 사이 XA RECOVER 1건 → 0건, 다른 커넥션 UPDATE가 Lock wait timeout임을 검증.</div><h3>같은 실패 시나리오, 4단계 비교</h3><div class="card"><div class="label" style="margin-bottom:8px">실패 후 남은 좌석 (reserved_count, 정답은 0)</div><div class="bars">
+<div class="bar good" style="--v:0.0"><span>Monolith</span><div class="track"><div class="fill"></div></div><span class="val">0석</span></div>
+<div class="bar bad" style="--v:1.0"><span>MSA</span><div class="track"><div class="fill"></div></div><span class="val">2석</span></div>
+<div class="bar good" style="--v:0.0"><span>2PC ◀</span><div class="track"><div class="fill"></div></div><span class="val">0석</span></div>
+<div class="bar good" style="--v:0.0"><span>TCC</span><div class="track"><div class="fill"></div></div><span class="val">0석</span></div>
+</div><div class="source">출처: 위 표의 테스트 assert 값. 막대 길이는 좌석 2석 기준 비율.</div></div><div style="height:12px"></div><div class="tablewrap"><table><thead><tr><th>단계</th><th>어떻게 묶나</th><th class="num">reserved_count</th><th>좌석 이력</th><th class="num">balance</th><th>지갑 쪽 기록</th><th>대가</th><th>근거 테스트</th></tr></thead><tbody>
+<tr><td><a href="../distributed-transaction-monolith/overview.html">Monolith</a></td><td>로컬 <code>@Transactional</code> 하나</td><td class="num"><b>0</b></td><td>— (이력 테이블 없음)</td><td class="num">50,000</td><td>원장 0건 · 예약 <code>CREATED</code></td><td>DB를 쪼갤 수 없다</td><td><code>ReservationServiceTest</code></td></tr>
+<tr><td><a href="../distributed-transaction-msa/overview.html">MSA</a></td><td>서비스별 로컬 트랜잭션 + HTTP</td><td class="num"><b style="color:var(--bad)">2</b></td><td><b style="color:var(--bad)">1건</b></td><td class="num">50,000</td><td>원장 0건 · 예약 <code>CREATED</code></td><td><span class="badge bad">부분 커밋</span></td><td><code>MsaLocalTransactionTest</code></td></tr>
+<tr class="hl"><td><b>2PC</b> (이 페이지)</td><td><code>XA PREPARE</code> → <code>XA ROLLBACK</code></td><td class="num"><b>0</b></td><td>0건</td><td class="num">50,000</td><td>(지갑 원장 테이블 없음)</td><td>prepared 락 블로킹 · 미결(in-doubt)</td><td><code>TwoPhaseCommitTest</code></td></tr>
+<tr><td><a href="../distributed-transaction-tcc/overview.html">TCC</a></td><td>Try 커밋 → Cancel(반대 방향 UPDATE)</td><td class="num"><b>0</b> (held 0)</td><td>— (seat_tcc_log <code>CANCELLED</code>)</td><td class="num">50,000 (frozen 0)</td><td>wallet_tcc_log 없음</td><td>중간 상태 노출 · 참여자 코드 증가</td><td><code>TryConfirmCancelTest</code></td></tr>
+</tbody></table></div>
+<div class="source">출처: 각 모듈의 실패 시나리오 테스트 assert 값 (실행 전 reserved_count 0, balance 50,000). TCC의 held/frozen도 같은 테스트에서 0으로 검증.</div><div class="callout"><strong>측정하지 않은 것</strong> 네 모듈 어디에도 지연·처리량 측정은 없습니다. 2PC README도 "참여자 하나가 느리면 전원이 기다린다"는 건 프로토콜상 성질이고 <em>지연을 측정하지는 않았다</em>고 적었습니다. 아래 숫자는 모두 데이터 상태값(행 수·잔액)입니다.</div><div class="callout"><strong>"3초"는 측정값이 아니다</strong> <code>innodb_lock_wait_timeout = 3</code>은 테스트가 기본값 50초를 기다리지 않으려고 <b>설정한</b> 값이다. "막혔다가 이 시간 뒤 에러가 난다"는 것만 확인한다.</div>
+    </section>
+
+    <section id="limits">
+      <h2><span class="num">05</span>한계·약점</h2>
+      <p class="sub"><span class="badge warn">README</span> = README가 밝힌 것, <span class="badge bad">코드</span> = 코드·README 대조에서 확인한 것.</p>
+<details id="lim-1" class="qa risk"><summary><span class="badge warn">README</span> 지연은 측정하지 않았다</summary><div class="a"><p>"참여자 하나가 느리면 전원이 그만큼 기다린다 … 이건 프로토콜상 그런 것이고 여기서 지연을 측정하지는 않았다." 2PC가 느리다는 주장에 쓸 수치는 이 저장소에 없다.</p></div></details><details id="lim-2" class="qa risk"><summary><span class="badge warn">README</span> 코디네이터 로그·자동 복구 없음, 서비스 분리 안 함</summary><div class="a"><p>코디네이터는 테스트 메서드의 제어 흐름이고 결정을 어디에도 적지 않는다. 복구는 손으로 <code>XA RECOVER</code> + <code>XA COMMIT</code>. 또 한 프로세스가 두 DB 커넥션을 직접 쥔다 — HTTP로 나뉜 서비스에서 prepare를 요청 사이에 열어 두는 상황은 재현하지 않았다(의도적 선택).</p></div></details><details id="lim-3" class="qa risk"><summary><span class="badge good">README 수정함</span> README와 코드가 어긋났던 곳 3군데</summary><div class="a"><p>아래 3군데는 README에서 코드에 맞게 바로잡았습니다. 면접에서 "문서를 코드와 대조해 고친 경험"으로 쓸 수 있습니다.</p><ul><li><b>3행</b>: "<code>README.html</code>을 내려받아…"라고 하지만 모듈에 <code>README.html</code> 파일이 없다.</li><li><b>49행</b>: "코디네이터 죽음 시나리오와 PreparedLockTest는 일부러 커밋도 롤백도 안 한 채 prepared 트랜잭션을 남기고 끝난다" — 실제 <code>prepare_직후_코디네이터가_죽으면_…</code>은 마지막에 새 커넥션으로 <code>XA COMMIT</code>해 정리하고 끝난다. 남기고 끝나는 건 <code>PreparedLockTest</code>뿐.</li><li><b>55행</b>: 시드 표에 "id=100(잔여 0), id=200(잔여 0)" — 실제 시드는 <code>total_seats 10, reserved_count 0</code>이므로 "예약 0(잔여 10)"이 맞다.</li></ul></div></details><details id="lim-4" class="qa risk"><summary><span class="badge bad">코드</span> "코디네이터 죽음"은 커넥션 close로 흉내 낸 것</summary><div class="a"><p>프로세스·서버 장애가 아니라 <code>try-with-resources</code>로 커넥션을 닫은 것이다. MySQL 서버 재시작 후에도 prepared 트랜잭션이 남는지는 검증하지 않았다.</p></div></details><details id="lim-5" class="qa risk"><summary><span class="badge bad">코드</span> 지갑 쪽은 잔액 UPDATE만 — 원장이 없다</summary><div class="a"><p><code>wallet</code> 테이블(<code>user_id</code>, <code>balance</code>)만 만들고 MSA의 <code>WalletLedger</code>에 해당하는 테이블이 없다. 좌석 쪽은 <code>seat_reservation_history</code>가 <code>request_id</code> PK로 있어 MSA보다 중복에 강하다(MSA는 unique 없음).</p></div></details><details id="lim-6" class="qa risk"><summary><span class="badge bad">코드</span> 투표가 순차적이다</summary><div class="a"><p>좌석이 prepare까지 끝낸 뒤에야 지갑 작업을 시작한다. 그 사이 좌석 락 보유 시간이 지갑 작업 시간만큼 늘어난다 <span class="badge warn">추론</span>. 실무 매니저는 참여자 prepare를 병렬로 보낼 수 있다 <span class="badge info">일반 지식</span>.</p></div></details><details id="lim-7" class="qa risk"><summary><span class="badge bad">코드</span> 실행 조건: 테스트 전용 · Docker · root</summary><div class="a"><p><code>src/main</code>이 없는 테스트 전용 모듈(Spring 앱 아님). Testcontainers로 <code>mysql:8.0.36</code> 두 대를 띄우므로 Docker가 필요하고, <code>XA RECOVER</code>의 <code>XA_RECOVER_ADMIN</code> 권한 때문에 <code>root</code>로 접속한다. 일반 사용자로 바꾸면 복구 테스트가 깨진다(README).</p></div></details>
+    </section>
+
+    <section id="interview">
+      <h2><span class="num">06</span>면접 Q&amp;A</h2>
+      <p class="sub">질문을 먼저 읽고 스스로 답해 본 뒤 펼쳐 보세요.</p>
+<div class="qa-tools"><button type="button" data-qa="open">모두 펼치기</button><button type="button" data-qa="close">모두 접기</button></div><details id="iv-1" class="qa"><summary>2PC를 1분 안에 설명해 보세요.</summary><div class="a"><p>1단계(투표): 코디네이터가 모든 참여자에게 작업 후 <code>PREPARE</code>를 요청 — 참여자는 변경을 디스크에 기록하고 락을 쥔 채 YES/NO. 2단계(결정): 전원 YES면 <code>COMMIT</code>, 하나라도 NO면 <code>ROLLBACK</code>. 이 모듈은 MySQL <code>XA</code> SQL로 이 두 단계를 직접 실행했다.</p></div></details><details id="iv-2" class="qa"><summary>prepare가 정확히 무엇을 보장하나요? 왜 락을 계속 쥐나요?</summary><div class="a"><p>"서버가 죽었다 살아나도 커밋할 수 있다"는 약속. 그 약속을 지키려면 다른 트랜잭션이 같은 행을 바꾸지 못하게 막아야 하므로 락을 유지한다. <code>XA END</code> 뒤에도 락은 풀리지 않는다. 이것이 정합성을 얻는 방법이자 대가.</p></div></details><details id="iv-3" class="qa"><summary>2PC의 블로킹 문제(in-doubt)란?</summary><div class="a"><p>YES를 던진 참여자가 결정을 못 들으면 혼자 커밋도 롤백도 못 하고 락을 쥔 채 멈춘다. 테스트에서 코디네이터 커넥션을 닫자 <code>XA RECOVER</code>에 1건이 남고, 다른 커넥션의 같은 행 UPDATE는 Lock wait timeout. 결정을 아는 쪽의 <code>XA COMMIT</code>으로만 풀렸다.</p></div></details><details id="iv-4" class="qa"><summary>같은 request_id로 INSERT하면 왜 중복 키 에러가 아니라 락 대기인가요?</summary><div class="a"><p>앞의 prepared 트랜잭션이 커밋될지 롤백될지 모르니 DB도 중복 여부를 확정할 수 없다. 그래서 에러 대신 기다린다. 실무에선 "실패한 요청의 재시도가 멈춰 버리는" 현상으로 나타난다(<code>PreparedLockTest</code>).</p></div></details><details id="iv-5" class="qa"><summary>prepared 상태에서 다른 사용자가 SELECT하면?</summary><div class="a"><p>막히지 않지만 MVCC 스냅샷이라 커밋 전 옛 값(reserved_count 0)을 본다. 남은 좌석 화면이 이미 잡힌 좌석을 남아 있다고 보여 줄 수 있다.</p></div></details><details id="iv-6" class="qa"><summary>지갑이 NO일 때 지갑은 왜 코디네이터 결정을 기다리지 않나요?</summary><div class="a"><p>prepare까지 가지 않았기 때문. 못 내겠다고 판단한 그 자리에서 <code>XA ROLLBACK</code>으로 스스로 정리하고 NO만 돌려준다. 결정을 기다려야 하는 건 YES를 던진 쪽뿐.</p></div></details><details id="iv-7" class="qa"><summary>Spring에서 실제로 쓰려면? JTA를 쓰면 블로킹이 해결되나요?</summary><div class="a"><p><code>JtaTransactionManager</code> + XA DataSource + Narayana/Atomikos 같은 트랜잭션 매니저. 매니저가 결정 로그를 남기고 재기동 시 자동 복구한다. 하지만 <b>블로킹 성질은 그대로</b>(README). 또 Spring Boot 3.0에서 Narayana·Atomikos 스타터가 빠져 서드파티 버전을 써야 한다(README).</p></div></details><details id="iv-8" class="qa"><summary>왜 MSA에서는 2PC를 잘 안 쓰나요?</summary><div class="a"><ul><li>참여자가 HTTP 뒤에 있으면 prepare한 트랜잭션을 요청 사이에 열어 둬야 해 커넥션이 묶인다</li><li>참여자가 늘수록 전원 YES 확률↓, 하나만 느려도 전체가 느려진다</li><li>코디네이터 장애가 전체 가용성을 끌어내린다</li><li>XA를 지원하지 않는 참여자(외부 결제 API, 일부 MQ, NoSQL)가 흔하다 — 모두 README 근거</li></ul></div></details><details id="iv-9" class="qa"><summary>이 실험에서 H2를 쓰지 않은 이유는?</summary><div class="a"><p>커넥션이 끊긴 뒤에도 살아 있는 prepared 트랜잭션과 <code>XA RECOVER</code>가 필요한데 H2는 지원하지 않는다(README, <code>TwoDatabases</code> 주석). 그래서 Testcontainers MySQL 8.0.36 두 대.</p></div></details><details id="iv-10" class="qa"><summary>2PC의 대안은? 다음 단계와 연결해 보세요.</summary><div class="a"><p>락을 쥐고 기다리는 대신 "일단 커밋하고 잘못되면 되돌린다". <a href="../distributed-transaction-tcc/overview.html">TCC</a>는 Try에서 자원을 잡아 두고 바로 커밋, Cancel로 반대 방향 업무 작업을 한다. 블로킹이 사라지는 대신 멱등성·빈 취소·매달림을 참여자 코드가 감당한다.</p></div></details>
+    </section>
+
+    <section id="files">
+      <h2><span class="num">07</span>파일 지도</h2>
+      <p class="sub">경로는 labs/distributed-transaction-2pc/ 기준.</p>
+<ul class="files"><li><code>README.md</code><span>프로토콜 설명, 시퀀스, 락 범위 표, 설계 선택, JTA 매핑</span></li><li><code>build.gradle</code><span>테스트 전용: Testcontainers MySQL + spring-boot-starter-test (BOM만 사용)</span></li><li><code>src/test/java/dev/deepdive/transaction/twopc/TwoDatabases.java</code><span>★ MySQL 컨테이너 2대 싱글톤, seed()의 XA ROLLBACK 정리, preparedSeatCount()=XA RECOVER</span></li><li><code>src/test/java/dev/deepdive/transaction/twopc/TwoPhaseCommitTest.java</code><span>★ 전원 YES 커밋 / 지갑 NO 롤백 / 코디네이터 죽음</span></li><li><code>src/test/java/dev/deepdive/transaction/twopc/PreparedLockTest.java</code><span>★ prepared 락이 막는 것·안 막는 것 5가지</span></li></ul>
+    </section>
+
+    <footer>README와 소스 코드를 근거로 정리한 문서입니다. 수치는 README·테스트에 기록된 값이며, 테스트로 검증되지 않은 내용(추론·일반 지식)은 그렇게 표기했습니다. 이 모듈들에는 성능·지연 측정값이 없습니다.</footer>
+  </main>
+</div>
+<script>
+/* ===== 공통 스크립트 (모든 모듈 overview.html에서 동일하게 유지) ===== */
+(function(){
+  var root=document.documentElement;
+  try{var saved=localStorage.getItem('deepdive-theme');if(saved)root.setAttribute('data-theme',saved);}catch(e){}
+  var tt=document.querySelector('.theme-toggle');
+  if(tt)tt.addEventListener('click',function(){
+    var cur=root.getAttribute('data-theme');
+    if(!cur)cur=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';
+    var next=cur==='dark'?'light':'dark';root.setAttribute('data-theme',next);
+    try{localStorage.setItem('deepdive-theme',next);}catch(e){}
+  });
+  document.querySelectorAll('[data-flow]').forEach(function(flow){
+    var steps=flow.querySelectorAll('.step');var detail=flow.nextElementSibling;
+    function show(btn){
+      steps.forEach(function(s){s.setAttribute('aria-selected',s===btn?'true':'false');});
+      if(detail)detail.querySelectorAll(':scope>div').forEach(function(d){d.classList.toggle('on',d.id===btn.dataset.target);});
+    }
+    steps.forEach(function(s){s.addEventListener('click',function(){show(s);});});
+    if(steps[0])show(steps[0]);
+  });
+  document.querySelectorAll('[data-tabs]').forEach(function(box){
+    var btns=box.querySelectorAll(':scope>.tabs>button');
+    function show(btn){
+      btns.forEach(function(b){b.setAttribute('aria-selected',b===btn?'true':'false');});
+      box.querySelectorAll(':scope>.tabpanel').forEach(function(p){p.classList.toggle('on',p.id===btn.dataset.target);});
+    }
+    btns.forEach(function(b){b.addEventListener('click',function(){show(b);});});
+    if(btns[0])show(btns[0]);
+  });
+  document.querySelectorAll('[data-qa]').forEach(function(b){
+    b.addEventListener('click',function(){
+      var sec=b.closest('section');var open=b.dataset.qa==='open';
+      sec.querySelectorAll('details.qa').forEach(function(d){d.open=open;});
+    });
+  });
+  var links=document.querySelectorAll('nav.toc a[href^="#"]');
+  if('IntersectionObserver' in window){
+    var io=new IntersectionObserver(function(es){es.forEach(function(e){
+      if(e.isIntersecting){links.forEach(function(l){l.classList.toggle('active',l.getAttribute('href')==='#'+e.target.id);});}
+    });},{rootMargin:'-20% 0px -70% 0px'});
+    document.querySelectorAll('main section[id]').forEach(function(s){io.observe(s);});
+  }
+  function openHash(){
+    var id='';try{id=decodeURIComponent(location.hash.slice(1));}catch(e){}
+    if(!id)return;var el=document.getElementById(id);if(!el)return;
+    var d=el.tagName==='DETAILS'?el:el.closest('details');if(d)d.open=true;
+    var p=el.closest('.tabpanel');
+    if(p&&!p.classList.contains('on')){var b=p.parentElement.querySelector(':scope>.tabs>button[data-target="'+p.id+'"]');if(b)b.click();}
+    setTimeout(function(){el.scrollIntoView({block:'start'});},0);
+  }
+  window.addEventListener('hashchange',openHash);openHash();
+})();
+</script>
+</body>
+</html>

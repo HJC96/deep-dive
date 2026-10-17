@@ -69,15 +69,19 @@ spring:
     password: wrong-password
 ```
 
-테스트에서는 컨테이너 값을 등록한다.
+이 값은 `src/test/resources/application-dynamic-property-source.yml`에 있어서 `dynamic-property-source` 프로필을 켜야 읽힌다. 테스트에서는 프로필을 켜고 컨테이너 값을 등록한다.
 
 ```java
 @Testcontainers
 @SpringBootTest
+@ActiveProfiles("dynamic-property-source")   // 틀린 정적 yml을 일부러 읽게 한다
 class DynamicPropertySourceTest {
 
     @Container
-    static MySQLContainer MYSQL = new MySQLContainer(DockerImageName.parse("mysql:8.0.36"));
+    private static final MySQLContainer MYSQL = new MySQLContainer(DockerImageName.parse("mysql:8.0.36"))
+            .withDatabaseName("dynamic_property_source")   // select database() 기대값
+            .withUsername("test")                          // username 기대값
+            .withPassword("test");
 
     @DynamicPropertySource
     static void registerProperties(DynamicPropertyRegistry registry) {
@@ -127,6 +131,8 @@ sequenceDiagram
 - username이 `wrong-user`가 아니라 `test`다.
 - `select database()` 결과가 `dynamic_property_source`다.
 - 즉, 정적 yml이 틀려도 테스트는 컨테이너 DB에 연결된다.
+- 기대값 `test`와 `dynamic_property_source`는 위의 `withUsername`·`withDatabaseName`에서 온다. 지정하지 않으면 Testcontainers 기본값(`test` 계정, `test` DB)이 쓰여 DB 이름 검증이 달라진다.
+- `@ActiveProfiles`를 빼면 틀린 정적 값 자체가 로드되지 않아 "동적 값이 정적 값을 이긴다"는 비교가 성립하지 않는다.
 
 ## 케이스 2. 컨테이너 생명주기
 
@@ -134,10 +140,10 @@ sequenceDiagram
 
 | 테스트 | 확인 내용 |
 | --- | --- |
-| `ContainerAnnotationLifecycleTest` | `@Container` 유무에 따른 자동 시작 차이를 비교한다 |
-| `ManualContainerLifecycleTest` | 수동 방식은 `start()`와 `stop()` 위치를 테스트 코드가 직접 가진다 |
+| `ContainerAnnotationLifecycleTest` | 같은 `@Testcontainers` 클래스에 `@Container`가 붙은 필드와 안 붙은 필드를 나란히 두고, 테스트 실행 중에 앞의 것만 떠 있음을 비교한다 |
+| `ManualContainerLifecycleTest` | 수동 방식은 `start()`와 `stop()` 위치를 테스트 코드가 직접 가진다. `start()` 전에는 꺼져 있고, `stop()` 뒤에 다시 꺼짐을 확인한다 |
 
-수동 방식에서 생명주기가 흩어진다는 말은 컨테이너 선언, 시작, 종료, Spring 프로퍼티 등록 책임이 각각 다른 위치로 나뉜다는 뜻이다.
+수동 방식에서 생명주기가 흩어진다는 말은 컨테이너 선언(필드), 시작(`@BeforeAll`), 종료(`@AfterAll`) 책임이 각각 다른 위치로 나뉜다는 뜻이다. `ManualContainerLifecycleTest`는 Spring 컨텍스트 없이 이 세 위치만 보여 준다. Spring 테스트에서 같은 방식을 쓰면 `@DynamicPropertySource` 프로퍼티 등록이 네 번째 위치로 더해진다.
 
 ## ArchUnit
 
@@ -184,7 +190,7 @@ flowchart LR
 확인 포인트:
 
 - `SampleController` → `SampleService` → `SampleRepository` 방향만 허용된다.
-- Repository가 Controller를 직접 호출하는 코드가 생기면 `check()`가 `AssertionError`를 던진다.
+- Repository가 Controller를 직접 호출하는 코드가 생기면 `check()`가 `AssertionError`를 던진다. 위반 예시 `ControllerCallingRepository`를 별도 패키지(`archunit.violation.repository`)에 두고, 위반 케이스에서만 Repository 계층에 함께 넣어 실제로 실패하는지 확인한다. 정상 케이스는 이 패키지를 임포트하지 않는다.
 - 세 계층 모두 생성자 주입만 사용하므로 규칙 검증이 통과한다.
 - 계층에 속하지 않은 패키지(`legacy`)는 이 검증 대상에서 제외한다. `mayOnlyBeAccessedByLayers`는 정의되지 않은 패키지의 접근도 위반으로 잡기 때문이다.
 
@@ -233,7 +239,8 @@ Docker가 떠 있어야 한다.
 | `ContainerAnnotationLifecycleTest` | `@Container` 유무에 따른 자동 시작 비교 |
 | `ManualContainerLifecycleTest` | 수동 `start()` / `stop()` 생명주기 검증 |
 | `application-dynamic-property-source.yml` | 일부러 틀린 정적 datasource |
-| `LayeredArchitectureTest` | Controller-Service-Repository 계층 의존 방향 검증 |
+| `LayeredArchitectureTest` | Controller-Service-Repository 계층 의존 방향 검증과 위반 탐지 |
 | `CodingRuleTest` | 필드 주입 금지 규칙 검증과 위반 탐지 |
 | `LegacyNotificationService` | 일부러 필드 주입을 사용한 위반 예시 |
+| `ControllerCallingRepository` | 일부러 Repository가 Controller를 호출하는 계층 위반 예시 |
 | `SpringTestInfraApplication` | 테스트 컨텍스트 시작점 |

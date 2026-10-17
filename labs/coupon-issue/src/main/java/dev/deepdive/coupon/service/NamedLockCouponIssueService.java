@@ -29,11 +29,17 @@ public class NamedLockCouponIssueService {
     // @Transactional로 getLock/releaseLock을 같은 커넥션에 고정한다.
     @Transactional
     public void issue(Long couponId) {
+        String lockKey = Objects.requireNonNull(couponId, "쿠폰 ID는 필수입니다.").toString();
+        // GET_LOCK은 성공 1, 타임아웃 0, 에러 NULL을 반환한다.
+        // 1이 아니면 락 없이 차감하면 안 되므로 발급 실패로 끝내고, 잡지 않은 락은 해제하지 않는다.
+        Integer acquired = namedLockRepository.getLock(lockKey);
+        if (!Integer.valueOf(1).equals(acquired)) {
+            throw new IllegalStateException("네임드 락 획득에 실패했습니다. couponId=" + couponId + ", result=" + acquired);
+        }
         try {
-            namedLockRepository.getLock(couponId.toString());
             self.issueOnce(couponId);
         } finally {
-            namedLockRepository.releaseLock(couponId.toString());
+            namedLockRepository.releaseLock(lockKey);
         }
     }
 

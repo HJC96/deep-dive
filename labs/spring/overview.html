@@ -1,0 +1,550 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>spring 한눈에</title>
+<style>
+/* ===== 공통 스타일 (모든 모듈 overview.html에서 동일하게 유지) ===== */
+:root{
+  --bg:#f7f7f5;--surface:#ffffff;--surface-2:#f0efeb;--border:#e2e0da;
+  --text:#1d1d1b;--muted:#6b6a65;--accent:#2f5bd3;--accent-soft:#e6ecfb;
+  --good:#1f8a4c;--good-soft:#e3f4ea;--bad:#c2410c;--bad-soft:#fcebe1;
+  --warn:#a16207;--warn-soft:#fbf3dc;--code-bg:#f3f2ee;
+  --shadow:0 1px 2px rgba(0,0,0,.04),0 4px 16px rgba(0,0,0,.04);
+  --radius:12px;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --sans:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Pretendard","Noto Sans KR","Segoe UI",sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#141413;--surface:#1c1c1a;--surface-2:#252522;--border:#33322e;
+    --text:#ecebe6;--muted:#a09e96;--accent:#7c9cff;--accent-soft:#1f2a47;
+    --good:#4ccf85;--good-soft:#16301f;--bad:#ff8a5c;--bad-soft:#3a1f14;
+    --warn:#e8b84a;--warn-soft:#3a2f12;--code-bg:#22221f;
+    --shadow:none;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#141413;--surface:#1c1c1a;--surface-2:#252522;--border:#33322e;
+  --text:#ecebe6;--muted:#a09e96;--accent:#7c9cff;--accent-soft:#1f2a47;
+  --good:#4ccf85;--good-soft:#16301f;--bad:#ff8a5c;--bad-soft:#3a1f14;
+  --warn:#e8b84a;--warn-soft:#3a2f12;--code-bg:#22221f;
+  --shadow:none;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);line-height:1.65;font-size:15.5px;-webkit-font-smoothing:antialiased}
+a{color:var(--accent)}
+code,.mono{font-family:var(--mono);font-size:.86em;background:var(--code-bg);padding:.1em .35em;border-radius:5px;word-break:break-all}
+pre{background:var(--code-bg);padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.55;margin:10px 0}
+pre code{background:none;padding:0;font-size:inherit;word-break:normal}
+.layout{display:grid;grid-template-columns:220px minmax(0,1fr);gap:40px;max-width:1180px;margin:0 auto;padding:32px 24px 80px}
+@media (max-width:860px){.layout{grid-template-columns:minmax(0,1fr);gap:0;padding:20px 16px 60px}}
+nav.toc{position:sticky;top:24px;align-self:start;font-size:14px}
+nav.toc .home{display:inline-block;margin-bottom:14px;color:var(--muted);text-decoration:none;font-size:13px}
+nav.toc ol{list-style:none;padding:0;margin:0;border-left:2px solid var(--border)}
+nav.toc li a{display:block;padding:5px 0 5px 14px;margin-left:-2px;border-left:2px solid transparent;color:var(--muted);text-decoration:none}
+nav.toc li a.active,nav.toc li a:hover{color:var(--text);border-left-color:var(--accent)}
+@media (max-width:860px){
+  nav.toc{position:static;margin-bottom:18px}
+  nav.toc ol{display:flex;flex-wrap:wrap;gap:6px;border:0}
+  nav.toc li a{padding:4px 10px;margin:0;border:1px solid var(--border);border-radius:999px;font-size:13px}
+  nav.toc li a.active{border-color:var(--accent)}
+}
+header.hero{margin-bottom:28px}
+.eyebrow{font-size:12.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
+h1{font-size:30px;line-height:1.25;margin:6px 0 10px;letter-spacing:-.01em}
+.lead{font-size:17px;color:var(--text);margin:0 0 14px;max-width:62ch}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font-size:12.5px;padding:3px 10px;border-radius:999px;background:var(--surface-2);border:1px solid var(--border);color:var(--muted)}
+section{margin:44px 0 0;scroll-margin-top:20px}
+h2{font-size:21px;margin:0 0 6px;letter-spacing:-.01em}
+h2 .num{color:var(--accent);margin-right:8px;font-variant-numeric:tabular-nums}
+.sub{color:var(--muted);margin:0 0 16px;font-size:14.5px}
+h3{font-size:16.5px;margin:18px 0 6px}
+.card{overflow-wrap:anywhere;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow)}
+.grid{display:grid;gap:12px}
+.grid.c2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.grid.c3{grid-template-columns:repeat(3,minmax(0,1fr))}
+@media (max-width:700px){.grid.c2,.grid.c3{grid-template-columns:minmax(0,1fr)}}
+.tldr .label{font-size:12px;font-weight:700;letter-spacing:.05em;color:var(--muted);text-transform:uppercase;margin-bottom:4px}
+.tldr .card{border-top:3px solid var(--accent)}
+.tldr .card.good{border-top-color:var(--good)}
+.tldr .card.bad{border-top-color:var(--bad)}
+.tldr p{margin:0}
+/* 흐름 다이어그램: 단계 클릭 시 상세 표시 */
+.flow{display:flex;flex-wrap:wrap;align-items:stretch;gap:0;margin:6px 0 10px}
+.flow .step{flex:1 1 140px;min-width:120px;text-align:left;font:inherit;color:inherit;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 12px;cursor:pointer;position:relative;transition:border-color .15s,background .15s}
+.flow .step:hover{border-color:var(--accent)}
+.flow .step[aria-selected="true"]{border-color:var(--accent);background:var(--accent-soft)}
+.flow .step .k{display:block;font-size:11.5px;color:var(--muted);font-weight:600}
+.flow .step .t{display:block;font-weight:600;font-size:14px;line-height:1.35}
+.flow .step.fail{border-style:dashed;border-color:var(--bad)}
+.flow .step.fail[aria-selected="true"]{background:var(--bad-soft)}
+.flow .arrow{display:flex;align-items:center;padding:0 6px;color:var(--muted);font-size:18px}
+@media (max-width:700px){.flow{flex-direction:column}.flow .step{flex:none}.flow .arrow{justify-content:center;padding:2px 0;transform:rotate(90deg)}}
+.flow-detail{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:10px;padding:14px 18px;min-height:64px}
+.flow-detail>div{display:none}
+.flow-detail>div.on{display:block}
+.flow-detail p:first-child{margin-top:0}.flow-detail p:last-child{margin-bottom:0}
+/* 탭 */
+.tabs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.tabs button{font:inherit;font-size:13.5px;padding:6px 12px;border-radius:999px;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{background:var(--text);color:var(--bg);border-color:var(--text)}
+.tabpanel{display:none}.tabpanel.on{display:block}
+.kv{display:grid;grid-template-columns:110px minmax(0,1fr);gap:6px 14px;margin:10px 0 0;font-size:14.5px}
+.kv dt{color:var(--muted);font-weight:600}
+.kv dd{margin:0}
+@media (max-width:520px){.kv{grid-template-columns:1fr}.kv dt{margin-top:6px}}
+/* 표 */
+.tablewrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:top}
+th{background:var(--surface-2);font-weight:600;font-size:13px;color:var(--muted);white-space:nowrap}
+tr:last-child td{border-bottom:0}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+.hl{background:var(--accent-soft)}
+/* 막대 그래프 (값은 --v: 0~1 비율) */
+.bars{display:grid;gap:8px}
+.bar{display:grid;grid-template-columns:150px minmax(0,1fr) 92px;align-items:center;gap:10px;font-size:13.5px}
+.bar .track{height:20px;background:var(--surface-2);border-radius:6px;overflow:hidden}
+.bar .fill{height:100%;width:calc(var(--v) * 100%);background:var(--accent);border-radius:6px;min-width:2px;transition:width .6s ease}
+.bar.good .fill{background:var(--good)}.bar.bad .fill{background:var(--bad)}.bar.warn .fill{background:var(--warn)}
+.bar .val{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--mono);font-size:12.5px}
+@media (max-width:520px){.bar{grid-template-columns:100px minmax(0,1fr) 72px}}
+.source{font-size:12.5px;color:var(--muted);margin-top:10px}
+/* 배지·콜아웃 */
+.badge{display:inline-block;font-size:11.5px;font-weight:700;padding:1px 8px;border-radius:999px;vertical-align:middle}
+.badge.good{background:var(--good-soft);color:var(--good)}
+.badge.bad{background:var(--bad-soft);color:var(--bad)}
+.badge.warn{background:var(--warn-soft);color:var(--warn)}
+.badge.info{background:var(--accent-soft);color:var(--accent)}
+.callout{border-radius:10px;padding:12px 16px;margin:12px 0;font-size:14.5px;border:1px solid var(--border);background:var(--surface)}
+.callout.warn{background:var(--warn-soft);border-color:transparent}
+.callout.bad{background:var(--bad-soft);border-color:transparent}
+.callout.good{background:var(--good-soft);border-color:transparent}
+.callout strong:first-child{margin-right:4px}
+/* 아코디언 (면접 Q&A, 약점) */
+details.qa{background:var(--surface);border:1px solid var(--border);border-radius:10px;margin:8px 0;overflow:hidden}
+details.qa summary{cursor:pointer;padding:12px 16px;font-weight:600;list-style:none;display:flex;gap:10px;align-items:flex-start}
+details.qa summary::-webkit-details-marker{display:none}
+details.qa summary::before{content:"Q";flex:none;width:22px;height:22px;border-radius:6px;background:var(--accent-soft);color:var(--accent);font-size:12px;display:grid;place-items:center;margin-top:1px}
+details.qa.risk summary::before{content:"!";background:var(--bad-soft);color:var(--bad)}
+details.qa[open] summary{border-bottom:1px solid var(--border)}
+details.qa .a{padding:12px 16px 14px 48px;font-size:14.5px}
+details.qa .a p{margin:0 0 8px}details.qa .a ul{margin:0;padding-left:18px}
+.qa-tools{display:flex;gap:8px;margin-bottom:8px}
+.qa-tools button,.theme-toggle{font:inherit;font-size:13px;padding:5px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer}
+.theme-toggle{position:fixed;right:16px;bottom:16px;z-index:5;box-shadow:var(--shadow)}
+/* 파일 지도 */
+ul.files{list-style:none;padding:0;margin:0;display:grid;gap:6px}
+ul.files li{display:grid;grid-template-columns:minmax(0,1fr);gap:2px;padding:9px 12px;background:var(--surface);border:1px solid var(--border);border-radius:9px}
+ul.files li code{background:none;padding:0;font-size:12.5px}
+ul.files li span{color:var(--muted);font-size:13.5px}
+footer{margin-top:56px;padding-top:18px;border-top:1px solid var(--border);color:var(--muted);font-size:13px}
+ul.plain{margin:6px 0;padding-left:20px}ul.plain li{margin:3px 0}
+</style>
+</head>
+<body>
+<button class="theme-toggle" type="button" aria-label="테마 전환">◐ 테마</button>
+<div class="layout">
+  <nav class="toc" aria-label="목차">
+    <a class="home" href="../index.html">← 전체 모듈</a>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin:0 0 14px"><a class="chip" style="text-decoration:none" href="../changes.html#m-spring">개선 내역</a><a class="chip" style="text-decoration:none" href="../interview.html#m-spring">질문 모음</a></div>
+    <ol>
+      <li><a href="#tldr">한눈에</a></li>
+      <li><a href="#flow">흐름</a></li>
+      <li><a href="#cases">비교·핵심 구현</a></li>
+      <li><a href="#results">결과·수치</a></li>
+      <li><a href="#limits">한계·약점</a></li>
+      <li><a href="#interview">면접 Q&amp;A</a></li>
+      <li><a href="#files">파일 지도</a></li>
+    </ol>
+  </nav>
+  <main>
+    <header class="hero">
+      <div class="eyebrow">deep-dive · labs/spring</div>
+      <h1>@Async · CompletableFuture · @Retryable — 프록시가 해 주는 일과 그 함정</h1>
+      <p class="lead">주문 확인 메일 후처리를 예로 <code>@Async</code>와 <code>ExecutorService</code>를 비교하고, 같은 빈 안에서 호출하면 왜 비동기가 안 되는지(self-invocation) 테스트로 확인합니다. 독립 작업 3개를 순차/병렬로 돌려 시간 차이를 보고, README에는 없지만 코드에 있는 <code>@Retryable</code> 결제 재시도 실험까지 담겨 있습니다.</p>
+      <div class="chips"><span class="chip">Java 21</span><span class="chip">Spring Boot 3.4.1</span><span class="chip">spring-retry</span><span class="chip">JUnit 5 · Mockito</span><span class="chip">DB 없음</span></div>
+    </header>
+
+    <section id="tldr" class="tldr">
+      <h2><span class="num">01</span>한눈에</h2>
+      <p class="sub">30초 요약</p>
+      <div class="grid c3">
+        <div class="card bad"><div class="label">문제</div><p>메일 같은 부가 작업이 요청 스레드를 붙잡고, 서로 무관한 작업 3개(결제 250ms·재고 200ms·배송 220ms)를 줄줄이 기다리면 시간이 합산됩니다. 외부 결제 API는 가끔 일시적으로 실패합니다.</p></div>
+        <div class="card"><div class="label">접근</div><p>① <code>@Async</code>와 <code>ExecutorService</code>로 같은 작업을 넘겨 실행 스레드 이름을 비교 ② 같은 빈 내부 호출 ③ 순차 vs 병렬 시간 ④ <code>@Retryable</code>에서 예외 종류별로 재시도할지, 복구(@Recover)할지 나누기.</p></div>
+        <div class="card good"><div class="label">결론</div><p><code>@Async</code>·<code>@Retryable</code>은 <b>프록시</b>를 거쳐야만 동작합니다. 병렬화는 “먼저 전부 시작하고 마지막에 <code>join()</code>”해야 효과가 있습니다. 재시도는 예외를 <b>재시도 / 즉시 거절 / 복구 금지</b>로 나누는 것이 핵심입니다.</p></div>
+      </div>
+    </section>
+
+    <section id="flow">
+      <h2><span class="num">02</span>흐름</h2>
+      <p class="sub">단계를 클릭하면 상세 설명이 나옵니다. 위는 @Async 호출 경로, 아래는 결제 재시도 경로입니다.</p>
+      <h3>@Async 호출 경로</h3>
+      <div class="flow" data-flow>
+        <button class="step" data-target="sp-f1"><span class="k">STEP 1</span><span class="t">호출자가 메서드 호출</span></button>
+        <span class="arrow">→</span>
+        <button class="step" data-target="sp-f2"><span class="k">STEP 2</span><span class="t">프록시가 가로챔</span></button>
+        <span class="arrow">→</span>
+        <button class="step" data-target="sp-f3"><span class="k">STEP 3</span><span class="t">spring-async 스레드 실행</span></button>
+        <span class="arrow">→</span>
+        <button class="step fail" data-target="sp-f4"><span class="k">함정</span><span class="t">같은 빈 내부 호출</span></button>
+      </div>
+      <div class="flow-detail">
+        <div id="sp-f1"><p>테스트가 <code>asyncWorkService.sendOrderConfirmationEmailWithAsync(order)</code>를 호출합니다. 주입받은 <code>asyncWorkService</code>는 실제 객체가 아니라 Spring이 만든 <b>프록시</b>입니다(<code>@EnableAsync</code>가 켜져 있어서).</p></div>
+        <div id="sp-f2"><p>프록시는 <code>@Async("springAsyncExecutor")</code>를 보고 메서드 본문을 실행하지 않고 <code>springAsyncExecutor</code>(core=max=3, queue 10)에 작업을 제출합니다. 호출자는 즉시 <code>CompletableFuture</code>를 받습니다.</p></div>
+        <div id="sp-f3"><p>풀의 워커 스레드(<code>spring-async-1</code> 등)가 본문을 실행해 <code>EmailReceipt</code>를 만들고 future를 완료합니다. 테스트는 <code>get(1, SECONDS)</code>로 기다린 뒤 <code>threadName()</code>이 <code>spring-async-</code>로 시작하는지 확인합니다.</p></div>
+        <div id="sp-f4"><p><code>callAsyncMethodFromSameBean()</code> 안에서 <code>sendOrderConfirmationEmailWithAsync()</code>를 부르면 <code>this.</code> 호출이라 <b>프록시를 다시 거치지 않습니다</b>. <code>@Async</code>가 무시되어 <b>호출자 스레드에서 동기 실행</b>되고, 이미 완료된 future가 반환됩니다. 테스트는 <code>threadName == 호출자 스레드명</code>으로 이를 증명합니다.</p></div>
+      </div>
+      <div class="tablewrap" style="padding:12px 8px;margin-top:12px">
+        <svg viewBox="0 0 560 210" role="img" aria-label="프록시 경유 호출과 self-invocation 비교" style="display:block;width:100%;min-width:520px;height:auto;font-family:var(--sans)">
+          <defs><marker id="sp-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--muted)"/></marker></defs>
+          <text x="10" y="20" style="fill:var(--good);font-size:13px;font-weight:700">외부 호출 (비동기 O)</text>
+          <rect x="10" y="32" width="110" height="40" rx="8" style="fill:var(--surface-2);stroke:var(--border)"/>
+          <text x="65" y="57" text-anchor="middle" style="fill:var(--text);font-size:12px">테스트 스레드</text>
+          <rect x="150" y="32" width="110" height="40" rx="8" style="fill:var(--accent-soft);stroke:var(--accent)"/>
+          <text x="205" y="57" text-anchor="middle" style="fill:var(--text);font-size:12px">Spring 프록시</text>
+          <rect x="290" y="32" width="120" height="40" rx="8" style="fill:var(--surface-2);stroke:var(--border)"/>
+          <text x="350" y="57" text-anchor="middle" style="fill:var(--text);font-size:12px">springAsyncExecutor</text>
+          <rect x="440" y="32" width="110" height="40" rx="8" style="fill:var(--good-soft);stroke:var(--good)"/>
+          <text x="495" y="57" text-anchor="middle" style="fill:var(--text);font-size:12px">spring-async-N</text>
+          <line x1="120" y1="52" x2="148" y2="52" style="stroke:var(--muted);stroke-width:1.5" marker-end="url(#sp-arr)"/>
+          <line x1="260" y1="52" x2="288" y2="52" style="stroke:var(--muted);stroke-width:1.5" marker-end="url(#sp-arr)"/>
+          <line x1="410" y1="52" x2="438" y2="52" style="stroke:var(--muted);stroke-width:1.5" marker-end="url(#sp-arr)"/>
+          <text x="10" y="118" style="fill:var(--bad);font-size:13px;font-weight:700">같은 빈 내부 호출 (비동기 X)</text>
+          <rect x="10" y="130" width="110" height="40" rx="8" style="fill:var(--surface-2);stroke:var(--border)"/>
+          <text x="65" y="155" text-anchor="middle" style="fill:var(--text);font-size:12px">테스트 스레드</text>
+          <rect x="150" y="130" width="110" height="40" rx="8" style="fill:var(--accent-soft);stroke:var(--accent)"/>
+          <text x="205" y="155" text-anchor="middle" style="fill:var(--text);font-size:12px">Spring 프록시</text>
+          <rect x="290" y="130" width="260" height="40" rx="8" style="fill:var(--bad-soft);stroke:var(--bad)"/>
+          <text x="420" y="149" text-anchor="middle" style="fill:var(--text);font-size:12px">AsyncWorkService (실제 객체)</text>
+          <text x="420" y="164" text-anchor="middle" style="fill:var(--muted);font-size:11px">this.sendOrderConfirmationEmailWithAsync()</text>
+          <line x1="120" y1="150" x2="148" y2="150" style="stroke:var(--muted);stroke-width:1.5" marker-end="url(#sp-arr)"/>
+          <line x1="260" y1="150" x2="288" y2="150" style="stroke:var(--muted);stroke-width:1.5" marker-end="url(#sp-arr)"/>
+          <path d="M520,170 C520,198 470,198 470,172" style="fill:none;stroke:var(--bad);stroke-width:1.5;stroke-dasharray:4 3" marker-end="url(#sp-arr)"/>
+          <text x="290" y="196" style="fill:var(--bad);font-size:11.5px">프록시 우회 → 테스트 스레드에서 동기 실행</text>
+        </svg>
+      </div>
+
+      <h3>결제 재시도 경로 (@Retryable)</h3>
+      <div class="flow" data-flow>
+        <button class="step" data-target="sp-r1"><span class="k">시도 1</span><span class="t">retryCount 0</span></button>
+        <span class="arrow">→</span>
+        <button class="step" data-target="sp-r2"><span class="k">일시 오류</span><span class="t">10ms → 20ms 대기 후 재시도</span></button>
+        <span class="arrow">→</span>
+        <button class="step" data-target="sp-r3"><span class="k">시도 3 실패</span><span class="t">@Recover → REVIEW_REQUIRED</span></button>
+        <span class="arrow">→</span>
+        <button class="step fail" data-target="sp-r4"><span class="k">예외 분류</span><span class="t">즉시 거절 / 복구 금지</span></button>
+      </div>
+      <div class="flow-detail">
+        <div id="sp-r1"><p><code>PaymentRetryService.requestPayment()</code>도 프록시를 거칩니다(<code>@EnableRetry</code>). 첫 호출의 <code>RetryContext.getRetryCount()</code>는 0. 성공하면 바로 끝나고 대기(backoff)도 없습니다.</p></div>
+        <div id="sp-r2"><p><code>TemporaryPaymentException</code>(PaymentException 하위)이 나면 재시도합니다. 테스트 설정(initial-delay 10, multiplier 2.0, random false)에서 대기는 <b>10ms → 20ms</b>로 늘어납니다. 세 번째 시도(retryCount 2)에서 성공하면 <code>COMPLETED</code>. 세 번 모두 같은 <code>idempotencyKey</code>로 호출됩니다.</p></div>
+        <div id="sp-r3"><p>max-attempts 3을 다 써도 실패하면 <code>@Recover recover(TemporaryPaymentException, ...)</code>가 호출되어 예외 대신 <code>REVIEW_REQUIRED</code>(수동 확인 필요)를 반환합니다.</p></div>
+        <div id="sp-r4"><p><b>InvalidPaymentRequestException</b>: <code>noRetryFor</code> → 재시도 없이 1회만 호출, 그러나 @Recover로 <code>REJECTED</code> 반환.<br><b>UnknownPaymentStateException</b>: 재시도는 3회 하지만 <code>notRecoverable</code> → @Recover를 건너뛰고 <b>원래 예외를 그대로</b> 던집니다. “결제가 됐는지 모르는 상태”를 조용히 덮지 않기 위함입니다.</p></div>
+      </div>
+    </section>
+
+    <section id="cases">
+      <h2><span class="num">03</span>비교·핵심 구현</h2>
+      <p class="sub">탭을 눌러 케이스별로 봅니다.</p>
+      <div data-tabs>
+        <div class="tabs" role="tablist">
+          <button role="tab" data-target="sp-t1">@Async</button>
+          <button role="tab" data-target="sp-t2">ExecutorService</button>
+          <button role="tab" data-target="sp-t3">self-invocation</button>
+          <button role="tab" data-target="sp-t4">순차 vs 병렬</button>
+          <button role="tab" data-target="sp-t5">@Async 병렬</button>
+          <button role="tab" data-target="sp-t6">@Retryable</button>
+        </div>
+        <div class="tabpanel card" id="sp-t1">
+          <h3>@Async — 서비스 코드는 단순, 실행은 프록시가 <span class="badge good">비동기</span></h3>
+          <p>메서드에 어노테이션만 붙이면 Spring이 지정한 풀로 넘겨 줍니다.</p>
+          <pre><code>// AsyncWorkService
+@Async("springAsyncExecutor")
+public CompletableFuture&lt;EmailReceipt&gt; sendOrderConfirmationEmailWithAsync(Order order) {
+    return CompletableFuture.completedFuture(emailSender.send(order, "@Async"));
+}
+
+// ExecutorConfig
+executor.setCorePoolSize(3);
+executor.setMaxPoolSize(3);
+executor.setQueueCapacity(10);
+executor.setThreadNamePrefix("spring-async-");</code></pre>
+          <dl class="kv">
+            <dt>어떻게</dt><dd>프록시가 메서드 호출을 가로채 <code>ThreadPoolTaskExecutor</code>에 제출. 본문 안의 <code>completedFuture</code>는 워커 스레드에서 만들어지고, 프록시가 돌려준 future가 그 결과로 완료됩니다.</dd>
+            <dt>결과</dt><dd>테스트: <code>threadName</code>이 <code>spring-async-</code>로 시작하고 호출자 스레드와 다름. 메일 제목 <code>[deep-dive] 주문 확인: order-1</code>.</dd>
+            <dt>트레이드오프</dt><dd>호출부가 평범한 메서드 호출처럼 보여 간단하지만, 프록시를 안 거치면 조용히 동기 실행됩니다.</dd>
+            <dt>코드</dt><dd><code>src/main/java/dev/deepdive/spring/async/AsyncWorkService.java</code>, <code>src/main/java/dev/deepdive/spring/config/ExecutorConfig.java</code></dd>
+          </dl>
+        </div>
+        <div class="tabpanel card" id="sp-t2">
+          <h3>ExecutorService — 제출이 코드에 드러남 <span class="badge good">비동기</span></h3>
+          <p>순수 Java 방식. 어떤 풀에 무엇을 제출하는지 호출부에서 바로 보입니다.</p>
+          <pre><code>// AsyncWorkService
+return CompletableFuture.supplyAsync(
+        () -&gt; emailSender.send(order, "ExecutorService"),
+        javaExecutorService
+);
+
+// ExecutorConfig
+@Bean(destroyMethod = "shutdown")
+public ExecutorService javaExecutorService() {
+    return Executors.newFixedThreadPool(3, Thread.ofPlatform().name("java-executor-", 1).factory());
+}</code></pre>
+          <dl class="kv">
+            <dt>어떻게</dt><dd>프록시와 무관. <code>supplyAsync(..., executor)</code>가 직접 작업을 넘깁니다. 종료(<code>shutdown</code>)는 빈 destroyMethod로 관리.</dd>
+            <dt>결과</dt><dd>테스트: <code>threadName</code>이 <code>java-executor-</code>로 시작.</dd>
+            <dt>트레이드오프</dt><dd>흐름이 명확하고 같은 클래스 안에서도 동작하지만, 풀 생성·종료·제출을 직접 관리해야 합니다.</dd>
+            <dt>언제</dt><dd>README “언제 쓰나” 표: 여러 작업의 제출·완료·조합을 직접 제어할 때, Spring 프록시 밖 순수 Java 코드, 같은 클래스 내부에서 비동기가 필요할 때.</dd>
+          </dl>
+        </div>
+        <div class="tabpanel card" id="sp-t3">
+          <h3>self-invocation — @Async가 무시됨 <span class="badge bad">동기 실행</span></h3>
+          <p>같은 객체 안에서 <code>this</code>로 부르면 프록시를 우회합니다.</p>
+          <pre><code>public CompletableFuture&lt;EmailReceipt&gt; callAsyncMethodFromSameBean(Order order) {
+    return sendOrderConfirmationEmailWithAsync(order); // this. 호출 → 프록시 미경유
+}
+
+// AsyncVsExecutorServiceTest
+assertThat(receipt.threadName()).isEqualTo(callerThreadName); // 내부 호출이라 테스트 스레드명 표출
+assertThat(receipt.threadName()).doesNotStartWith("spring-async-");</code></pre>
+          <dl class="kv">
+            <dt>왜</dt><dd>Spring AOP는 빈을 감싼 프록시 객체에 부가 기능을 넣습니다. 프록시 내부에서 실제 객체로 들어간 뒤의 <code>this</code>는 프록시가 아닙니다.</dd>
+            <dt>해결</dt><dd>비동기 메서드를 <b>별도 빈</b>으로 분리 — 이 모듈은 병렬 예제에서 실제로 <code>OrderPreparationAsyncService</code>를 따로 둡니다. 또는 <code>ExecutorService</code> 사용.</dd>
+            <dt>같은 원리</dt><dd><code>@Transactional</code>, <code>@Retryable</code>, <code>@Cacheable</code>도 프록시 기반이라 같은 함정이 있습니다(일반 지식).</dd>
+          </dl>
+        </div>
+        <div class="tabpanel card" id="sp-t4">
+          <h3>CompletableFuture — 순차 vs 병렬 <span class="badge info">시간 비교</span></h3>
+          <p>결제 확인 250ms, 재고 확인 200ms, 배송 예정일 220ms (모두 <code>Thread.sleep</code>으로 흉내). 서로 의존하지 않습니다.</p>
+          <pre><code>// before: 하나 끝나야 다음 시작 → 합에 가까움
+String paymentStatus = confirmPayment(order);
+String inventoryStatus = checkInventory(order);
+String deliveryEstimate = estimateDelivery(order);
+
+// after: 셋을 먼저 다 시작 → 가장 느린 작업에 가까움
+CompletableFuture&lt;String&gt; paymentStatus = CompletableFuture.supplyAsync(() -&gt; confirmPayment(order), javaExecutorService);
+CompletableFuture&lt;String&gt; inventoryStatus = CompletableFuture.supplyAsync(() -&gt; checkInventory(order), javaExecutorService);
+CompletableFuture&lt;String&gt; deliveryEstimate = CompletableFuture.supplyAsync(() -&gt; estimateDelivery(order), javaExecutorService);
+// ...
+paymentStatus.join(), inventoryStatus.join(), deliveryEstimate.join()</code></pre>
+          <dl class="kv">
+            <dt>결과</dt><dd>테스트 임계값: 순차 <b>≥ 600ms</b>, 병렬 <b>&lt; 500ms</b>. 두 방식 모두 같은 메일 본문을 반환.</dd>
+            <dt>전제</dt><dd>풀 크기 3 = 작업 3개가 동시에 돌 수 있어야 함. 풀이 1이면 병렬 이점이 사라집니다.</dd>
+          </dl>
+        </div>
+        <div class="tabpanel card" id="sp-t5">
+          <h3>@Async로 병렬 — join 위치가 전부 <span class="badge warn">함정 주의</span></h3>
+          <p><code>@Async</code> 작업을 <b>호출하자마자 join()</b>하면 비동기여도 사실상 순차입니다.</p>
+          <pre><code>// before: 제출 → 즉시 대기 → 다음 제출 (순차와 같음)
+String paymentStatus = orderPreparationAsyncService.confirmPayment(order).join();
+String inventoryStatus = orderPreparationAsyncService.checkInventory(order).join();
+String deliveryEstimate = orderPreparationAsyncService.estimateDelivery(order).join();
+
+// after: 셋 다 시작한 뒤 마지막에 join
+CompletableFuture&lt;String&gt; paymentStatus = orderPreparationAsyncService.confirmPayment(order);
+CompletableFuture&lt;String&gt; inventoryStatus = orderPreparationAsyncService.checkInventory(order);
+CompletableFuture&lt;String&gt; deliveryEstimate = orderPreparationAsyncService.estimateDelivery(order);</code></pre>
+          <dl class="kv">
+            <dt>왜 별도 빈</dt><dd>결제/재고/배송 메서드를 <code>AsyncWorkService</code> 안에 두면 self-invocation이 되어 비동기가 안 됩니다. 그래서 <code>OrderPreparationAsyncService</code>로 분리.</dd>
+            <dt>결과</dt><dd>테스트 임계값: before ≥ 600ms, after &lt; 500ms.</dd>
+          </dl>
+        </div>
+        <div class="tabpanel card" id="sp-t6">
+          <h3>@Retryable — 예외를 3갈래로 분류 <span class="badge info">README에 없음</span></h3>
+          <p>외부 결제 API의 일시 오류는 재시도하되, 고쳐지지 않을 오류와 “결과를 모르는” 오류는 다르게 다룹니다.</p>
+          <pre><code>@Retryable(
+        retryFor = PaymentException.class,
+        noRetryFor = InvalidPaymentRequestException.class,
+        notRecoverable = UnknownPaymentStateException.class,
+        maxAttemptsExpression = "${payment.retry.max-attempts:3}",
+        backoff = @Backoff(
+                delayExpression = "${payment.retry.initial-delay:50}",
+                maxDelayExpression = "${payment.retry.max-delay:500}",
+                multiplierExpression = "${payment.retry.multiplier:2.0}",
+                randomExpression = "${payment.retry.random:true}"
+        )
+)
+public PaymentResult requestPayment(PaymentRequest request) { ... }
+
+@Recover
+public PaymentResult recover(TemporaryPaymentException exception, PaymentRequest request) {
+    return PaymentResult.reviewRequired(request.orderId());
+}</code></pre>
+          <div class="tablewrap">
+            <table>
+              <thead><tr><th>예외</th><th>재시도</th><th>@Recover</th><th>최종 결과 (RetryableTest)</th></tr></thead>
+              <tbody>
+                <tr><td><code>TemporaryPaymentException</code></td><td>O (최대 3회)</td><td>O</td><td>3번째 성공 → COMPLETED / 3회 실패 → REVIEW_REQUIRED</td></tr>
+                <tr><td><code>InvalidPaymentRequestException</code></td><td>X (noRetryFor)</td><td>O</td><td>1회 호출 → REJECTED</td></tr>
+                <tr><td><code>UnknownPaymentStateException</code></td><td>O (3회)</td><td>X (notRecoverable)</td><td>같은 예외 인스턴스가 그대로 던져짐</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <dl class="kv">
+            <dt>설정</dt><dd><code>application.yml</code>의 <code>payment.retry.*</code>(3회, 50ms, 최대 500ms, ×2.0, random true). 테스트는 <code>@SpringBootTest(properties=...)</code>로 10ms·random false로 바꿔 대기값을 결정적으로 만듭니다.</dd>
+            <dt>테스트 기법</dt><dd><code>RecordingSleeper</code>(Sleeper 빈)로 실제로 자지 않고 대기 시간만 기록, <code>RetrySynchronizationManager.getContext()</code>로 시도 번호 확인, <code>@MockitoBean PaymentGatewayClient</code>로 실패 주입.</dd>
+            <dt>코드</dt><dd><code>src/main/java/dev/deepdive/spring/retry/PaymentRetryService.java</code></dd>
+          </dl>
+        </div>
+      </div>
+    </section>
+
+    <section id="results">
+      <h2><span class="num">04</span>결과·수치</h2>
+      <p class="sub">이 모듈은 실제 측정값을 기록하지 않습니다. 아래는 코드의 sleep 값으로 계산한 이론값과 테스트 임계값입니다.</p>
+      <div class="card">
+        <div class="tablewrap" style="border:0;padding:4px 0">
+          <svg viewBox="0 0 560 200" role="img" aria-label="순차와 병렬 실행 타임라인" style="display:block;width:100%;min-width:520px;height:auto;font-family:var(--sans)">
+            <text x="90" y="44" text-anchor="end" style="fill:var(--text);font-size:12px;font-weight:600">순차</text>
+            <rect x="100" y="30" width="150" height="20" rx="4" style="fill:var(--bad);opacity:.85"/>
+            <rect x="250" y="30" width="120" height="20" rx="4" style="fill:var(--bad);opacity:.6"/>
+            <rect x="370" y="30" width="132" height="20" rx="4" style="fill:var(--bad);opacity:.4"/>
+            <text x="175" y="44" text-anchor="middle" style="fill:var(--bg);font-size:11px">결제 250</text>
+            <text x="310" y="44" text-anchor="middle" style="fill:var(--bg);font-size:11px">재고 200</text>
+            <text x="436" y="44" text-anchor="middle" style="fill:var(--text);font-size:11px">배송 220</text>
+            <text x="90" y="88" text-anchor="end" style="fill:var(--text);font-size:12px;font-weight:600">병렬</text>
+            <rect x="100" y="72" width="150" height="16" rx="4" style="fill:var(--good);opacity:.85"/>
+            <rect x="100" y="92" width="120" height="16" rx="4" style="fill:var(--good);opacity:.6"/>
+            <rect x="100" y="112" width="132" height="16" rx="4" style="fill:var(--good);opacity:.4"/>
+            <text x="256" y="85" style="fill:var(--text);font-size:11px">결제 250 (가장 느림)</text>
+            <text x="226" y="105" style="fill:var(--text);font-size:11px">재고 200</text>
+            <text x="238" y="125" style="fill:var(--text);font-size:11px">배송 220</text>
+            <line x1="400" y1="22" x2="400" y2="160" style="stroke:var(--good);stroke-dasharray:4 3"/>
+            <text x="400" y="176" text-anchor="middle" style="fill:var(--good);font-size:11px">500ms 병렬 상한</text>
+            <line x1="460" y1="22" x2="460" y2="160" style="stroke:var(--bad);stroke-dasharray:4 3"/>
+            <text x="470" y="192" text-anchor="middle" style="fill:var(--bad);font-size:11px">600ms 순차 하한</text>
+            <line x1="100" y1="150" x2="520" y2="150" style="stroke:var(--border)"/>
+            <text x="100" y="164" text-anchor="middle" style="fill:var(--muted);font-size:10px">0</text>
+            <text x="250" y="164" text-anchor="middle" style="fill:var(--muted);font-size:10px">250</text>
+            <text x="502" y="164" text-anchor="middle" style="fill:var(--muted);font-size:10px">670</text>
+          </svg>
+        </div>
+        <div class="bars" style="margin-top:8px">
+          <div class="bar bad" style="--v:1"><span>순차 (sleep 합)</span><div class="track"><div class="fill"></div></div><span class="val">670 ms</span></div>
+          <div class="bar good" style="--v:.373"><span>병렬 (sleep 최대)</span><div class="track"><div class="fill"></div></div><span class="val">250 ms</span></div>
+        </div>
+        <div class="source">출처: <code>AsyncWorkService</code>·<code>OrderPreparationAsyncService</code>의 <code>Thread.sleep</code> 값(250/200/220ms)으로 계산한 이론값 — 측정값 아님. 점선은 <code>AsyncVsExecutorServiceTest</code>의 <b>테스트 임계값</b>(순차 ≥ 600ms, 병렬 &lt; 500ms).</div>
+      </div>
+      <h3>테스트가 확인하는 것</h3>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>테스트</th><th>단언</th><th>출처</th></tr></thead>
+          <tbody>
+            <tr><td>@Async 실행 스레드</td><td><code>spring-async-*</code>, 호출자와 다름</td><td>AsyncVsExecutorServiceTest</td></tr>
+            <tr><td>ExecutorService 실행 스레드</td><td><code>java-executor-*</code></td><td>AsyncVsExecutorServiceTest</td></tr>
+            <tr><td>self-invocation</td><td>스레드명 == 호출자 스레드</td><td>AsyncVsExecutorServiceTest</td></tr>
+            <tr><td>순차 2종 / 병렬 2종</td><td>≥ 600ms / &lt; 500ms (테스트 임계값)</td><td>AsyncVsExecutorServiceTest</td></tr>
+            <tr><td>첫 호출 성공</td><td>retryCount <code>[0]</code>, 대기 없음, 호출 1회</td><td>RetryableTest</td></tr>
+            <tr><td>일시 오류 2회 후 성공</td><td>retryCount <code>[0,1,2]</code>, 대기 <code>[10,20]</code>ms, 같은 멱등 키</td><td>RetryableTest</td></tr>
+            <tr><td>일시 오류 3회</td><td>REVIEW_REQUIRED, 호출 3회</td><td>RetryableTest</td></tr>
+            <tr><td>잘못된 요청</td><td>REJECTED, retryCount <code>[0]</code>, 호출 1회</td><td>RetryableTest</td></tr>
+            <tr><td>상태 불명</td><td>같은 예외 재던짐, 호출 3회</td><td>RetryableTest</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="limits">
+      <h2><span class="num">05</span>한계·약점</h2>
+      <p class="sub">README가 스스로 밝힌 한계와, 코드에서 확인되는 약점.</p>
+      <details id="lim-1" class="qa risk"><summary><span><span class="badge good">README 수정함</span> README에 @Retryable 실험이 없었음</span></summary><div class="a"><p><code>SpringLabApplication</code>에 <code>@EnableRetry</code>, <code>retry/</code> 패키지, <code>RetryableTest</code>가 있었지만 README는 @Async만 다뤘습니다. 지금은 README에 “@Retryable로 재시도할 오류와 하지 않을 오류 나누기” 섹션과 시작점 항목을 추가했습니다.</p></div></details>
+      <details id="lim-2" class="qa risk"><summary><span><span class="badge good">README 수정함</span> “springAsyncExecutor도 fixed thread pool 크기 3”</span></summary><div class="a"><p>README 문장을 실제 설정에 맞게 고쳤습니다. 실제로는 <code>ThreadPoolTaskExecutor</code>(core=max=3, <b>queueCapacity 10</b>)입니다. <code>javaExecutorService</code>만 <code>Executors.newFixedThreadPool(3)</code>. 결과적으로 동시 3개는 같지만 큐 동작이 다릅니다.</p></div></details>
+      <details id="lim-3" class="qa risk"><summary><span><span class="badge bad">코드</span> 시간 기반 테스트는 환경에 민감</span></summary><div class="a"><p>병렬 &lt; 500ms 단언은 가장 느린 작업 250ms 대비 여유가 250ms뿐입니다. CI가 느리거나 스레드 풀 워밍업이 늦으면 실패할 수 있습니다.</p><p><b>실측 후 그대로 둠</b>: 두 병렬 테스트를 5회 반복 실행한 소요 시간은 모두 255~257ms였습니다(순차는 670ms 이상). 오버헤드가 5ms 남짓이라 250ms 여유는 그 50배이고, 두 스레드 풀 모두 크기 3이라 세 작업이 큐에서 기다리지 않습니다. 기준을 바꿀 근거가 없어 단언은 유지했습니다. 아주 느린 공유 CI에서 문제가 되면 "병렬 &lt; 순차 × 0.7" 같은 상대 비교를 더하는 것이 다음 단계입니다.</p></div></details>
+      <details id="lim-4" class="qa risk"><summary><span><span class="badge bad">코드</span> 풀 포화·예외 전파는 실험하지 않음</span></summary><div class="a"><ul><li>작업이 3개뿐이라 큐(10)가 차는 상황, 거절 정책은 다루지 않습니다. 일반 지식: <code>ThreadPoolTaskExecutor</code>는 기본적으로 큐가 차고 max에 도달하면 <code>TaskRejectedException</code>; <code>newFixedThreadPool</code>은 큐가 무제한이라 메모리가 쌓일 수 있음.</li><li>비동기 작업에서 예외가 났을 때 future로 전파되는 방식, <code>void</code> 반환 @Async의 예외 처리(<code>AsyncUncaughtExceptionHandler</code>, 일반 지식)도 없습니다.</li></ul></div></details>
+      <details id="lim-5" class="qa risk"><summary><span><span class="badge bad">코드</span> 재시도 설정 일부는 검증되지 않음</span></summary><div class="a"><p>운영 설정 <code>random: true</code>(지터)와 <code>max-delay</code> 상한은 테스트에서 끄거나(random false) 도달하지 않습니다(10→20ms, 상한 40). <code>PaymentGatewayClient</code>는 항상 성공하는 스텁이라 실패는 <code>@MockitoBean</code>으로만 재현됩니다.</p></div></details>
+    </section>
+
+    <section id="interview">
+      <h2><span class="num">06</span>면접 Q&amp;A</h2>
+      <p class="sub">질문을 먼저 읽고 스스로 답해 본 뒤 펼쳐 보세요.</p>
+      <div class="qa-tools"><button type="button" data-qa="open">모두 펼치기</button><button type="button" data-qa="close">모두 접기</button></div>
+      <details id="iv-1" class="qa"><summary>@Async는 어떻게 동작하고, 같은 클래스 안에서 호출하면 왜 비동기가 안 되나요?</summary><div class="a"><p><code>@EnableAsync</code>가 빈을 프록시로 감싸고, 프록시가 호출을 가로채 TaskExecutor에 제출합니다. 같은 객체 안의 <code>this.method()</code>는 프록시를 거치지 않으므로 그냥 호출자 스레드에서 실행됩니다. 이 모듈의 테스트가 스레드 이름이 호출자와 같은 것으로 증명합니다. 해결은 별도 빈 분리(<code>OrderPreparationAsyncService</code>) 또는 ExecutorService 직접 사용.</p></div></details>
+      <details id="iv-2" class="qa"><summary>@Async와 ExecutorService는 언제 각각 쓰나요?</summary><div class="a"><ul><li><b>@Async</b>: 서비스 메서드 하나를 간단히 백그라운드로 — 메일·알림 같은 분리 가능한 후처리.</li><li><b>ExecutorService</b>: 여러 작업의 제출·완료·조합을 직접 제어해야 할 때, 프록시 밖 순수 Java 코드, 같은 클래스 내부 호출.</li></ul><p>(README “언제 쓰나” 표 기준)</p></div></details>
+      <details id="iv-3" class="qa"><summary>독립 작업 3개를 병렬화했는데 시간이 안 줄었습니다. 무엇을 의심하나요?</summary><div class="a"><ul><li>제출 직후 <code>join()</code>/<code>get()</code>으로 기다리고 있는지 — 이 모듈의 “@Async before” 케이스가 정확히 이 실수입니다.</li><li>self-invocation으로 @Async가 무시됐는지.</li><li>풀 크기가 동시 작업 수보다 작은지(여기선 3으로 맞춤).</li></ul></div></details>
+      <details id="iv-4" class="qa"><summary>@Async를 쓸 때 전용 스레드 풀을 직접 정의하는 이유는?</summary><div class="a"><p>스레드 이름(<code>spring-async-</code>)으로 로그 추적이 쉬워지고, core/max/queue로 동시성과 메모리 상한을 통제할 수 있습니다. <span class="badge info">일반 지식</span> 기본 실행기에 의존하면 큐 크기·거절 정책을 통제하기 어렵고, 작업 종류별로 풀을 나눠(bulkhead) 한 작업이 다른 작업을 굶기지 않게 하는 것도 불가능합니다.</p></div></details>
+      <details id="iv-5" class="qa"><summary>어떤 예외는 재시도하고 어떤 예외는 하면 안 되나요?</summary><div class="a"><p>일시적 오류(타임아웃, 일시 장애)는 재시도. 요청 자체가 잘못된 경우(<code>InvalidPaymentRequestException</code>)는 몇 번 해도 같으므로 <code>noRetryFor</code>로 즉시 거절. 결제 성공 여부를 모르는 경우(<code>UnknownPaymentStateException</code>)는 재시도는 해도 <code>notRecoverable</code>로 @Recover가 “실패”로 덮지 못하게 예외를 그대로 올려 상위에서 상태 조회·보정을 하게 합니다.</p></div></details>
+      <details id="iv-6" class="qa"><summary>결제 API를 재시도할 때 가장 중요한 것은?</summary><div class="a"><p>멱등성입니다. 첫 요청이 실제로는 처리됐는데 응답만 유실됐다면 재시도가 이중 결제를 만듭니다. 이 모듈의 <code>PaymentRequest</code>는 <code>idempotencyKey</code>를 필수로 하고, 테스트는 3번의 시도가 모두 같은 키(<code>payment-order-2</code>)로 호출됐는지 확인합니다.</p></div></details>
+      <details id="iv-7" class="qa"><summary>지수 백오프와 지터(random)는 왜 쓰나요?</summary><div class="a"><p>테스트에서 대기는 10ms → 20ms로 배수 증가합니다. <span class="badge info">일반 지식</span> 장애 중인 서버에 즉시·동시에 재시도가 몰리면 회복을 방해하므로 간격을 늘리고(backoff), 여러 클라이언트가 같은 박자로 재시도하지 않도록 무작위성(jitter)을 섞습니다. 이 모듈의 운영 설정은 <code>random: true</code>입니다.</p></div></details>
+      <details id="iv-8" class="qa"><summary>@Recover 메서드는 어떻게 선택되나요?</summary><div class="a"><p>첫 파라미터가 던져진 예외 타입, 이후 파라미터가 원래 메서드 인자와 맞는 @Recover 중 가장 구체적인 타입이 선택됩니다. 그래서 <code>TemporaryPaymentException</code>은 전용 recover, 다른 <code>PaymentException</code>은 범용 recover로 갑니다. 코드 주석: “UnknownPaymentStateException에 notRecoverable이 없다면 이 메서드(범용)가 선택된다.”</p></div></details>
+    </section>
+
+    <section id="files">
+      <h2><span class="num">07</span>파일 지도</h2>
+      <p class="sub">코드를 다시 볼 때 여기서부터. (경로는 <code>labs/spring/</code> 기준)</p>
+      <ul class="files">
+        <li><code>src/main/java/dev/deepdive/spring/SpringLabApplication.java</code><span>@EnableAsync + @EnableRetry</span></li>
+        <li><code>src/main/java/dev/deepdive/spring/config/ExecutorConfig.java</code><span>springAsyncExecutor(3/3/큐10), javaExecutorService(fixed 3)</span></li>
+        <li><code>src/main/java/dev/deepdive/spring/async/AsyncWorkService.java</code><span>@Async·ExecutorService·self-invocation·순차/병렬 4종</span></li>
+        <li><code>src/main/java/dev/deepdive/spring/async/OrderPreparationAsyncService.java</code><span>@Async 결제/재고/배송 (별도 빈으로 분리)</span></li>
+        <li><code>src/main/java/dev/deepdive/spring/async/OrderConfirmationEmailSender.java</code><span>메일 내용 + 실행 스레드명 기록</span></li>
+        <li><code>src/main/java/dev/deepdive/spring/retry/PaymentRetryService.java</code><span>@Retryable + @Recover 3개</span></li>
+        <li><code>src/main/java/dev/deepdive/spring/retry/PaymentRequest.java</code><span>orderId + idempotencyKey (필수)</span></li>
+        <li><code>src/main/resources/application.yml</code><span>payment.retry.* 기본값</span></li>
+        <li><code>src/test/java/dev/deepdive/spring/async/AsyncVsExecutorServiceTest.java</code><span>스레드명·시간 임계값 7개 테스트</span></li>
+        <li><code>src/test/java/dev/deepdive/spring/retry/RetryableTest.java</code><span>retryCount·대기시간·예외 분류 5개 테스트</span></li>
+      </ul>
+    </section>
+
+    <footer>README와 소스 코드를 근거로 정리한 문서입니다. 수치는 README에 기록된 값이며, 테스트로 검증되지 않은 값은 그렇게 표기했습니다.</footer>
+  </main>
+</div>
+<script>
+/* ===== 공통 스크립트 (모든 모듈 overview.html에서 동일하게 유지) ===== */
+(function(){
+  var root=document.documentElement;
+  try{var saved=localStorage.getItem('deepdive-theme');if(saved)root.setAttribute('data-theme',saved);}catch(e){}
+  var tt=document.querySelector('.theme-toggle');
+  if(tt)tt.addEventListener('click',function(){
+    var cur=root.getAttribute('data-theme');
+    if(!cur)cur=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';
+    var next=cur==='dark'?'light':'dark';root.setAttribute('data-theme',next);
+    try{localStorage.setItem('deepdive-theme',next);}catch(e){}
+  });
+  document.querySelectorAll('[data-flow]').forEach(function(flow){
+    var steps=flow.querySelectorAll('.step');var detail=flow.nextElementSibling;
+    function show(btn){
+      steps.forEach(function(s){s.setAttribute('aria-selected',s===btn?'true':'false');});
+      if(detail)detail.querySelectorAll(':scope>div').forEach(function(d){d.classList.toggle('on',d.id===btn.dataset.target);});
+    }
+    steps.forEach(function(s){s.addEventListener('click',function(){show(s);});});
+    if(steps[0])show(steps[0]);
+  });
+  document.querySelectorAll('[data-tabs]').forEach(function(box){
+    var btns=box.querySelectorAll(':scope>.tabs>button');
+    function show(btn){
+      btns.forEach(function(b){b.setAttribute('aria-selected',b===btn?'true':'false');});
+      box.querySelectorAll(':scope>.tabpanel').forEach(function(p){p.classList.toggle('on',p.id===btn.dataset.target);});
+    }
+    btns.forEach(function(b){b.addEventListener('click',function(){show(b);});});
+    if(btns[0])show(btns[0]);
+  });
+  document.querySelectorAll('[data-qa]').forEach(function(b){
+    b.addEventListener('click',function(){
+      var sec=b.closest('section');var open=b.dataset.qa==='open';
+      sec.querySelectorAll('details.qa').forEach(function(d){d.open=open;});
+    });
+  });
+  var links=document.querySelectorAll('nav.toc a[href^="#"]');
+  if('IntersectionObserver' in window){
+    var io=new IntersectionObserver(function(es){es.forEach(function(e){
+      if(e.isIntersecting){links.forEach(function(l){l.classList.toggle('active',l.getAttribute('href')==='#'+e.target.id);});}
+    });},{rootMargin:'-20% 0px -70% 0px'});
+    document.querySelectorAll('main section[id]').forEach(function(s){io.observe(s);});
+  }
+  function openHash(){
+    var id='';try{id=decodeURIComponent(location.hash.slice(1));}catch(e){}
+    if(!id)return;var el=document.getElementById(id);if(!el)return;
+    var d=el.tagName==='DETAILS'?el:el.closest('details');if(d)d.open=true;
+    var p=el.closest('.tabpanel');
+    if(p&&!p.classList.contains('on')){var b=p.parentElement.querySelector(':scope>.tabs>button[data-target="'+p.id+'"]');if(b)b.click();}
+    setTimeout(function(){el.scrollIntoView({block:'start'});},0);
+  }
+  window.addEventListener('hashchange',openHash);openHash();
+})();
+</script>
+</body>
+</html>

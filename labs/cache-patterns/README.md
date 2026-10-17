@@ -582,6 +582,14 @@ sequenceDiagram
 - 보호 없는 Cache Aside: 캐시에는 v1, 저장소에는 v2
 - `VersionedCache`: 더 낮은 버전의 put 거부
 - `rejectedPuts()`로 거부 횟수 확인
+- evict 경쟁: 쓰기 B가 `evict(1L, 2L)`로 무효화한 뒤 읽기 A의 버전 1 put이 와도 거부
+
+evict는 버전을 남긴다(tombstone):
+
+- 위 시나리오의 3번은 "캐시 제거"다. evict가 엔트리를 통째로 지우면 비교할 버전이 사라져, 4번의 뒤늦은 v1 put이 그대로 받아들여진다.
+- 그래서 `VersionedCache.evict()`는 값만 비우고 지금까지 본 가장 높은 버전을 남긴다. 쓰기 경로는 `evict(key, newVersion)`으로 자신이 저장한 새 버전을 tombstone에 기록한다.
+- 대가로 지운 key도 버전 하나만큼 메모리를 계속 쓴다. 실무에서는 tombstone에 race 창보다 긴 짧은 TTL을 둔다.
+- 버전 비교와 교체는 `ConcurrentHashMap.compute()`로 key 단위 원자적으로 처리한다.
 
 ## 4. 3대장
 
@@ -599,6 +607,9 @@ sequenceDiagram
 
 - `SingleFlightCache`: 같은 key의 동시 로드를 1회로 합침
 - `RefreshAheadCache`: 만료 직전에 미리 갱신해서 완전 만료로 생기는 miss를 줄임
+  - threshold(TTL 80%) ~ 만료 전: 가진 값을 **즉시 반환**하고 갱신은 주입받은 `Executor`에서 백그라운드로 실행
+  - 같은 key의 갱신은 한 번에 하나만 제출(`refreshing` 집합), 값이 없거나 만료된 key의 동시 miss는 key별 락 + double-check로 1회 로드
+  - 백그라운드 갱신이 실패하면 기존 값을 유지하고 다음 조회가 다시 시도
 
 ```mermaid
 sequenceDiagram
@@ -642,7 +653,9 @@ sequenceDiagram
 
 - 보호 없는 Cache Aside: `THREADS`만큼 load 발생
 - `SingleFlightCache`: load 1회
-- `RefreshAheadCache`: TTL 80% 경과 시점부터 미리 갱신
+- `RefreshAheadCache`: TTL 80% 경과 시점부터 기존 값을 주면서 백그라운드 갱신 제출 → 갱신 완료 후 새 값, 원래 만료 시점에도 hard-miss 없음
+- `RefreshAheadCache`: threshold 구간에 16개 스레드가 몰려도 갱신 작업은 1개만 제출
+- 테스트는 제출된 작업을 쌓아 두었다가 직접 실행하는 `ManualExecutor`로 갱신 시점을 결정론적으로 제어
 
 ### 4-2. Cache Penetration
 
@@ -656,7 +669,7 @@ sequenceDiagram
 
 방어:
 
-- Negative caching: `Optional.empty()`도 캐시에 저장
+- Negative caching: `Optional.empty()`도 캐시에 저장, 단 negative 엔트리는 짧은 TTL 뒤 만료
 - Bloom filter: 확실히 없는 키는 저장소 조회 전 차단
 
 ```mermaid
@@ -700,12 +713,13 @@ sequenceDiagram
 
 - 보호 없는 Cache Aside: 없는 키 조회마다 저장소 read 증가
 - `NegativeCachingCache`: 첫 조회만 저장소 read
+- `NegativeCachingCache`: negative TTL이 지나면 저장소를 다시 조회해 나중에 생긴 값을 보여줌 (`MutableClock`으로 시간 이동)
 - `BloomFilter`: 확실히 없는 키는 저장소 read 0회
 
 주의점:
 
-- Negative cache는 짧은 TTL 권장
-- 나중에 실제 값이 생성됐는데 empty 캐시가 오래 남으면 새 값을 가릴 수 있음
+- Negative cache는 짧은 TTL 권장 → `NegativeCachingCache(clock, negativeTtlMillis)`가 negative 엔트리에만 TTL을 둔다
+- TTL 안에서는 실제 값이 생성돼도 empty가 계속 hit → TTL이 "새 값을 가려도 되는 최대 시간"
 - Bloom filter의 `true`는 "있을 수도 있음", `false`는 "확실히 없음"
 
 ### 4-3. Cache Avalanche

@@ -23,6 +23,7 @@ import reactor.core.publisher.Sinks;
 import reactor.core.scheduler.Schedulers;
 import reactor.kafka.sender.SenderResult;
 
+import java.time.Duration;
 import java.util.function.Supplier;
 
 @Configuration
@@ -32,6 +33,11 @@ public class PaymentEventMessageSender implements DispatchEventMessagePort {
     private static final Logger log = LoggerFactory.getLogger(PaymentEventMessageSender.class);
 
     private final PaymentOutboxRepository paymentOutboxRepository;
+
+    // unicast 싱크는 동시에 emitNext 가 들어오면 FAIL_NON_SERIALIZED 로 실패한다. 커밋 후 리스너(여러 스레드)와 릴레이가
+    // 동시에 보낼 수 있으므로, FAIL_FAST 대신 잠깐 재시도(busy looping)해서 직렬화한다.
+    private static final Sinks.EmitFailureHandler EMIT_FAILURE_HANDLER =
+            Sinks.EmitFailureHandler.busyLooping(Duration.ofSeconds(2));
 
     private final Sinks.Many<Message<PaymentEventMessage>> sender =
             Sinks.many().unicast().onBackpressureBuffer();
@@ -60,7 +66,7 @@ public class PaymentEventMessageSender implements DispatchEventMessagePort {
             log.error("sendEventMessage - receive an exception for event message send.", results.exception());
         }
 
-        sendResult.emitNext(results, Sinks.EmitFailureHandler.FAIL_FAST);
+        sendResult.emitNext(results, EMIT_FAILURE_HANDLER);
     }
 
     @PostConstruct
@@ -82,7 +88,7 @@ public class PaymentEventMessageSender implements DispatchEventMessagePort {
 
     @Override
     public void dispatch(PaymentEventMessage paymentEventMessage) {
-        sender.emitNext(createEventMessage(paymentEventMessage), Sinks.EmitFailureHandler.FAIL_FAST);
+        sender.emitNext(createEventMessage(paymentEventMessage), EMIT_FAILURE_HANDLER);
     }
 
     private Message<PaymentEventMessage> createEventMessage(PaymentEventMessage paymentEventMessage) {

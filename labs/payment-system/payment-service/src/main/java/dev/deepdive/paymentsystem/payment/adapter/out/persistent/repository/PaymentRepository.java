@@ -11,7 +11,7 @@ public interface PaymentRepository {
 
     Flux<PendingPaymentEvent> getPendingPayments();
 
-    Mono<PaymentEvent> getPayment(String orderId);
+    Mono<Void> completeWalletUpdate(String orderId);
 
-    Mono<Void> complete(PaymentEvent paymentEvent);
+    Mono<Void> completeLedgerUpdate(String orderId);
 }

@@ -1,0 +1,494 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>spring-cache-local 한눈에</title>
+<style>
+/* ===== 공통 스타일 (모든 모듈 overview.html에서 동일하게 유지) ===== */
+:root{
+  --bg:#f7f7f5;--surface:#ffffff;--surface-2:#f0efeb;--border:#e2e0da;
+  --text:#1d1d1b;--muted:#6b6a65;--accent:#2f5bd3;--accent-soft:#e6ecfb;
+  --good:#1f8a4c;--good-soft:#e3f4ea;--bad:#c2410c;--bad-soft:#fcebe1;
+  --warn:#a16207;--warn-soft:#fbf3dc;--code-bg:#f3f2ee;
+  --shadow:0 1px 2px rgba(0,0,0,.04),0 4px 16px rgba(0,0,0,.04);
+  --radius:12px;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --sans:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Pretendard","Noto Sans KR","Segoe UI",sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#141413;--surface:#1c1c1a;--surface-2:#252522;--border:#33322e;
+    --text:#ecebe6;--muted:#a09e96;--accent:#7c9cff;--accent-soft:#1f2a47;
+    --good:#4ccf85;--good-soft:#16301f;--bad:#ff8a5c;--bad-soft:#3a1f14;
+    --warn:#e8b84a;--warn-soft:#3a2f12;--code-bg:#22221f;
+    --shadow:none;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#141413;--surface:#1c1c1a;--surface-2:#252522;--border:#33322e;
+  --text:#ecebe6;--muted:#a09e96;--accent:#7c9cff;--accent-soft:#1f2a47;
+  --good:#4ccf85;--good-soft:#16301f;--bad:#ff8a5c;--bad-soft:#3a1f14;
+  --warn:#e8b84a;--warn-soft:#3a2f12;--code-bg:#22221f;
+  --shadow:none;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);line-height:1.65;font-size:15.5px;-webkit-font-smoothing:antialiased}
+a{color:var(--accent)}
+code,.mono{font-family:var(--mono);font-size:.86em;background:var(--code-bg);padding:.1em .35em;border-radius:5px;word-break:break-all}
+pre{background:var(--code-bg);padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.55;margin:10px 0}
+pre code{background:none;padding:0;font-size:inherit;word-break:normal}
+.layout{display:grid;grid-template-columns:220px minmax(0,1fr);gap:40px;max-width:1180px;margin:0 auto;padding:32px 24px 80px}
+@media (max-width:860px){.layout{grid-template-columns:minmax(0,1fr);gap:0;padding:20px 16px 60px}}
+nav.toc{position:sticky;top:24px;align-self:start;font-size:14px}
+nav.toc .home{display:inline-block;margin-bottom:14px;color:var(--muted);text-decoration:none;font-size:13px}
+nav.toc ol{list-style:none;padding:0;margin:0;border-left:2px solid var(--border)}
+nav.toc li a{display:block;padding:5px 0 5px 14px;margin-left:-2px;border-left:2px solid transparent;color:var(--muted);text-decoration:none}
+nav.toc li a.active,nav.toc li a:hover{color:var(--text);border-left-color:var(--accent)}
+@media (max-width:860px){
+  nav.toc{position:static;margin-bottom:18px}
+  nav.toc ol{display:flex;flex-wrap:wrap;gap:6px;border:0}
+  nav.toc li a{padding:4px 10px;margin:0;border:1px solid var(--border);border-radius:999px;font-size:13px}
+  nav.toc li a.active{border-color:var(--accent)}
+}
+header.hero{margin-bottom:28px}
+.eyebrow{font-size:12.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
+h1{font-size:30px;line-height:1.25;margin:6px 0 10px;letter-spacing:-.01em}
+.lead{font-size:17px;color:var(--text);margin:0 0 14px;max-width:62ch}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font-size:12.5px;padding:3px 10px;border-radius:999px;background:var(--surface-2);border:1px solid var(--border);color:var(--muted)}
+section{margin:44px 0 0;scroll-margin-top:20px}
+h2{font-size:21px;margin:0 0 6px;letter-spacing:-.01em}
+h2 .num{color:var(--accent);margin-right:8px;font-variant-numeric:tabular-nums}
+.sub{color:var(--muted);margin:0 0 16px;font-size:14.5px}
+h3{font-size:16.5px;margin:18px 0 6px}
+.card{overflow-wrap:anywhere;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow)}
+.grid{display:grid;gap:12px}
+.grid.c2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.grid.c3{grid-template-columns:repeat(3,minmax(0,1fr))}
+@media (max-width:700px){.grid.c2,.grid.c3{grid-template-columns:minmax(0,1fr)}}
+.tldr .label{font-size:12px;font-weight:700;letter-spacing:.05em;color:var(--muted);text-transform:uppercase;margin-bottom:4px}
+.tldr .card{border-top:3px solid var(--accent)}
+.tldr .card.good{border-top-color:var(--good)}
+.tldr .card.bad{border-top-color:var(--bad)}
+.tldr p{margin:0}
+/* 흐름 다이어그램: 단계 클릭 시 상세 표시 */
+.flow{display:flex;flex-wrap:wrap;align-items:stretch;gap:0;margin:6px 0 10px}
+.flow .step{flex:1 1 140px;min-width:120px;text-align:left;font:inherit;color:inherit;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 12px;cursor:pointer;position:relative;transition:border-color .15s,background .15s}
+.flow .step:hover{border-color:var(--accent)}
+.flow .step[aria-selected="true"]{border-color:var(--accent);background:var(--accent-soft)}
+.flow .step .k{display:block;font-size:11.5px;color:var(--muted);font-weight:600}
+.flow .step .t{display:block;font-weight:600;font-size:14px;line-height:1.35}
+.flow .step.fail{border-style:dashed;border-color:var(--bad)}
+.flow .step.fail[aria-selected="true"]{background:var(--bad-soft)}
+.flow .arrow{display:flex;align-items:center;padding:0 6px;color:var(--muted);font-size:18px}
+@media (max-width:700px){.flow{flex-direction:column}.flow .step{flex:none}.flow .arrow{justify-content:center;padding:2px 0;transform:rotate(90deg)}}
+.flow-detail{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:10px;padding:14px 18px;min-height:64px}
+.flow-detail>div{display:none}
+.flow-detail>div.on{display:block}
+.flow-detail p:first-child{margin-top:0}.flow-detail p:last-child{margin-bottom:0}
+/* 탭 */
+.tabs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.tabs button{font:inherit;font-size:13.5px;padding:6px 12px;border-radius:999px;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{background:var(--text);color:var(--bg);border-color:var(--text)}
+.tabpanel{display:none}.tabpanel.on{display:block}
+.kv{display:grid;grid-template-columns:110px minmax(0,1fr);gap:6px 14px;margin:10px 0 0;font-size:14.5px}
+.kv dt{color:var(--muted);font-weight:600}
+.kv dd{margin:0}
+@media (max-width:520px){.kv{grid-template-columns:1fr}.kv dt{margin-top:6px}}
+/* 표 */
+.tablewrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:top}
+th{background:var(--surface-2);font-weight:600;font-size:13px;color:var(--muted);white-space:nowrap}
+tr:last-child td{border-bottom:0}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+.hl{background:var(--accent-soft)}
+/* 막대 그래프 (값은 --v: 0~1 비율) */
+.bars{display:grid;gap:8px}
+.bar{display:grid;grid-template-columns:150px minmax(0,1fr) 92px;align-items:center;gap:10px;font-size:13.5px}
+.bar .track{height:20px;background:var(--surface-2);border-radius:6px;overflow:hidden}
+.bar .fill{height:100%;width:calc(var(--v) * 100%);background:var(--accent);border-radius:6px;min-width:2px;transition:width .6s ease}
+.bar.good .fill{background:var(--good)}.bar.bad .fill{background:var(--bad)}.bar.warn .fill{background:var(--warn)}
+.bar .val{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--mono);font-size:12.5px}
+@media (max-width:520px){.bar{grid-template-columns:100px minmax(0,1fr) 72px}}
+.source{font-size:12.5px;color:var(--muted);margin-top:10px}
+/* 배지·콜아웃 */
+.badge{display:inline-block;font-size:11.5px;font-weight:700;padding:1px 8px;border-radius:999px;vertical-align:middle}
+.badge.good{background:var(--good-soft);color:var(--good)}
+.badge.bad{background:var(--bad-soft);color:var(--bad)}
+.badge.warn{background:var(--warn-soft);color:var(--warn)}
+.badge.info{background:var(--accent-soft);color:var(--accent)}
+.callout{border-radius:10px;padding:12px 16px;margin:12px 0;font-size:14.5px;border:1px solid var(--border);background:var(--surface)}
+.callout.warn{background:var(--warn-soft);border-color:transparent}
+.callout.bad{background:var(--bad-soft);border-color:transparent}
+.callout.good{background:var(--good-soft);border-color:transparent}
+.callout strong:first-child{margin-right:4px}
+/* 아코디언 (면접 Q&A, 약점) */
+details.qa{background:var(--surface);border:1px solid var(--border);border-radius:10px;margin:8px 0;overflow:hidden}
+details.qa summary{cursor:pointer;padding:12px 16px;font-weight:600;list-style:none;display:flex;gap:10px;align-items:flex-start}
+details.qa summary::-webkit-details-marker{display:none}
+details.qa summary::before{content:"Q";flex:none;width:22px;height:22px;border-radius:6px;background:var(--accent-soft);color:var(--accent);font-size:12px;display:grid;place-items:center;margin-top:1px}
+details.qa.risk summary::before{content:"!";background:var(--bad-soft);color:var(--bad)}
+details.qa[open] summary{border-bottom:1px solid var(--border)}
+details.qa .a{padding:12px 16px 14px 48px;font-size:14.5px}
+details.qa .a p{margin:0 0 8px}details.qa .a ul{margin:0;padding-left:18px}
+.qa-tools{display:flex;gap:8px;margin-bottom:8px}
+.qa-tools button,.theme-toggle{font:inherit;font-size:13px;padding:5px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer}
+.theme-toggle{position:fixed;right:16px;bottom:16px;z-index:5;box-shadow:var(--shadow)}
+/* 파일 지도 */
+ul.files{list-style:none;padding:0;margin:0;display:grid;gap:6px}
+ul.files li{display:grid;grid-template-columns:minmax(0,1fr);gap:2px;padding:9px 12px;background:var(--surface);border:1px solid var(--border);border-radius:9px}
+ul.files li code{background:none;padding:0;font-size:12.5px}
+ul.files li span{color:var(--muted);font-size:13.5px}
+footer{margin-top:56px;padding-top:18px;border-top:1px solid var(--border);color:var(--muted);font-size:13px}
+ul.plain{margin:6px 0;padding-left:20px}ul.plain li{margin:3px 0}
+</style>
+</head>
+<body>
+<button class="theme-toggle" type="button" aria-label="테마 전환">◐ 테마</button>
+<div class="layout">
+  <nav class="toc" aria-label="목차">
+    <a class="home" href="../index.html">← 전체 모듈</a>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin:0 0 14px"><a class="chip" style="text-decoration:none" href="../changes.html#m-spring-cache-local">개선 내역</a><a class="chip" style="text-decoration:none" href="../interview.html#m-spring-cache-local">질문 모음</a></div>
+    <ol>
+      <li><a href="#tldr">한눈에</a></li>
+      <li><a href="#flow">흐름</a></li>
+      <li><a href="#cases">비교·핵심 구현</a></li>
+      <li><a href="#results">결과·수치</a></li>
+      <li><a href="#limits">한계·약점</a></li>
+      <li><a href="#interview">면접 Q&amp;A</a></li>
+      <li><a href="#files">파일 지도</a></li>
+    </ol>
+  </nav>
+  <main>
+    <header class="hero">
+      <div class="eyebrow">deep-dive · labs/spring-cache-local</div>
+      <h1>Spring Cache 로컬 캐시 — 어노테이션 3종과 캐시 키를 호출 횟수로 확인</h1>
+      <p class="lead">Spring Cache는 "DB를 자동으로 캐시"하는 기능이 아니라, <strong>Bean 메서드 호출 앞뒤에 프록시를 끼워</strong> 캐시 조회·저장·삭제를 대신해 주는 추상화입니다. 이 모듈은 외부 Redis 없이 <code>ConcurrentMapCacheManager</code>(JVM 안 <code>ConcurrentHashMap</code>)로 <code>@Cacheable</code>/<code>@CachePut</code>/<code>@CacheEvict</code>와 캐시 키 규칙을 관찰하고, 로컬 캐시가 왜 여러 서버에서 한계가 있는지 정리합니다.</p>
+      <div class="chips"><span class="chip">Java 21</span><span class="chip">Spring Boot 3.4.1</span><span class="chip">Spring Cache</span><span class="chip">ConcurrentMapCacheManager</span><span class="chip">MySQL 8.0.36 · JPA</span><span class="chip">Testcontainers</span><span class="chip">@MockitoSpyBean</span></div>
+    </header>
+
+    <section id="tldr" class="tldr">
+      <h2><span class="num">01</span>한눈에</h2>
+      <p class="sub">30초 요약</p>
+      <div class="grid c3">
+        <div class="card bad"><div class="label">문제</div><p>같은 조회마다 DB를 치면 느리고, 캐시 코드를 직접 쓰면 반복됩니다. 게다가 <strong>캐시 키를 잘못 잡으면</strong> 다른 요청이 같은 값을 공유하거나 매번 miss가 나고, 로컬 캐시는 <strong>서버마다 따로</strong> 존재합니다.</p></div>
+        <div class="card"><div class="label">접근</div><p><code>StudyBookService</code>로 어노테이션 4가지 동작, <code>BookLookupService</code>로 cacheName 분리·<code>key="#id"</code>·DTO equals·테이블 버전 키를 실험. MySQL(Testcontainers)에 데이터를 넣고 <code>@MockitoSpyBean BookRepository</code> 호출 횟수로 검증.</p></div>
+        <div class="card good"><div class="label">결론</div><p>캐시 동작은 <strong>프록시 + CacheManager + 키 설계</strong>로 결정됩니다. 로컬 캐시는 빠르지만 재시작 시 소멸·서버 간 불일치·JVM 메모리 부담이 있어, 분산 환경이면 Redis 같은 리모트 캐시를 고려합니다.</p></div>
+      </div>
+    </section>
+
+    <section id="flow">
+      <h2><span class="num">02</span>흐름</h2>
+      <p class="sub"><code>@Cacheable</code> 메서드를 호출했을 때 프록시 안에서 일어나는 일. 단계를 클릭하세요.</p>
+      <div class="flow" data-flow>
+        <button class="step" data-target="scl-f1"><span class="k">STEP 1</span><span class="t">프록시가 가로챔</span></button>
+        <span class="arrow">→</span>
+        <button class="step" data-target="scl-f2"><span class="k">STEP 2</span><span class="t">key 계산</span></button>
+        <span class="arrow">→</span>
+        <button class="step" data-target="scl-f3"><span class="k">STEP 3</span><span class="t">cacheName → Cache</span></button>
+        <span class="arrow">→</span>
+        <button class="step" data-target="scl-f4"><span class="k">HIT</span><span class="t">메서드 생략, 캐시 값 반환</span></button>
+        <span class="arrow">→</span>
+        <button class="step fail" data-target="scl-f5"><span class="k">MISS</span><span class="t">메서드 실행 → put</span></button>
+      </div>
+      <div class="flow-detail">
+        <div id="scl-f1"><p><code>@EnableCaching</code>(<code>SpringCacheApplication</code>)이 캐시 AOP 인프라를 켭니다. 호출 코드 → <strong>캐시 프록시</strong> → <code>CacheInterceptor</code>가 <code>CacheOperationSource</code>로 메서드의 어노테이션(cacheNames, key, operation)을 읽습니다.</p><p>조건: 대상이 Spring Bean이어야 하고(직접 <code>new</code> 한 객체는 동작 안 함), 호출이 프록시를 지나야 합니다.</p></div>
+        <div id="scl-f2"><p><code>key = "#id"</code>처럼 SpEL을 쓰면 그 결과가 key(README의 "Key Expression Evaluation"). 생략하면 <code>SimpleKeyGenerator</code>: 파라미터 0개 → <code>SimpleKey.EMPTY</code>, 1개 → 그 값 자체, 여러 개 → <code>SimpleKey</code>.</p></div>
+        <div id="scl-f3"><p><code>CacheResolver</code>(기본 <code>SimpleCacheResolver</code>)가 <code>CacheManager.getCache("studyBooks")</code>로 실제 <code>Cache</code>를 찾습니다. 이 모듈의 <code>CacheManager</code>는 <code>CacheConfig</code>가 등록한 <code>ConcurrentMapCacheManager</code>.</p><svg viewBox="0 0 520 200" role="img" aria-label="CacheManager 아래 cacheName별 Cache와 key" style="width:100%;max-width:620px;height:auto;display:block;margin:6px auto 10px;font-family:var(--sans)"><title>cacheName은 공간, key는 공간 안의 항목</title><rect x="190" y="8" width="140" height="30" rx="8" style="fill:var(--accent-soft);stroke:var(--accent)"/><text x="260" y="28" text-anchor="middle" style="fill:var(--text);font-size:13px;font-weight:700">CacheManager</text><line x1="260" y1="38" x2="90" y2="66" style="stroke:var(--muted);stroke-width:1.4"/><rect x="18" y="66" width="144" height="28" rx="7" style="fill:var(--surface-2);stroke:var(--border)"/><text x="90" y="85" text-anchor="middle" style="fill:var(--text);font-size:12.5px;font-weight:700">Cache: bookById</text><line x1="90" y1="94" x2="90" y2="112" style="stroke:var(--border);stroke-width:1.2"/><rect x="14" y="112" width="152" height="26" rx="6" style="fill:var(--surface);stroke:var(--border)"/><text x="90" y="129" text-anchor="middle" style="fill:var(--muted);font-size:11.5px;font-family:var(--mono)">1L → Book</text><line x1="90" y1="94" x2="90" y2="148" style="stroke:var(--border);stroke-width:1.2"/><rect x="14" y="148" width="152" height="26" rx="6" style="fill:var(--surface);stroke:var(--border)"/><text x="90" y="165" text-anchor="middle" style="fill:var(--muted);font-size:11.5px;font-family:var(--mono)">2L → Book</text><line x1="260" y1="38" x2="260" y2="66" style="stroke:var(--muted);stroke-width:1.4"/><rect x="188" y="66" width="144" height="28" rx="7" style="fill:var(--surface-2);stroke:var(--border)"/><text x="260" y="85" text-anchor="middle" style="fill:var(--text);font-size:12.5px;font-weight:700">Cache: bookName</text><line x1="260" y1="94" x2="260" y2="112" style="stroke:var(--border);stroke-width:1.2"/><rect x="184" y="112" width="152" height="26" rx="6" style="fill:var(--surface);stroke:var(--border)"/><text x="260" y="129" text-anchor="middle" style="fill:var(--muted);font-size:11.5px;font-family:var(--mono)">1L → &quot;Effective Java&quot;</text><line x1="260" y1="38" x2="430" y2="66" style="stroke:var(--muted);stroke-width:1.4"/><rect x="358" y="66" width="144" height="28" rx="7" style="fill:var(--surface-2);stroke:var(--border)"/><text x="430" y="85" text-anchor="middle" style="fill:var(--text);font-size:12.5px;font-weight:700">Cache: studyBooks</text><line x1="430" y1="94" x2="430" y2="112" style="stroke:var(--border);stroke-width:1.2"/><rect x="354" y="112" width="152" height="26" rx="6" style="fill:var(--surface);stroke:var(--border)"/><text x="430" y="129" text-anchor="middle" style="fill:var(--muted);font-size:11.5px;font-family:var(--mono)">1L → &quot;Effective Java&quot;</text><text x="260" y="192" text-anchor="middle" style="fill:var(--muted);font-size:11.5px">같은 key 1L이라도 cacheName이 다르면 다른 값</text></svg></div>
+        <div id="scl-f4"><p><code>Cache.get(key)</code>에 값이 있으면 <strong>대상 메서드 자체를 실행하지 않고</strong> 반환. 그래서 Repository 호출 횟수로 hit/miss를 확인할 수 있습니다.</p></div>
+        <div id="scl-f5"><p>miss면 실제 메서드를 실행(→ <code>BookRepository</code> → MySQL)하고 결과를 <code>Cache.put(key, result)</code>. <code>@CachePut</code>은 hit 여부와 무관하게 항상 실행 후 put, <code>@CacheEvict</code>는 실행 후(기본 <code>beforeInvocation = false</code>) 삭제.</p></div>
+      </div>
+
+      <h3>로컬 캐시의 구조적 한계 — 서버가 두 대라면</h3>
+      <svg viewBox="0 0 520 230" role="img" aria-label="WAS 두 대의 로컬 캐시 불일치" style="width:100%;max-width:620px;height:auto;display:block;margin:6px auto 10px;font-family:var(--sans)"><title>로컬 캐시는 서버마다 따로 존재한다</title><defs><marker id="scl-mw-m" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" style="fill:var(--muted)"/></marker></defs><rect x="200" y="6" width="120" height="30" rx="8" style="fill:var(--accent-soft);stroke:var(--accent)"/><text x="260.0" y="26.0" text-anchor="middle" style="fill:var(--text);font-size:12.5px;font-weight:700">로드밸런서</text><line x1="240" y1="36" x2="120" y2="60" style="stroke:var(--muted);stroke-width:1.4" marker-end="url(#scl-mw-m)"/><line x1="280" y1="36" x2="400" y2="60" style="stroke:var(--muted);stroke-width:1.4" marker-end="url(#scl-mw-m)"/><rect x="40" y="60" width="160" height="30" rx="8" style="fill:var(--surface-2);stroke:var(--border)"/><text x="120.0" y="80.0" text-anchor="middle" style="fill:var(--text);font-size:12.5px;font-weight:700">WAS 1  @CacheEvict 실행</text><rect x="320" y="60" width="160" height="30" rx="8" style="fill:var(--surface-2);stroke:var(--border)"/><text x="400.0" y="80.0" text-anchor="middle" style="fill:var(--text);font-size:12.5px;font-weight:700">WAS 2</text><rect x="40" y="104" width="160" height="46" rx="8" style="fill:var(--good-soft);stroke:transparent"/><text x="120.0" y="122" text-anchor="middle" style="fill:var(--good);font-size:12.5px;font-weight:700">로컬 캐시 1</text><text x="120.0" y="140" text-anchor="middle" style="fill:var(--good);font-size:11.5px">key 1L 삭제됨</text><rect x="320" y="104" width="160" height="46" rx="8" style="fill:var(--bad-soft);stroke:transparent"/><text x="400.0" y="122" text-anchor="middle" style="fill:var(--bad);font-size:12.5px;font-weight:700">로컬 캐시 2</text><text x="400.0" y="140" text-anchor="middle" style="fill:var(--bad);font-size:11.5px">옛 값 그대로 (stale)</text><line x1="120" y1="90" x2="120" y2="102" style="stroke:var(--muted);stroke-width:1.4" marker-end="url(#scl-mw-m)"/><line x1="400" y1="90" x2="400" y2="102" style="stroke:var(--muted);stroke-width:1.4" marker-end="url(#scl-mw-m)"/><rect x="200" y="176" width="120" height="30" rx="8" style="fill:var(--accent-soft);stroke:var(--accent)"/><text x="260.0" y="196.0" text-anchor="middle" style="fill:var(--text);font-size:12.5px;font-weight:700">MySQL</text><line x1="120" y1="150" x2="220" y2="176" style="stroke:var(--muted);stroke-width:1.4" marker-end="url(#scl-mw-m)"/><line x1="400" y1="150" x2="300" y2="176" style="stroke:var(--muted);stroke-width:1.4" marker-end="url(#scl-mw-m)"/><text x="260" y="224" text-anchor="middle" style="fill:var(--muted);font-size:11.5px">WAS 1의 evict는 WAS 2 메모리에 닿지 않는다</text></svg>
+      <p>README: 로컬 캐시는 "빠른 조회"에는 좋지만 "여러 서버의 캐시를 동시에 바꾸는 문제"는 직접 해결하지 않습니다. 잘 맞는 데이터는 국가별 공휴일, 서비스 설정값, 거의 바뀌지 않는 코드성 데이터. 주의할 데이터는 사용자별 데이터, 서버 간 동기화가 필요한 데이터, 대용량 데이터.</p>
+    </section>
+
+    <section id="cases">
+      <h2><span class="num">03</span>비교·핵심 구현</h2>
+      <p class="sub">탭을 눌러 케이스별로 봅니다. 코드는 실제 파일에서 발췌했습니다.</p>
+      <div class="tablewrap" style="margin-bottom:14px"><table>
+        <thead><tr><th>어노테이션</th><th>메서드 실행</th><th>캐시 동작</th><th>테스트에서 확인</th></tr></thead>
+        <tbody>
+          <tr><td><code>@Cacheable</code></td><td>miss일 때만</td><td>get → (miss) put</td><td>2회 호출에 <code>findNameById</code> 1회</td></tr>
+          <tr><td><code>@CachePut</code></td><td>항상</td><td>실행 후 결과로 덮어쓰기</td><td>이후 조회에 <code>findNameById</code> 0회</td></tr>
+          <tr><td><code>@CacheEvict</code></td><td>항상</td><td>실행 후 key 삭제</td><td>다음 조회에 <code>findNameById</code> 1회</td></tr>
+          <tr><td><code>@CacheEvict(allEntries = true)</code></td><td>항상</td><td>캐시 전체 <code>clear()</code></td><td>1L, 2L 모두 다시 조회</td></tr>
+        </tbody>
+      </table></div>
+      <div data-tabs>
+        <div class="tabs" role="tablist">
+          <button role="tab" data-target="scl-t-ann">어노테이션 3종</button>
+          <button role="tab" data-target="scl-t-name">cacheName 분리</button>
+          <button role="tab" data-target="scl-t-key">key="#id"</button>
+          <button role="tab" data-target="scl-t-dto">DTO 키 equals</button>
+          <button role="tab" data-target="scl-t-ver">테이블 버전 키</button>
+          <button role="tab" data-target="scl-t-cfg">CacheManager 설정</button>
+        </div>
+
+        <div class="tabpanel card" id="scl-t-ann">
+          <h3>StudyBookService — @Cacheable / @CachePut / @CacheEvict</h3>
+<pre><code>// miss일 때만 JPA Repository를 호출하고, 반환값을 studyBooks 캐시에 저장한다.
+@Cacheable(cacheNames = "studyBooks", key = "#id")
+public String findName(long id) {
+    return findNameDirectly(id);
+}
+
+// 캐시 hit 여부와 상관없이 DB를 갱신하고, 반환값으로 studyBooks 캐시를 덮어쓴다.
+@CachePut(cacheNames = "studyBooks", key = "#id")
+public String renameWithCachePut(long id, String name) {
+    return renameDirectly(id, name);
+}
+
+// DB 갱신 후 지정한 key의 캐시를 삭제해서 다음 조회가 다시 Repository를 타게 한다.
+@CacheEvict(cacheNames = "studyBooks", key = "#id")
+public String renameWithCacheEvict(long id, String name) { ... }
+
+// 개별 key가 아니라 studyBooks 캐시 전체를 삭제한다.
+@CacheEvict(cacheNames = "studyBooks", allEntries = true)
+public void evictAll() {
+}</code></pre>
+          <dl class="kv">
+            <dt>검증 방법</dt><dd>임의 카운터 대신 <code>@MockitoSpyBean BookRepository</code>로 실제 Repository 호출을 <code>verify(..., times(n))</code>. 매 테스트 전 데이터 reset + 캐시 clear + <code>clearInvocations</code>.</dd>
+            <dt>@CachePut 포인트</dt><dd>반환값이 그대로 캐시 값이 되므로 <strong>조회 메서드와 같은 타입·같은 key</strong>를 돌려줘야 합니다(여기선 이름 String, key <code>#id</code>).</dd>
+            <dt>코드</dt><dd><code>src/main/java/dev/deepdive/springcache/book/StudyBookService.java</code>, <code>src/test/java/dev/deepdive/springcache/annotation/CacheAnnotationStudyTest.java</code></dd>
+          </dl>
+        </div>
+
+        <div class="tabpanel card" id="scl-t-name">
+          <h3>cacheName은 "공간", key는 "공간 안의 항목"</h3>
+<pre><code>@Cacheable(cacheNames = "bookById", key = "#id")
+public Book findBookById(long id) { ... }
+
+@Cacheable(cacheNames = "bookName", key = "#id")
+public String findBookNameById(long id) { ... }</code></pre>
+          <dl class="kv">
+            <dt>결과</dt><dd>같은 1L이라도 <code>bookById</code>엔 <code>Book</code>, <code>bookName</code>엔 이름 String. 각각 2회 호출해도 <code>findById</code> 1회, <code>findNameById</code> 1회.</dd>
+            <dt>주의</dt><dd>같은 cacheName에 다른 타입을 넣으면 같은 key에서 충돌(ClassCast 등)할 수 있으므로 반환 타입별로 공간을 나눕니다.</dd>
+          </dl>
+        </div>
+
+        <div class="tabpanel card" id="scl-t-key">
+          <h3>key="#id" — 다른 파라미터를 의도적으로 무시 <span class="badge warn">버그일 수도</span></h3>
+<pre><code>@Cacheable(cacheNames = "bookSummary", key = "#id")
+public String findBookSummary(long id, String language) {
+    return findBookNameDirectly(id) + " summary language=" + language;
+}</code></pre>
+          <dl class="kv">
+            <dt>결과</dt><dd><code>findBookSummary(1L, "ko")</code> 뒤 <code>findBookSummary(1L, "en")</code>도 <strong>"…language=ko"</strong>를 반환. <code>findNameById</code> 1회.</dd>
+            <dt>의미</dt><dd>README: "의도한 최적화일 수도 있고, 언어별 결과가 달라야 한다면 버그일 수도 있다." key를 생략했다면 <code>SimpleKey [1L, "ko"]</code>가 됩니다.</dd>
+          </dl>
+        </div>
+
+        <div class="tabpanel card" id="scl-t-dto">
+          <h3>DTO를 키로 쓸 때: equals/hashCode가 전부</h3>
+<pre><code>public record BookSearchCondition(String keyword, String language) { }
+
+public class BookSearchConditionWithoutEquals {
+    private final String keyword;
+    private final String language;
+    // equals/hashCode 없음 → 객체 동일성 비교
+}</code></pre>
+          <dl class="kv">
+            <dt>결과</dt><dd>같은 값 ("java","ko")으로 두 번 조회 시 record는 캐시 엔트리 <strong>1개</strong>(hit), equals 없는 클래스는 <strong>2개</strong>(매번 miss).</dd>
+            <dt>왜</dt><dd>파라미터가 하나라 <code>SimpleKeyGenerator</code>는 객체 자체를 key로 쓰고, <code>ConcurrentHashMap</code>은 equals/hashCode로 비교하기 때문.</dd>
+          </dl>
+        </div>
+
+        <div class="tabpanel card" id="scl-t-ver">
+          <h3>테이블 버전 키 — evict 없이 "새 세대"로 넘기기</h3>
+<pre><code>@Cacheable(cacheNames = "bookNameByTableVersion",
+           key = "{#root.target.currentBookTableUpdatedAt(), #id}")
+public String findBookNameByIdWithTableVersion(long id) {
+    return findBookNameDirectly(id);
+}
+
+public Instant currentBookTableUpdatedAt() {
+    return bookRepository.findMaxUpdatedAt()
+            .orElse(Instant.EPOCH);
+}
+
+// BookRepository
+@Query("select max(b.updatedAt) from BookEntity b")
+Optional&lt;Instant&gt; findMaxUpdatedAt();</code></pre>
+          <dl class="kv">
+            <dt>왜 필요</dt><dd>여러 WAS에서 한 서버의 <code>@CacheEvict</code>는 다른 서버 로컬 캐시를 못 지움. Redis를 바로 못 쓰면 <code>max(updatedAt)</code>을 키에 넣어, 테이블 어떤 row가 바뀌든 <strong>모든 서버가 새 키로 자연스럽게 miss</strong>.</dd>
+            <dt>결과</dt><dd>id=1 조회 2회(두 번째 hit) → id=2의 updatedAt을 +60초로 변경 → id=1 조회 2회(첫 번째 miss, 두 번째 hit). <code>findMaxUpdatedAt</code> 4회, <code>findNameById(1L)</code> 2회, 캐시 엔트리 2개(옛 세대 + 새 세대).</dd>
+            <dt>운영 팁</dt><dd>README: <code>max(updated_at)</code>이 가벼워야 하므로 인덱스(<code>idx_books_updated_at</code>), 그룹 컬럼이 있으면 <code>(group_key, updated_at)</code> 복합 인덱스.</dd>
+            <dt>코드</dt><dd><code>src/main/java/dev/deepdive/springcache/book/BookLookupService.java</code>, <code>src/main/java/dev/deepdive/springcache/book/BookEntity.java</code></dd>
+          </dl>
+        </div>
+
+        <div class="tabpanel card" id="scl-t-cfg">
+          <h3>CacheConfig — 로컬 캐시 관리자를 명시 등록</h3>
+<pre><code>@Bean
+public CacheManager cacheManager() {
+    return new ConcurrentMapCacheManager(
+            "catalogItems",
+            "bookById",
+            "bookName",
+            "studyBooks",
+            "bookNameByTableVersion",
+            "bookSummary",
+            "bookSearchByRecordCondition",
+            "bookSearchByIdentityCondition"
+    );
+}</code></pre>
+          <dl class="kv">
+            <dt>결과</dt><dd><code>BookLookupServiceCacheTest</code>: <code>cacheManager</code>는 <code>ConcurrentMapCacheManager</code>, native cache는 <code>ConcurrentMap</code>.</dd>
+            <dt>포인트</dt><dd>저장소가 로컬인지 Redis인지는 비즈니스 코드가 아니라 <code>CacheManager</code>가 숨깁니다. 이름을 미리 지정했으므로 목록에 없는 cacheName은 동적으로 생성되지 않습니다.</dd>
+            <dt>코드</dt><dd><code>src/main/java/dev/deepdive/springcache/config/CacheConfig.java</code></dd>
+          </dl>
+        </div>
+      </div>
+    </section>
+
+    <section id="results">
+      <h2><span class="num">04</span>결과·수치</h2>
+      <p class="sub">성능 측정은 없습니다. 테스트가 <code>verify(bookRepository, times(n))</code>로 단언한 호출 횟수를 봅니다.</p>
+      <div class="callout warn"><strong>측정 수치 없음.</strong> 아래 막대와 표는 모두 테스트 단언값입니다(MySQL Testcontainers 위에서 실행).</div>
+      <div class="grid c2">
+        <div class="card">
+          <h3 style="margin-top:0">테이블 버전 키: 조회 4회 동안 Repository 호출</h3>
+          <div class="bars">
+            <div class="bar" style="--v:1"><span>조회 메서드 호출</span><div class="track"><div class="fill"></div></div><span class="val">4</span></div>
+            <div class="bar warn" style="--v:1"><span>findMaxUpdatedAt</span><div class="track"><div class="fill"></div></div><span class="val">4</span></div>
+            <div class="bar good" style="--v:.5"><span>findNameById(1L)</span><div class="track"><div class="fill"></div></div><span class="val">2</span></div>
+          </div>
+          <div class="source">테스트 단언값: <code>BookLookupServiceCacheTest</code> — 버전 변경 전 2회, 후 2회 조회. hit여도 버전 쿼리는 매번 실행.</div>
+        </div>
+        </div>
+        <div class="card">
+          <h3 style="margin-top:0">같은 값 DTO 2회 조회 후 캐시 엔트리 수</h3>
+          <div class="bars">
+            <div class="bar good" style="--v:.5"><span>record</span><div class="track"><div class="fill"></div></div><span class="val">1</span></div>
+            <div class="bar bad" style="--v:1"><span>equals 없음</span><div class="track"><div class="fill"></div></div><span class="val">2</span></div>
+          </div>
+          <div class="source">테스트 단언값: <code>BookLookupServiceCacheTest</code> (<code>hasSize(1)</code> / <code>hasSize(2)</code>)</div>
+        </div>
+      </div>
+      <h3>테스트별 단언값</h3>
+      <div class="tablewrap"><table>
+        <thead><tr><th>테스트 메서드 (요지)</th><th>호출 순서</th><th>단언</th></tr></thead>
+        <tbody>
+          <tr><td>Cacheable hit/miss</td><td><code>findName(1L)</code> ×2</td><td><code>findNameById</code> 1회</td></tr>
+          <tr><td>CachePut 덮어쓰기</td><td>findName → renameWithCachePut → findName</td><td>(clear 후) <code>findById</code> 1, <code>save</code> 1, <code>findNameById</code> 0</td></tr>
+          <tr><td>CacheEvict</td><td>findName → renameWithCacheEvict → findName</td><td>evict 직후 캐시 null, <code>findById</code> 1, <code>save</code> 1, <code>findNameById</code> 1</td></tr>
+          <tr><td>allEntries</td><td>findName(1L), (2L) → evictAll → 다시 둘 다</td><td>1L, 2L 캐시 null, 각각 <code>findNameById</code> 1</td></tr>
+          <tr><td>cacheName 분리</td><td>findBookById, findBookNameById 각 2회</td><td><code>findById</code> 1, <code>findNameById</code> 1</td></tr>
+          <tr><td>테이블 버전 키</td><td>조회 2 → id=2 updatedAt 변경 → 조회 2</td><td><code>findMaxUpdatedAt</code> 4, <code>findNameById(1L)</code> 2, 엔트리 2</td></tr>
+          <tr><td>BookLookup @CachePut</td><td>find → update → find → update → find</td><td><code>findById</code> 1, <code>save</code> 2</td></tr>
+          <tr><td>BookLookup @CacheEvict</td><td>find → renameBookAndEvictCache → find</td><td><code>findById</code> 3 (조회, rename 내부, 재조회), <code>save</code> 1</td></tr>
+          <tr><td>관련 캐시 무효화 <span class="badge good">수정함</span></td><td>bookName·bookSummary 채움 → updateBook / renameBookAndEvictCache</td><td>세 캐시의 해당 key가 비고 새 이름 반환, 다른 id 캐시는 유지</td></tr>
+          <tr><td>key="#id"</td><td>findBookSummary(1L,"ko"), (1L,"en")</td><td>두 결과 동일("…ko"), <code>findNameById</code> 1</td></tr>
+        </tbody>
+      </table></div>
+    </section>
+
+    <section id="limits">
+      <h2><span class="num">05</span>한계·약점</h2>
+      <p class="sub"><span class="badge info">README 인정</span> 문서가 스스로 밝힌 한계, <span class="badge warn">코드 확인</span> 코드를 읽어 보면 드러나는 약점.</p>
+      <details id="lim-1" class="qa risk"><summary><span><span class="badge info">README 인정</span> 로컬 캐시의 4가지 한계</span></summary><div class="a"><ul><li>서버 재시작 시 캐시가 사라진다.</li><li>서버가 여러 대면 각 서버가 서로 다른 캐시를 가진다.</li><li>대용량 캐시는 JVM 메모리에 부담을 준다.</li><li>서버 간 캐시 동기화가 어렵다. → 분산 환경이면 Redis 같은 리모트 캐시 고려.</li></ul></div></details>
+      <details id="lim-2" class="qa risk"><summary><span><span class="badge info">README 인정</span> 다중 WAS 문제는 설명만, 테스트로 재현하지 않음</span></summary><div class="a"><p>LB + WAS 2대 다이어그램과 테이블 버전 키 아이디어는 있지만, 실제로 두 애플리케이션 컨텍스트를 띄워 불일치를 보여 주는 테스트는 없습니다. 테이블 버전 키도 한 JVM 안에서 "키가 바뀌면 miss"만 확인합니다.</p></div></details>
+      <details id="lim-3" class="qa risk"><summary><span><span class="badge warn">코드 확인</span> 테이블 버전 방식: 매 조회마다 쿼리 1개 추가 + 옛 세대 엔트리 누적</span></summary><div class="a"><ul><li>key 계산을 위해 <strong>hit일 때도</strong> <code>findMaxUpdatedAt()</code>이 실행됩니다(4회 조회 → 4회 쿼리, 테스트가 단언). DB 부하를 "없애는" 게 아니라 가벼운 쿼리로 "바꾸는" 것.</li><li>옛 버전 키는 지우지 않아 엔트리가 세대마다 쌓입니다(테스트: <code>hasSize(2)</code>). <code>ConcurrentMapCacheManager</code>는 TTL·크기 제한이 없어 장기적으로 메모리 누수가 됩니다. (코드는 그대로 두고 README "테이블 버전 키의 대가"에 알고 쓰는 트레이드오프로 명시: 드물게 바뀌는 작은 테이블에만, 실제로는 Caffeine <code>expireAfterWrite</code>/<code>maximumSize</code>와 함께)</li><li>정밀도: <code>updated_at</code>은 <code>timestamp(6)</code>. 같은 값으로 갱신되면 버전이 안 바뀝니다.</li></ul></div></details>
+      <details id="lim-4" class="qa risk"><summary><span><span class="badge warn">코드 확인</span> rename 계열은 updatedAt을 그대로 둬서 버전 키가 안 바뀐다</span></summary><div class="a"><p><code>StudyBookService.renameDirectly</code>와 <code>BookLookupService.renameBookAndEvictCache</code>는 <code>before.updatedAt()</code>을 그대로 복사해 저장합니다. 테스트는 <code>renameBookWithoutEvictCache(id, name, updatedAt)</code>로 시각을 <strong>명시적으로 넘겨서만</strong> 버전을 바꿉니다. 실제로는 <code>@UpdateTimestamp</code>/<code>@LastModifiedDate</code> 같은 자동 갱신이 없으면 이 전략이 조용히 깨집니다.</p></div></details>
+      <details id="lim-5" class="qa risk"><summary><span><span class="badge warn">코드 확인</span> <span class="badge good">수정함</span> 같은 데이터를 담은 여러 캐시가 함께 무효화되지 않는다</span></summary><div class="a"><p>예전 <code>updateBook</code>(<code>@CachePut</code>)과 <code>renameBookAndEvictCache</code>(<code>@CacheEvict</code>)는 <code>bookById</code>만 갱신·삭제해서, 같은 책 이름을 담은 <code>bookName</code>, <code>bookSummary</code>가 오래된 이름을 돌려줄 수 있었습니다.</p><p>수정: <code>updateBook</code>은 <code>@Caching(put = bookById, evict = {bookName, bookSummary})</code>, <code>renameBookAndEvictCache</code>는 <code>@CacheEvict(cacheNames = {"bookById", "bookName", "bookSummary"}, key = "#id")</code>. 테스트 2개가 수정 후 세 캐시가 비고 새 이름이 조회되는지, 다른 책 캐시는 남는지 확인합니다.</p></div></details>
+      <details id="lim-6" class="qa risk"><summary><span><span class="badge warn">코드 확인</span> CatalogLookupService는 README·테스트 어디에도 없다</span></summary><div class="a"><p><code>catalog/CatalogLookupService</code>(<code>@Cacheable(cacheNames = "catalogItems", key = "#itemId")</code> + <code>loadCount</code>)와 <code>CatalogItem</code>은 <code>CacheConfig</code>에 이름만 등록돼 있고, 이를 쓰는 테스트나 문서가 없습니다. 이전 실험의 잔재로 보입니다.</p></div></details>
+      <details id="lim-7" class="qa risk"><summary><span><span class="badge warn">코드 확인</span> TTL·최대 크기·통계가 없는 캐시</span></summary><div class="a"><p><code>ConcurrentMapCacheManager</code>는 만료와 eviction 정책이 없습니다. 이 모듈은 만료로 인한 재조회나 메모리 상한을 다루지 않습니다. <span class="badge info">일반 지식</span> 운영 로컬 캐시는 보통 Caffeine(<code>CaffeineCacheManager</code>)으로 TTL·maximumSize를 둡니다.</p></div></details>
+    </section>
+
+    <section id="interview">
+      <h2><span class="num">06</span>면접 Q&amp;A</h2>
+      <p class="sub">질문을 먼저 읽고 스스로 답해 본 뒤 펼쳐 보세요. <span class="badge info">일반 지식</span>은 이 레포 밖의 널리 알려진 내용입니다.</p>
+      <div class="qa-tools"><button type="button" data-qa="open">모두 펼치기</button><button type="button" data-qa="close">모두 접기</button></div>
+      <details id="iv-1" class="qa"><summary>Spring Cache는 내부적으로 어떻게 동작하나?</summary><div class="a"><ul><li><code>@EnableCaching</code> → 캐시 어노테이션이 붙은 Bean을 프록시로 감쌈.</li><li>호출 시 <code>CacheInterceptor</code>가 <code>CacheOperationSource</code>로 메타데이터를 읽고, key를 계산(SpEL 또는 <code>KeyGenerator</code>), <code>CacheResolver</code>→<code>CacheManager.getCache(name)</code>으로 Cache를 찾아 get/put/evict.</li><li>저장소가 로컬이든 Redis든 <code>CacheManager</code> 구현만 바뀜 — 이 모듈은 <code>ConcurrentMapCacheManager</code>.</li></ul></div></details>
+      <details id="iv-2" class="qa"><summary>@Cacheable, @CachePut, @CacheEvict의 차이는?</summary><div class="a"><ul><li><code>@Cacheable</code>: hit면 메서드 생략. miss면 실행 후 저장.</li><li><code>@CachePut</code>: 항상 실행 후 결과로 덮어씀 → 반환 타입이 조회 메서드와 맞아야 함.</li><li><code>@CacheEvict</code>: 실행 후 삭제(기본 <code>beforeInvocation=false</code> → 메서드가 예외로 끝나면 삭제 안 됨). <code>allEntries=true</code>면 <code>clear()</code>.</li><li>테스트 근거: <code>CacheAnnotationStudyTest</code>의 Repository 호출 횟수.</li></ul></div></details>
+      <details id="iv-3" class="qa"><summary>같은 클래스 안에서 @Cacheable 메서드를 호출하면 캐시가 동작할까?</summary><div class="a"><ul><li>README의 동작 조건: "호출이 캐시 프록시를 지나야 한다."</li><li><span class="badge info">일반 지식</span> 기본 프록시 방식에선 <code>this.method()</code> 내부 호출(self-invocation)은 프록시를 거치지 않아 캐시가 적용되지 않음. 별도 Bean으로 분리하거나 자기 프록시를 주입해 호출.</li><li>참고: 이 모듈의 <code>#root.target.currentBookTableUpdatedAt()</code>은 SpEL에서 대상 객체 메서드를 직접 호출하는 것이라 캐싱과 무관.</li></ul></div></details>
+      <details id="iv-4" class="qa"><summary>기본 캐시 키는 어떻게 만들어지고, 어떤 실수가 흔한가?</summary><div class="a"><ul><li><code>SimpleKeyGenerator</code>: 파라미터 0개 <code>SimpleKey.EMPTY</code>, 1개 그 값, 여러 개 <code>SimpleKey</code>.</li><li>실수 1: DTO에 equals/hashCode가 없으면 같은 조건도 다른 키 → 매번 miss (테스트: 엔트리 2개). record를 쓰면 해결.</li><li>실수 2: <code>key="#id"</code>처럼 일부 파라미터만 쓰면 language가 달라도 같은 값 공유 → 의도인지 확인.</li><li>실수 3: 서로 다른 반환 타입을 같은 cacheName에 넣기 → cacheName 분리.</li></ul></div></details>
+      <details id="iv-5" class="qa"><summary>로컬 캐시와 분산(리모트) 캐시는 어떻게 고르나?</summary><div class="a"><ul><li>로컬: 네트워크 왕복이 없어 빠름. 대신 재시작 시 소멸, 서버별 불일치, JVM 메모리 부담 (README).</li><li>적합: 공휴일, 설정값, 코드성 데이터처럼 거의 안 바뀌고 작은 데이터. 부적합: 사용자별 데이터, 서버 간 동기화가 필요한 데이터.</li><li><span class="badge info">일반 지식</span> 둘을 섞은 2단(L1 로컬 + L2 Redis) 구성도 흔함 — 핫 데이터는 로컬, 공유는 Redis.</li></ul></div></details>
+      <details id="iv-6" class="qa"><summary>WAS 여러 대에서 로컬 캐시를 무효화하려면?</summary><div class="a"><ul><li>이 레포의 답: 공통 테이블의 <code>max(updatedAt)</code>을 키에 포함해 버전이 바뀌면 모든 서버가 새 키로 miss (evict 불필요).</li><li>비용: 매 조회 <code>max</code> 쿼리(인덱스 필수), 옛 엔트리 누적, updatedAt 갱신 누락 시 무력화.</li><li><span class="badge info">일반 지식</span> 다른 방법: 짧은 TTL로 불일치 시간 제한, Redis Pub/Sub·메시지 브로커로 evict 이벤트 브로드캐스트, 아예 공용 Redis로 전환.</li></ul></div></details>
+      <details id="iv-7" class="qa"><summary>(꼬리) 테이블 버전 키 방식에서 hit인데도 DB 쿼리가 나가는 이유는?</summary><div class="a"><ul><li>key가 <code>{currentBookTableUpdatedAt(), #id}</code>라 <strong>key를 계산하려면 먼저</strong> <code>findMaxUpdatedAt()</code>을 실행해야 함. 테스트도 4회 조회에 4회를 단언.</li><li>그래서 무거운 원본 쿼리를 가벼운 인덱스 조회로 바꾸는 트레이드오프. 개선하려면 버전 값을 짧게 로컬 캐싱하거나 별도 버전 테이블/Redis 카운터를 둠(설계 아이디어).</li></ul></div></details>
+      <details id="iv-8" class="qa"><summary>테스트에서 캐시 hit/miss를 어떻게 검증했나?</summary><div class="a"><ul><li>MySQL Testcontainers(<code>mysql:8.0.36</code>)에 JPA로 실제 데이터를 넣고, <code>@MockitoSpyBean BookRepository</code>로 실제 호출은 그대로 두면서 횟수만 <code>verify</code>.</li><li>매 테스트 전 데이터 reset, 캐시 clear, <code>clearInvocations</code>로 이전 테스트 hit가 섞이지 않게 함.</li><li>native cache(<code>ConcurrentMap</code>)를 꺼내 엔트리 수(<code>hasSize</code>)로 키 구분을 확인.</li></ul></div></details>
+    </section>
+
+    <section id="files">
+      <h2><span class="num">07</span>파일 지도</h2>
+      <p class="sub">경로는 <code>labs/spring-cache-local/</code> 기준. 코드를 다시 볼 때 여기서부터.</p>
+      <ul class="files">
+        <li><code>README.md</code><span>로컬 캐싱 개념, Spring Cache 구성요소, 어노테이션별 시퀀스, 캐시 키, 한계</span></li>
+        <li><code>src/main/java/dev/deepdive/springcache/SpringCacheApplication.java</code><span><code>@EnableCaching</code></span></li>
+        <li><code>src/main/java/dev/deepdive/springcache/config/CacheConfig.java</code><span><code>ConcurrentMapCacheManager</code>와 cacheName 목록</span></li>
+        <li><code>src/main/java/dev/deepdive/springcache/book/StudyBookService.java</code><span>어노테이션 4종 학습용 서비스</span></li>
+        <li><code>src/main/java/dev/deepdive/springcache/book/BookLookupService.java</code><span>cacheName 분리, key="#id", DTO 키, 테이블 버전 키, 관련 캐시 함께 무효화(<code>@Caching</code>)</span></li>
+        <li><code>src/main/java/dev/deepdive/springcache/book/BookRepository.java</code><span><code>findNameById</code>, <code>findMaxUpdatedAt</code></span></li>
+        <li><code>src/main/java/dev/deepdive/springcache/book/BookEntity.java</code><span><code>idx_books_updated_at</code> 인덱스, <code>timestamp(6)</code></span></li>
+        <li><code>src/main/java/dev/deepdive/springcache/book/BookSearchCondition.java</code><span>record 키 (+ <code>BookSearchConditionWithoutEquals.java</code>)</span></li>
+        <li><code>src/main/java/dev/deepdive/springcache/catalog/CatalogLookupService.java</code><span>미사용·미테스트 서비스</span></li>
+        <li><code>src/test/java/dev/deepdive/springcache/annotation/CacheAnnotationStudyTest.java</code><span>어노테이션 동작 호출 횟수 검증</span></li>
+        <li><code>src/test/java/dev/deepdive/springcache/book/BookLookupServiceCacheTest.java</code><span>키 규칙·테이블 버전 키·관련 캐시 무효화 검증</span></li>
+        <li><code>src/test/java/dev/deepdive/springcache/support/MySQLContainerTest.java</code><span>MySQL Testcontainers 베이스</span></li>
+      </ul>
+    </section>
+
+    <footer>README와 소스 코드를 근거로 정리한 문서입니다. 이 모듈에는 성능 측정값이 없으며, 표시한 숫자는 모두 테스트 단언값입니다.</footer>
+  </main>
+</div>
+<script>
+/* ===== 공통 스크립트 (모든 모듈 overview.html에서 동일하게 유지) ===== */
+(function(){
+  var root=document.documentElement;
+  try{var saved=localStorage.getItem('deepdive-theme');if(saved)root.setAttribute('data-theme',saved);}catch(e){}
+  var tt=document.querySelector('.theme-toggle');
+  if(tt)tt.addEventListener('click',function(){
+    var cur=root.getAttribute('data-theme');
+    if(!cur)cur=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';
+    var next=cur==='dark'?'light':'dark';root.setAttribute('data-theme',next);
+    try{localStorage.setItem('deepdive-theme',next);}catch(e){}
+  });
+  document.querySelectorAll('[data-flow]').forEach(function(flow){
+    var steps=flow.querySelectorAll('.step');var detail=flow.nextElementSibling;
+    function show(btn){
+      steps.forEach(function(s){s.setAttribute('aria-selected',s===btn?'true':'false');});
+      if(detail)detail.querySelectorAll(':scope>div').forEach(function(d){d.classList.toggle('on',d.id===btn.dataset.target);});
+    }
+    steps.forEach(function(s){s.addEventListener('click',function(){show(s);});});
+    if(steps[0])show(steps[0]);
+  });
+  document.querySelectorAll('[data-tabs]').forEach(function(box){
+    var btns=box.querySelectorAll(':scope>.tabs>button');
+    function show(btn){
+      btns.forEach(function(b){b.setAttribute('aria-selected',b===btn?'true':'false');});
+      box.querySelectorAll(':scope>.tabpanel').forEach(function(p){p.classList.toggle('on',p.id===btn.dataset.target);});
+    }
+    btns.forEach(function(b){b.addEventListener('click',function(){show(b);});});
+    if(btns[0])show(btns[0]);
+  });
+  document.querySelectorAll('[data-qa]').forEach(function(b){
+    b.addEventListener('click',function(){
+      var sec=b.closest('section');var open=b.dataset.qa==='open';
+      sec.querySelectorAll('details.qa').forEach(function(d){d.open=open;});
+    });
+  });
+  var links=document.querySelectorAll('nav.toc a[href^="#"]');
+  if('IntersectionObserver' in window){
+    var io=new IntersectionObserver(function(es){es.forEach(function(e){
+      if(e.isIntersecting){links.forEach(function(l){l.classList.toggle('active',l.getAttribute('href')==='#'+e.target.id);});}
+    });},{rootMargin:'-20% 0px -70% 0px'});
+    document.querySelectorAll('main section[id]').forEach(function(s){io.observe(s);});
+  }
+  function openHash(){
+    var id='';try{id=decodeURIComponent(location.hash.slice(1));}catch(e){}
+    if(!id)return;var el=document.getElementById(id);if(!el)return;
+    var d=el.tagName==='DETAILS'?el:el.closest('details');if(d)d.open=true;
+    var p=el.closest('.tabpanel');
+    if(p&&!p.classList.contains('on')){var b=p.parentElement.querySelector(':scope>.tabs>button[data-target="'+p.id+'"]');if(b)b.click();}
+    setTimeout(function(){el.scrollIntoView({block:'start'});},0);
+  }
+  window.addEventListener('hashchange',openHash);openHash();
+})();
+</script>
+</body>
+</html>

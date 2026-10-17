@@ -1,3 +1,12 @@
+pluginManagement {
+    repositories {
+        gradlePluginPortal()
+        // 플러그인의 전이 의존성(예: jmh-core)은 Maven Central에 있다.
+        // 포털이 Central로 넘기는 과정에서 일시적으로 못 찾으면 바로 Central에서 다시 찾게 한다.
+        mavenCentral()
+    }
+}
+
 rootProject.name = 'deep-dive'
 
 include 'coupon-issue'

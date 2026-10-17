@@ -15,6 +15,9 @@ import java.util.Objects;
  * <p>{@code @Version} 컬럼이 있으면 JPA가 UPDATE 시 {@code WHERE id=? AND version=?} 조건을 붙이고,
  * 영향받은 행이 0이면(= 그 사이 누군가 먼저 수정해 버전이 올라감) 낙관적 락 예외를 던진다.
  * 커밋/flush 때마다 version은 1씩 자동 증가한다.
+ *
+ * <p>단, detached 엔티티를 {@code save}/{@code merge}하면 그보다 먼저 merge가 SELECT로 읽어 온 version과
+ * 비교해 다르면 UPDATE 없이 예외를 던진다({@code OptimisticLockTest} 참고).
  */
 @Entity
 @Table(name = "product")

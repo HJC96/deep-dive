@@ -36,14 +36,15 @@ import org.openjdk.jmh.infra.Blackhole;
  *
  * <h2>실행</h2>
  * <pre>{@code
- * ./gradlew :labs:java-sandbox:jmh \
+ * ./gradlew :java-sandbox:jmh \
  *     -PjmhIncludes=AesProviderRegistrationSingleThreadBenchmark
  * }</pre>
  *
  * <h2>결과 읽는 법</h2>
  * {@link Mode#Throughput} + {@link TimeUnit#SECONDS}이므로 <b>초당 처리 횟수(ops/s, 높을수록 빠름)</b>로
  * 출력된다. {@code withProviderInitializedOnce}의 Score가 {@code withRepeatedProviderRegistration}보다
- * 높으면 "Provider 1회 등록"이 더 빠른 것이다. Error는 ±95% 신뢰구간.
+ * 높으면 "Provider 1회 등록"이 더 빠른 것이다. Error는 99.9% 신뢰구간의 절반(JMH 기본값,
+ * 출력의 {@code ±(99.9%)}).
  *
  * @see AesProviderRegistrationEightThreadsBenchmark 동일 실험을 8스레드로 돌려 락 경합 영향을 본다
  */

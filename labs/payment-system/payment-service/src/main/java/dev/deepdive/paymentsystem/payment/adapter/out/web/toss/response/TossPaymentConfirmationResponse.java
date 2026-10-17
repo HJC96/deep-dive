@@ -6,6 +6,7 @@ import java.util.List;
 
 /**
  * Toss `/v1/payments/confirm` 성공 응답. 필요한 필드 위주로 매핑하고 나머지는 무시한다.
+ * Toss 문서상 결제 조회(`GET /v1/payments/{paymentKey}`)도 같은 Payment 객체를 돌려주므로 조회 응답에도 이 레코드를 쓴다(가정).
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record TossPaymentConfirmationResponse(

@@ -2,6 +2,8 @@
 
 주제별 실험 코드를 단계적으로 추가합니다.
 
+[`index.html`](index.html)을 브라우저로 열면 모듈 전체 지도와 모듈별 `overview.html`로 이동할 수 있습니다.
+
 ## 목록
 
 - `coupon-issue`: 동시성 문제 실험실

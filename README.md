@@ -3,6 +3,8 @@
 
 공부하다 직접 돌려보고 싶은 내용을 정리하는 실험실. 주제 하나당 `labs/` 아래 모듈 하나.
 
+모듈마다 흐름 다이어그램·비교·한계·면접 Q&A를 시각적으로 정리한 `overview.html`이 있다. 레포를 내려받아 [`labs/index.html`](labs/index.html)을 브라우저로 열면 전체 지도에서 각 모듈로 이동할 수 있다.
+
 ## 모듈
 
 - `coupon-issue` — 선착순 쿠폰 발급 동시성 문제. 락 없음 / synchronized / 원자적 UPDATE / 비관적 락 / 낙관적 락 / 네임드 락 / Redis 분산락 / Redis 원자적 차감(Lua) / Redisson 비교
@@ -35,9 +37,13 @@
 ./gradlew :seat-reservation:test       # 좌석 예약 모듈만
 ./gradlew :spring-data-jpa:test        # Spring Data JPA 모듈만
 ./gradlew :spring-boot-actuator:test   # Actuator 모듈만
+./gradlew :distributed-transaction-monolith:test  # Monolithic 기준선 모듈만
+./gradlew :distributed-transaction-msa-reservation-service:test  # MSA 모듈(통합 테스트는 reservation-service에 있음)
 ./gradlew :distributed-transaction-2pc:test  # 2PC 모듈만
 ./gradlew :distributed-transaction-tcc:test  # TCC 모듈만
 ./gradlew :payment-system-payment-service:test  # 결제 처리 모듈만
 ./gradlew :payment-system-wallet-service:test   # 정산 모듈만
 ./gradlew :payment-system-ledger-service:test   # 장부 모듈만
 ```
+
+`payment-system` 테스트도 Testcontainers로 MySQL·Kafka를 직접 띄워 기본 실행(CI 포함)에서 돈다. 실제 Toss 테스트 서버를 부르는 `TossPaymentExecutorTest`만 제외되고, `-PincludeIntegration`을 붙이면 포함된다.
