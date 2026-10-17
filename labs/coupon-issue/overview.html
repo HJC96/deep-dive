@@ -1,0 +1,715 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>coupon-issue 한눈에</title>
+<style>
+/* ===== 공통 스타일 (모든 모듈 overview.html에서 동일하게 유지) ===== */
+:root{
+  --bg:#f7f7f5;--surface:#ffffff;--surface-2:#f0efeb;--border:#e2e0da;
+  --text:#1d1d1b;--muted:#6b6a65;--accent:#2f5bd3;--accent-soft:#e6ecfb;
+  --good:#1f8a4c;--good-soft:#e3f4ea;--bad:#c2410c;--bad-soft:#fcebe1;
+  --warn:#a16207;--warn-soft:#fbf3dc;--code-bg:#f3f2ee;
+  --shadow:0 1px 2px rgba(0,0,0,.04),0 4px 16px rgba(0,0,0,.04);
+  --radius:12px;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --sans:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Pretendard","Noto Sans KR","Segoe UI",sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#141413;--surface:#1c1c1a;--surface-2:#252522;--border:#33322e;
+    --text:#ecebe6;--muted:#a09e96;--accent:#7c9cff;--accent-soft:#1f2a47;
+    --good:#4ccf85;--good-soft:#16301f;--bad:#ff8a5c;--bad-soft:#3a1f14;
+    --warn:#e8b84a;--warn-soft:#3a2f12;--code-bg:#22221f;
+    --shadow:none;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#141413;--surface:#1c1c1a;--surface-2:#252522;--border:#33322e;
+  --text:#ecebe6;--muted:#a09e96;--accent:#7c9cff;--accent-soft:#1f2a47;
+  --good:#4ccf85;--good-soft:#16301f;--bad:#ff8a5c;--bad-soft:#3a1f14;
+  --warn:#e8b84a;--warn-soft:#3a2f12;--code-bg:#22221f;
+  --shadow:none;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);line-height:1.65;font-size:15.5px;-webkit-font-smoothing:antialiased}
+a{color:var(--accent)}
+code,.mono{font-family:var(--mono);font-size:.86em;background:var(--code-bg);padding:.1em .35em;border-radius:5px;word-break:break-all}
+pre{background:var(--code-bg);padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.55;margin:10px 0}
+pre code{background:none;padding:0;font-size:inherit;word-break:normal}
+.layout{display:grid;grid-template-columns:220px minmax(0,1fr);gap:40px;max-width:1180px;margin:0 auto;padding:32px 24px 80px}
+@media (max-width:860px){.layout{grid-template-columns:minmax(0,1fr);gap:0;padding:20px 16px 60px}}
+nav.toc{position:sticky;top:24px;align-self:start;font-size:14px}
+nav.toc .home{display:inline-block;margin-bottom:14px;color:var(--muted);text-decoration:none;font-size:13px}
+nav.toc ol{list-style:none;padding:0;margin:0;border-left:2px solid var(--border)}
+nav.toc li a{display:block;padding:5px 0 5px 14px;margin-left:-2px;border-left:2px solid transparent;color:var(--muted);text-decoration:none}
+nav.toc li a.active,nav.toc li a:hover{color:var(--text);border-left-color:var(--accent)}
+@media (max-width:860px){
+  nav.toc{position:static;margin-bottom:18px}
+  nav.toc ol{display:flex;flex-wrap:wrap;gap:6px;border:0}
+  nav.toc li a{padding:4px 10px;margin:0;border:1px solid var(--border);border-radius:999px;font-size:13px}
+  nav.toc li a.active{border-color:var(--accent)}
+}
+header.hero{margin-bottom:28px}
+.eyebrow{font-size:12.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
+h1{font-size:30px;line-height:1.25;margin:6px 0 10px;letter-spacing:-.01em}
+.lead{font-size:17px;color:var(--text);margin:0 0 14px;max-width:62ch}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font-size:12.5px;padding:3px 10px;border-radius:999px;background:var(--surface-2);border:1px solid var(--border);color:var(--muted)}
+section{margin:44px 0 0;scroll-margin-top:20px}
+h2{font-size:21px;margin:0 0 6px;letter-spacing:-.01em}
+h2 .num{color:var(--accent);margin-right:8px;font-variant-numeric:tabular-nums}
+.sub{color:var(--muted);margin:0 0 16px;font-size:14.5px}
+h3{font-size:16.5px;margin:18px 0 6px}
+.card{overflow-wrap:anywhere;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow)}
+.grid{display:grid;gap:12px}
+.grid.c2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.grid.c3{grid-template-columns:repeat(3,minmax(0,1fr))}
+@media (max-width:700px){.grid.c2,.grid.c3{grid-template-columns:minmax(0,1fr)}}
+.tldr .label{font-size:12px;font-weight:700;letter-spacing:.05em;color:var(--muted);text-transform:uppercase;margin-bottom:4px}
+.tldr .card{border-top:3px solid var(--accent)}
+.tldr .card.good{border-top-color:var(--good)}
+.tldr .card.bad{border-top-color:var(--bad)}
+.tldr p{margin:0}
+/* 흐름 다이어그램: 단계 클릭 시 상세 표시 */
+.flow{display:flex;flex-wrap:wrap;align-items:stretch;gap:0;margin:6px 0 10px}
+.flow .step{flex:1 1 140px;min-width:120px;text-align:left;font:inherit;color:inherit;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 12px;cursor:pointer;position:relative;transition:border-color .15s,background .15s}
+.flow .step:hover{border-color:var(--accent)}
+.flow .step[aria-selected="true"]{border-color:var(--accent);background:var(--accent-soft)}
+.flow .step .k{display:block;font-size:11.5px;color:var(--muted);font-weight:600}
+.flow .step .t{display:block;font-weight:600;font-size:14px;line-height:1.35}
+.flow .step.fail{border-style:dashed;border-color:var(--bad)}
+.flow .step.fail[aria-selected="true"]{background:var(--bad-soft)}
+.flow .arrow{display:flex;align-items:center;padding:0 6px;color:var(--muted);font-size:18px}
+@media (max-width:700px){.flow{flex-direction:column}.flow .arrow{justify-content:center;padding:2px 0;transform:rotate(90deg)}}
+.flow-detail{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:10px;padding:14px 18px;min-height:64px}
+.flow-detail>div{display:none}
+.flow-detail>div.on{display:block}
+.flow-detail p:first-child{margin-top:0}.flow-detail p:last-child{margin-bottom:0}
+/* 탭 */
+.tabs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.tabs button{font:inherit;font-size:13.5px;padding:6px 12px;border-radius:999px;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{background:var(--text);color:var(--bg);border-color:var(--text)}
+.tabpanel{display:none}.tabpanel.on{display:block}
+.kv{display:grid;grid-template-columns:110px minmax(0,1fr);gap:6px 14px;margin:10px 0 0;font-size:14.5px}
+.kv dt{color:var(--muted);font-weight:600}
+.kv dd{margin:0}
+@media (max-width:520px){.kv{grid-template-columns:1fr}.kv dt{margin-top:6px}}
+/* 표 */
+.tablewrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:top}
+th{background:var(--surface-2);font-weight:600;font-size:13px;color:var(--muted);white-space:nowrap}
+tr:last-child td{border-bottom:0}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+.hl{background:var(--accent-soft)}
+/* 막대 그래프 (값은 --v: 0~1 비율) */
+.bars{display:grid;gap:8px}
+.bar{display:grid;grid-template-columns:150px minmax(0,1fr) 92px;align-items:center;gap:10px;font-size:13.5px}
+.bar .track{height:20px;background:var(--surface-2);border-radius:6px;overflow:hidden}
+.bar .fill{height:100%;width:calc(var(--v) * 100%);background:var(--accent);border-radius:6px;min-width:2px;transition:width .6s ease}
+.bar.good .fill{background:var(--good)}.bar.bad .fill{background:var(--bad)}.bar.warn .fill{background:var(--warn)}
+.bar .val{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--mono);font-size:12.5px}
+@media (max-width:520px){.bar{grid-template-columns:100px minmax(0,1fr) 72px}}
+.source{font-size:12.5px;color:var(--muted);margin-top:10px}
+/* 배지·콜아웃 */
+.badge{display:inline-block;font-size:11.5px;font-weight:700;padding:1px 8px;border-radius:999px;vertical-align:middle}
+.badge.good{background:var(--good-soft);color:var(--good)}
+.badge.bad{background:var(--bad-soft);color:var(--bad)}
+.badge.warn{background:var(--warn-soft);color:var(--warn)}
+.badge.info{background:var(--accent-soft);color:var(--accent)}
+.callout{border-radius:10px;padding:12px 16px;margin:12px 0;font-size:14.5px;border:1px solid var(--border);background:var(--surface)}
+.callout.warn{background:var(--warn-soft);border-color:transparent}
+.callout.bad{background:var(--bad-soft);border-color:transparent}
+.callout.good{background:var(--good-soft);border-color:transparent}
+.callout strong:first-child{margin-right:4px}
+/* 아코디언 (면접 Q&A, 약점) */
+details.qa{background:var(--surface);border:1px solid var(--border);border-radius:10px;margin:8px 0;overflow:hidden}
+details.qa summary{cursor:pointer;padding:12px 16px;font-weight:600;list-style:none;display:flex;gap:10px;align-items:flex-start}
+details.qa summary::-webkit-details-marker{display:none}
+details.qa summary::before{content:"Q";flex:none;width:22px;height:22px;border-radius:6px;background:var(--accent-soft);color:var(--accent);font-size:12px;display:grid;place-items:center;margin-top:1px}
+details.qa.risk summary::before{content:"!";background:var(--bad-soft);color:var(--bad)}
+details.qa[open] summary{border-bottom:1px solid var(--border)}
+details.qa .a{padding:12px 16px 14px 48px;font-size:14.5px}
+details.qa .a p{margin:0 0 8px}details.qa .a ul{margin:0;padding-left:18px}
+.qa-tools{display:flex;gap:8px;margin-bottom:8px}
+.qa-tools button,.theme-toggle{font:inherit;font-size:13px;padding:5px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer}
+.theme-toggle{position:fixed;right:16px;bottom:16px;z-index:5;box-shadow:var(--shadow)}
+/* 파일 지도 */
+ul.files{list-style:none;padding:0;margin:0;display:grid;gap:6px}
+ul.files li{display:grid;grid-template-columns:minmax(0,1fr);gap:2px;padding:9px 12px;background:var(--surface);border:1px solid var(--border);border-radius:9px}
+ul.files li code{background:none;padding:0;font-size:12.5px}
+ul.files li span{color:var(--muted);font-size:13.5px}
+footer{margin-top:56px;padding-top:18px;border-top:1px solid var(--border);color:var(--muted);font-size:13px}
+ul.plain{margin:6px 0;padding-left:20px}ul.plain li{margin:3px 0}
+</style>
+</head>
+<body>
+<button class="theme-toggle" type="button" aria-label="테마 전환">◐ 테마</button>
+<div class="layout">
+  <nav class="toc" aria-label="목차">
+    <a class="home" href="../index.html">← 전체 모듈</a>
+    <ol>
+      <li><a href="#tldr">한눈에</a></li>
+      <li><a href="#flow">흐름</a></li>
+      <li><a href="#cases">비교·핵심 구현</a></li>
+      <li><a href="#results">결과·수치</a></li>
+      <li><a href="#limits">한계·약점</a></li>
+      <li><a href="#interview">면접 Q&amp;A</a></li>
+      <li><a href="#files">파일 지도</a></li>
+    </ol>
+  </nav>
+  <main>
+    <header class="hero">
+      <div class="eyebrow">deep-dive · labs/coupon-issue</div>
+      <h1>선착순 쿠폰 재고 차감 — 동시성 제어 9가지를 한 테이블에서 비교</h1>
+      <p class="lead">재고 200개짜리 쿠폰 한 장(row 하나)에 요청 200~250개가 동시에 몰리면, "읽고 → 빼고 → 쓰기" 사이에 끼어들기가 생겨 차감이 사라집니다(lost update). 이 모듈은 그 현상을 테스트로 재현한 뒤, JVM 락·DB 락·Redis 락·원자 연산 9가지로 각각 막아 보고 실행 시간을 나란히 찍어 봅니다.</p>
+      <div class="chips"><span class="chip">Java 21</span><span class="chip">Spring Boot 3.4.1</span><span class="chip">Spring Data JPA</span><span class="chip">MySQL 8.0.36</span><span class="chip">Redis 7.2.5</span><span class="chip">Redisson 3.38.1</span><span class="chip">Testcontainers</span></div>
+    </header>
+
+    <section id="tldr" class="tldr">
+      <h2><span class="num">01</span>한눈에</h2>
+      <p class="sub">30초 요약</p>
+      <div class="grid c3">
+        <div class="card bad"><div class="label">문제</div><p>두 요청이 같은 <code>quantity = 200</code>을 읽고 둘 다 <code>199</code>를 저장 → 요청은 2번인데 차감은 1번. 테스트는 200번 발급 후 재고가 <b>0이 아님</b>을 단언합니다.</p></div>
+        <div class="card"><div class="label">접근</div><p>같은 조건(재고 200, 스레드 풀 32)에서 <b>9가지</b> 방식을 구현: 제어 없음 · <code>synchronized</code> · 원자적 UPDATE · 비관적/낙관적 락 · 네임드 락 · Redis <code>SET NX</code> · Redis Lua · Redisson.</p></div>
+        <div class="card good"><div class="label">결론</div><p>"락으로 줄 세우기"보다 <b>확인+차감을 한 번에 원자적으로</b>(UPDATE … WHERE, Lua) 하는 쪽이 단순하고 빨랐고, 경합이 심한 곳에서 낙관적 락은 재시도 폭주로 가장 느렸습니다(README 예시 출력 기준).</p></div>
+      </div>
+      <div class="callout"><strong>한 줄 암기:</strong> 문제의 본질은 "읽기-계산-쓰기"가 원자적이지 않다는 것. 해법은 ① 구간 전체를 직렬화(락)하거나 ② 연산 자체를 원자적으로 만들거나(조건부 UPDATE / Lua) ③ 충돌을 사후 감지 후 재시도(낙관적 락) 중 하나.</div>
+    </section>
+
+    <section id="flow">
+      <h2><span class="num">02</span>흐름</h2>
+      <p class="sub">단계를 클릭하면 상세 설명이 나옵니다. 먼저 "왜 깨지는가", 다음은 "고친 방식들의 공통 골격"입니다.</p>
+
+      <h3>① 제어 없음 — lost update가 생기는 경로</h3>
+      <div class="flow" data-flow>
+        <button class="step" data-target="f-start"><span class="k">STEP 1</span><span class="t">200개 작업 동시 출발</span></button>
+        <span class="arrow">→</span>
+        <button class="step" data-target="f-read"><span class="k">STEP 2</span><span class="t">SELECT quantity</span></button>
+        <span class="arrow">→</span>
+        <button class="step" data-target="f-calc"><span class="k">STEP 3</span><span class="t">메모리에서 −1 (yield)</span></button>
+        <span class="arrow">→</span>
+        <button class="step" data-target="f-write"><span class="k">STEP 4</span><span class="t">커밋 시 UPDATE</span></button>
+        <span class="arrow">→</span>
+        <button class="step fail" data-target="f-lost"><span class="k">실패</span><span class="t">차감 유실 (≠ 0)</span></button>
+      </div>
+      <div class="flow-detail">
+        <div id="f-start"><p>테스트는 <code>Executors.newFixedThreadPool(32)</code>에 작업 200개를 넣고, 모든 작업이 <code>start.await()</code>에서 기다리다가 <code>start.countDown()</code> 한 번에 동시에 출발합니다. 끝은 <code>done.await()</code>로 기다립니다. (<code>CouponIssueServiceTest</code>)</p></div>
+        <div id="f-read"><p><code>CouponIssueService.issue()</code>는 <code>@Transactional</code> 안에서 <code>findById</code>로 재고를 읽습니다. 락이 없으므로 여러 스레드가 <b>같은 값</b>(예: 200)을 동시에 읽을 수 있습니다.</p></div>
+        <div id="f-calc"><p><code>CouponStock.decrease()</code>는 일부러 경합 구간을 벌립니다.</p>
+<pre><code>int currentQuantity = remainingQuantity;
+Thread.yield();               // 다른 스레드에게 CPU 양보 → 끼어들기 유도
+remainingQuantity = currentQuantity - 1;</code></pre></div>
+        <div id="f-write"><p>JPA 변경 감지로 커밋 시점에 <code>UPDATE coupon_stock SET quantity = 199</code>가 나갑니다. 같은 200을 읽은 스레드들은 모두 199를 씁니다.</p></div>
+        <div id="f-lost"><p>요청은 200번 처리됐지만 재고는 0까지 내려가지 않습니다. 테스트 단언: <code>assertThat(couponStock.remainingQuantity()).isNotEqualTo(0)</code>. 남은 값은 실행마다 달라서 README도 "0이 아닐 수 있음"이라고만 적습니다.</p></div>
+      </div>
+
+      <svg viewBox="0 0 640 170" role="img" aria-label="두 요청이 같은 값을 읽어 차감 하나가 사라지는 타임라인" style="width:100%;height:auto;display:block;margin:6px 0 18px">
+        <text x="10" y="40" style="fill:var(--text);font-size:14px;font-weight:600">요청 A</text>
+        <text x="10" y="110" style="fill:var(--text);font-size:14px;font-weight:600">요청 B</text>
+        <line x1="80" y1="35" x2="630" y2="35" style="stroke:var(--border);stroke-width:2"/>
+        <line x1="80" y1="105" x2="630" y2="105" style="stroke:var(--border);stroke-width:2"/>
+        <rect x="90" y="20" width="120" height="30" rx="6" style="fill:var(--accent-soft);stroke:var(--accent)"/>
+        <text x="150" y="40" text-anchor="middle" style="fill:var(--text);font-size:12px">READ 200</text>
+        <rect x="150" y="90" width="120" height="30" rx="6" style="fill:var(--accent-soft);stroke:var(--accent)"/>
+        <text x="210" y="110" text-anchor="middle" style="fill:var(--text);font-size:12px">READ 200</text>
+        <rect x="300" y="20" width="120" height="30" rx="6" style="fill:var(--surface-2);stroke:var(--border)"/>
+        <text x="360" y="40" text-anchor="middle" style="fill:var(--text);font-size:12px">200−1 = 199</text>
+        <rect x="330" y="90" width="120" height="30" rx="6" style="fill:var(--surface-2);stroke:var(--border)"/>
+        <text x="390" y="110" text-anchor="middle" style="fill:var(--text);font-size:12px">200−1 = 199</text>
+        <rect x="450" y="20" width="130" height="30" rx="6" style="fill:var(--good-soft);stroke:var(--good)"/>
+        <text x="515" y="40" text-anchor="middle" style="fill:var(--text);font-size:12px">WRITE 199</text>
+        <rect x="480" y="90" width="130" height="30" rx="6" style="fill:var(--bad-soft);stroke:var(--bad)"/>
+        <text x="545" y="110" text-anchor="middle" style="fill:var(--text);font-size:12px">WRITE 199 (덮어씀)</text>
+        <text x="320" y="155" text-anchor="middle" style="fill:var(--bad);font-size:13px;font-weight:600">2번 처리했는데 재고는 198이 아니라 199 → lost update</text>
+      </svg>
+
+      <h3>② 고친 방식들의 공통 골격 — "임계 구역을 누가 지키나"</h3>
+      <div class="flow" data-flow>
+        <button class="step" data-target="f-guard"><span class="k">STEP 1</span><span class="t">진입 제어</span></button>
+        <span class="arrow">→</span>
+        <button class="step" data-target="f-rmw"><span class="k">STEP 2</span><span class="t">읽기·차감·쓰기</span></button>
+        <span class="arrow">→</span>
+        <button class="step" data-target="f-commit"><span class="k">STEP 3</span><span class="t">커밋 후 해제</span></button>
+        <span class="arrow">→</span>
+        <button class="step fail" data-target="f-conflict"><span class="k">실패 시</span><span class="t">대기·재시도·거절</span></button>
+      </div>
+      <div class="flow-detail">
+        <div id="f-guard"><p>방식별로 "문지기"가 다릅니다.</p>
+          <ul class="plain">
+            <li>JVM 모니터: <code>synchronized</code></li>
+            <li>DB row 락: <code>SELECT … FOR UPDATE</code> (<code>PESSIMISTIC_WRITE</code>)</li>
+            <li>DB 문자열 키 락: <code>GET_LOCK('1', 10)</code></li>
+            <li>Redis 키 존재 여부: <code>SET coupon:issue:lock:1 LOCK NX</code> + TTL 30초 / Redisson <code>RLock</code></li>
+            <li>문지기 없음, 연산 자체가 원자적: 조건부 <code>UPDATE</code>, Redis Lua</li>
+            <li>문지기 없음, 커밋 때 검사: <code>@Version</code></li>
+          </ul></div>
+        <div id="f-rmw"><p>락 계열(비관적·네임드·Redis·Redisson)은 안쪽에서 <b>기존 <code>CouponIssueService</code>와 같은 읽기-차감-쓰기</b>를 그대로 실행합니다. 원자 연산 계열은 이 단계가 SQL 한 문장 / Lua 스크립트 한 번으로 줄어듭니다.</p></div>
+        <div id="f-commit"><p>핵심 규칙: <b>락을 풀기 전에 커밋</b>되어야 다음 스레드가 갱신된 값을 봅니다. 네임드 락은 이를 위해 차감을 <code>REQUIRES_NEW</code>로 분리했고, Redis/Redisson 락은 <code>couponIssueService.issue()</code>(프록시의 <code>@Transactional</code>)가 반환된 뒤 <code>finally</code>에서 락을 해제합니다.</p></div>
+        <div id="f-conflict"><p>실패 시 동작이 방식마다 다릅니다.</p>
+          <ul class="plain">
+            <li>비관적·<code>synchronized</code>·Redisson: 그냥 <b>대기</b></li>
+            <li>Redis <code>SET NX</code>: 10ms 쉬고 <b>재시도</b> 루프</li>
+            <li>낙관적 락: 커밋 때 <code>ObjectOptimisticLockingFailureException</code> → 5ms 후 <b>새 트랜잭션으로 재시도</b></li>
+            <li>원자적 UPDATE / Lua: 재고가 없으면 <code>affected rows = 0</code> / <code>0</code> 반환 → <b>즉시 거절</b> (250개 중 50개)</li>
+          </ul></div>
+      </div>
+    </section>
+
+    <section id="cases">
+      <h2><span class="num">03</span>비교·핵심 구현</h2>
+      <p class="sub">탭을 눌러 케이스별로 봅니다. 코드는 실제 소스 발췌입니다.</p>
+
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>#</th><th>방식</th><th>누가 막나</th><th>서버 여러 대</th><th>요청 수</th><th>테스트 단언</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td>제어 없음</td><td>—</td><td>—</td><td class="num">200</td><td><span class="badge bad">≠ 0</span></td></tr>
+            <tr><td>2</td><td>synchronized</td><td>JVM 모니터</td><td><span class="badge bad">불가</span></td><td class="num">200</td><td><span class="badge good">= 0</span></td></tr>
+            <tr class="hl"><td>3</td><td>원자적 UPDATE</td><td>MySQL (단일 문장)</td><td><span class="badge good">가능</span></td><td class="num">250</td><td><span class="badge good">성공 200, 재고 0</span></td></tr>
+            <tr><td>4</td><td>비관적 락</td><td>MySQL row 락</td><td><span class="badge good">가능</span></td><td class="num">200</td><td><span class="badge good">= 0</span></td></tr>
+            <tr><td>5</td><td>낙관적 락</td><td>커밋 시 version 검사</td><td><span class="badge good">가능</span></td><td class="num">200</td><td><span class="badge good">= 0</span></td></tr>
+            <tr><td>6</td><td>네임드 락</td><td>MySQL <code>GET_LOCK</code></td><td><span class="badge good">가능</span></td><td class="num">200</td><td><span class="badge good">= 0</span></td></tr>
+            <tr><td>7</td><td>Redis 분산락</td><td>Redis <code>SET NX</code></td><td><span class="badge good">가능</span></td><td class="num">200</td><td><span class="badge good">= 0</span></td></tr>
+            <tr class="hl"><td>8</td><td>Redis Lua</td><td>Redis (스크립트 원자 실행)</td><td><span class="badge good">가능</span></td><td class="num">250</td><td><span class="badge good">성공 200, 재고 "0"</span></td></tr>
+            <tr><td>9</td><td>Redisson</td><td>Redis <code>RLock</code></td><td><span class="badge good">가능</span></td><td class="num">200</td><td><span class="badge good">= 0</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="source">"서버 여러 대" 열: README의 synchronized 한계("같은 서비스 인스턴스/단일 JVM 안에서만 유효")와 비관적 락 설명("DB가 락 관리 → 서버 여러 대여도 동작")을 근거로 정리. 실제 다중 서버 테스트는 없습니다.</p>
+
+      <div data-tabs style="margin-top:16px">
+        <div class="tabs" role="tablist">
+          <button role="tab" data-target="t-none">1 제어 없음</button>
+          <button role="tab" data-target="t-sync">2 synchronized</button>
+          <button role="tab" data-target="t-atomic">3 원자적 UPDATE</button>
+          <button role="tab" data-target="t-pess">4 비관적 락</button>
+          <button role="tab" data-target="t-opt">5 낙관적 락</button>
+          <button role="tab" data-target="t-named">6 네임드 락</button>
+          <button role="tab" data-target="t-redis">7 Redis SET NX</button>
+          <button role="tab" data-target="t-lua">8 Redis Lua</button>
+          <button role="tab" data-target="t-redisson">9 Redisson</button>
+        </div>
+
+        <div class="tabpanel card" id="t-none">
+          <h3>동시성 제어 없음 <span class="badge bad">재고 ≠ 0</span></h3>
+          <p>기준선(baseline). 평범한 JPA 코드가 동시성 앞에서 어떻게 깨지는지 보여 줍니다.</p>
+<pre><code>@Transactional
+public void issue(Long couponId) {
+    CouponStock couponStock = couponRepository.findById(couponId)
+            .orElseThrow(() -&gt; new IllegalArgumentException("..."));
+    couponStock.decrease();          // 내부에 Thread.yield()
+    couponRepository.save(couponStock);
+}</code></pre>
+          <dl class="kv">
+            <dt>어떻게</dt><dd>SELECT → 메모리 −1 → 커밋 시 UPDATE. 각 단계 사이에 다른 트랜잭션이 끼어들 수 있음.</dd>
+            <dt>결과</dt><dd><code>isNotEqualTo(0)</code> — 남은 재고가 0이 아님을 단언.</dd>
+            <dt>포인트</dt><dd><code>@Transactional</code>만으로는 동시성이 해결되지 않는다. (MySQL 기본 격리 수준 REPEATABLE READ에서도 일반 SELECT는 락을 잡지 않음 — <span class="badge info">일반 지식</span>)</dd>
+            <dt>코드</dt><dd><code>labs/coupon-issue/src/main/java/dev/deepdive/coupon/service/CouponIssueService.java</code></dd>
+          </dl>
+        </div>
+
+        <div class="tabpanel card" id="t-sync">
+          <h3>synchronized <span class="badge good">재고 0</span> <span class="badge warn">단일 JVM 한정</span></h3>
+          <p>메서드 전체를 JVM 모니터로 감싸 한 번에 한 스레드만 들어가게 합니다.</p>
+<pre><code>public final class SynchronizedCouponIssueService {   // 스프링 빈 아님, 테스트에서 new로 생성
+    public synchronized void issue(Long couponId) {
+        CouponStock couponStock = couponRepository.findById(couponId).orElseThrow(...);
+        couponStock.decrease();
+        couponRepository.save(couponStock);
+    }
+}</code></pre>
+          <dl class="kv">
+            <dt>어떻게</dt><dd>읽기·계산·저장이 순서대로 하나씩 실행.</dd>
+            <dt>주의</dt><dd>이 클래스에는 <code>@Transactional</code>이 없습니다. 그래서 <code>findById</code>, <code>save</code>가 각자 리포지토리 트랜잭션으로 즉시 커밋되고, 모니터를 놓기 전에 DB에 반영됩니다. 만약 메서드에 <code>@Transactional</code>을 붙이면 프록시가 <b>모니터 해제 후에</b> 커밋해 다시 lost update가 생길 수 있습니다 <span class="badge info">일반 지식</span>.</dd>
+            <dt>트레이드오프</dt><dd>서버가 여러 대면 JVM마다 모니터가 따로라 무력. 전 구간 직렬화로 처리량 저하. (README 한계)</dd>
+            <dt>코드</dt><dd><code>labs/coupon-issue/src/main/java/dev/deepdive/coupon/service/SynchronizedCouponIssueService.java</code></dd>
+          </dl>
+        </div>
+
+        <div class="tabpanel card" id="t-atomic">
+          <h3>원자적 UPDATE <span class="badge good">성공 200 / 실패 50</span></h3>
+          <p>"재고가 1 이상이면 1 빼라"를 SQL 한 문장으로. 애플리케이션 락이 필요 없습니다.</p>
+<pre><code>@Transactional
+@Modifying
+@Query("""
+        UPDATE CouponStock c
+        SET c.remainingQuantity = c.remainingQuantity - 1
+        WHERE c.couponId = :couponId AND c.remainingQuantity &gt;= 1
+        """)
+int decreaseQuantity(@Param("couponId") Long couponId);
+
+// AtomicUpdateCouponIssueService
+public boolean issue(Long couponId) {
+    return couponRepository.decreaseQuantity(couponId) == 1;
+}</code></pre>
+          <dl class="kv">
+            <dt>어떻게</dt><dd>조건 검사와 차감이 한 문장. 같은 row UPDATE는 MySQL이 row 락으로 순서대로 처리. <code>affected rows</code> 1이면 성공, 0이면 재고 부족.</dd>
+            <dt>결과</dt><dd>250 요청 → <code>issuedCount == 200</code>, 재고 <code>0</code>. 재고가 음수로 내려가지 않음.</dd>
+            <dt>트레이드오프</dt><dd>단순 증감에만 적합. 여러 테이블 검증·복잡한 정책은 한 문장으로 끝내기 어려움 (README 한계).</dd>
+            <dt>코드</dt><dd><code>labs/coupon-issue/src/main/java/dev/deepdive/coupon/repository/CouponRepository.java</code>, <code>.../service/AtomicUpdateCouponIssueService.java</code></dd>
+          </dl>
+        </div>
+
+        <div class="tabpanel card" id="t-pess">
+          <h3>비관적 락 (SELECT … FOR UPDATE) <span class="badge good">재고 0</span></h3>
+          <p>읽는 순간 row에 쓰기 락을 걸어, 커밋까지 다른 트랜잭션을 기다리게 합니다.</p>
+<pre><code>@Lock(LockModeType.PESSIMISTIC_WRITE)
+@Query("SELECT c FROM CouponStock c WHERE c.couponId = :couponId")
+Optional&lt;CouponStock&gt; findByIdWithPessimisticLock(@Param("couponId") Long couponId);
+
+@Transactional
+public void issue(Long couponId) {
+    CouponStock couponStock = couponRepository.findByIdWithPessimisticLock(couponId).orElseThrow(...);
+    couponStock.decrease();
+    couponRepository.save(couponStock);
+}</code></pre>
+          <dl class="kv">
+            <dt>어떻게</dt><dd>DB가 락을 관리 → 서버가 여러 대여도 동작.</dd>
+            <dt>트레이드오프</dt><dd>전 구간 직렬화, 락 대기 동안 커넥션 점유 → 풀 고갈·락 타임아웃·데드락 위험 (README 한계).</dd>
+            <dt>코드</dt><dd><code>labs/coupon-issue/src/main/java/dev/deepdive/coupon/service/PessimisticLockCouponIssueService.java</code></dd>
+          </dl>
+        </div>
+
+        <div class="tabpanel card" id="t-opt">
+          <h3>낙관적 락 (@Version) + 재시도 <span class="badge good">재고 0</span> <span class="badge bad">가장 느림</span></h3>
+          <p>락을 안 잡고, 커밋 때 <code>UPDATE … WHERE version = 읽은값</code>으로 충돌을 감지. 충돌하면 처음부터 다시.</p>
+<pre><code>// 재시도 루프는 트랜잭션 "밖"
+public void issue(Long couponId) {
+    while (true) {
+        try {
+            self.issueOnce(couponId);      // 프록시 경유 → 시도 1회 = 트랜잭션 1개
+            return;
+        } catch (ObjectOptimisticLockingFailureException conflict) {
+            sleep(BACKOFF_MILLIS);         // 5ms
+        }
+    }
+}
+
+@Transactional
+public void issueOnce(Long couponId) { ... }   // 이 시점에 커밋됨</code></pre>
+          <dl class="kv">
+            <dt>왜 self?</dt><dd><code>this.issueOnce()</code>는 프록시를 우회해 <code>@Transactional</code>이 무시됨(self-invocation). 생성자에 <code>@Lazy OptimisticLockCouponIssueService self</code>를 주입해 프록시를 직접 호출. <code>@Lazy</code>는 자기 자신 주입의 순환 참조를 끊기 위함.</dd>
+            <dt>왜 별도 엔티티?</dt><dd><code>@Version</code>을 공용 <code>CouponStock</code>에 두면 "락 없음" 케이스까지 버전 검사를 받아 lost update가 재현되지 않음 → <code>VersionedCouponStock</code>로 분리 (README).</dd>
+            <dt>트레이드오프</dt><dd>충돌 = 실패라 재시도 코드가 필수. 한 row에 200개가 몰리면 재시도 폭주 → 충돌이 드문 상황에 적합 (README).</dd>
+            <dt>코드</dt><dd><code>labs/coupon-issue/src/main/java/dev/deepdive/coupon/service/OptimisticLockCouponIssueService.java</code>, <code>.../core/VersionedCouponStock.java</code></dd>
+          </dl>
+        </div>
+
+        <div class="tabpanel card" id="t-named">
+          <h3>네임드 락 (MySQL GET_LOCK) <span class="badge good">재고 0</span></h3>
+          <p>row가 아니라 <b>문자열 키</b>에 거는 MySQL 락. 락 대상을 앱이 자유롭게 정합니다.</p>
+<pre><code>@Query(value = "SELECT GET_LOCK(:key, 10)", nativeQuery = true)
+Integer getLock(@Param("key") String key);     // 성공 1, 타임아웃 0, 에러 NULL
+
+@Transactional                                   // getLock/releaseLock을 같은 커넥션에 고정
+public void issue(Long couponId) {
+    try {
+        namedLockRepository.getLock(couponId.toString());
+        self.issueOnce(couponId);                // REQUIRES_NEW → 락 풀기 전에 커밋
+    } finally {
+        namedLockRepository.releaseLock(couponId.toString());
+    }
+}</code></pre>
+          <dl class="kv">
+            <dt>어떻게</dt><dd>락 잡는 커넥션 1개 + 차감 커넥션 1개(<code>REQUIRES_NEW</code>)가 동시에 필요. 차감을 먼저 커밋해야 다음 스레드가 최신 재고를 봄.</dd>
+            <dt>트레이드오프</dt><dd>직렬화로 처리량 저하, 대기 스레드도 커넥션 점유, MySQL 종속 (README 한계).</dd>
+            <dt>코드</dt><dd><code>labs/coupon-issue/src/main/java/dev/deepdive/coupon/service/NamedLockCouponIssueService.java</code>, <code>.../repository/NamedLockRepository.java</code></dd>
+          </dl>
+        </div>
+
+        <div class="tabpanel card" id="t-redis">
+          <h3>Redis 분산락 (SET NX) <span class="badge good">재고 0</span> <span class="badge warn">소유자 확인 없음</span></h3>
+          <p>Redis 키가 "있으면 잠김, 없으면 열림". 직접 스핀락을 구현했습니다.</p>
+<pre><code>private static final Duration LOCK_TTL = Duration.ofSeconds(30);
+private static final long LOCK_RETRY_MILLIS = 10L;
+private static final String LOCK_VALUE = "LOCK";
+
+public void issue(Long couponId) {
+    String lockKey = "coupon:issue:lock:" + couponId;
+    lock(lockKey);                         // setIfAbsent(lockKey, "LOCK", 30s) 될 때까지 10ms 간격 재시도
+    try {
+        couponIssueService.issue(couponId);
+    } finally {
+        redisTemplate.delete(lockKey);     // 내 락인지 확인하지 않고 삭제
+    }
+}</code></pre>
+          <dl class="kv">
+            <dt>어떻게</dt><dd>DB 차감은 기존 <code>CouponIssueService</code> 재사용, Redis는 문지기 역할만.</dd>
+            <dt>트레이드오프</dt><dd>TTL이 짧으면 작업 중 락 만료, 길면 장애 시 대기 증가 (README). 값이 고정 문자열이라 <b>남의 락을 지울 수 있음</b>(아래 약점).</dd>
+            <dt>코드</dt><dd><code>labs/coupon-issue/src/main/java/dev/deepdive/coupon/service/RedisLockCouponIssueService.java</code></dd>
+          </dl>
+        </div>
+
+        <div class="tabpanel card" id="t-lua">
+          <h3>Redis Lua 원자 차감 <span class="badge good">성공 200 / 실패 50</span> <span class="badge good">가장 빠름</span></h3>
+          <p>"확인 → 차감"을 Lua 스크립트 하나로 묶어 Redis 안에서 원자적으로 실행합니다.</p>
+<pre><code>local stock = tonumber(redis.call('GET', KEYS[1]) or '0')
+if stock &lt; 1 then
+    return 0
+end
+redis.call('DECR', KEYS[1])
+return 1</code></pre>
+<pre><code>public boolean issue(Long couponId) {
+    Long result = redisTemplate.execute(DECREASE_STOCK_SCRIPT, List.of(stockKey(couponId)));
+    return Long.valueOf(1L).equals(result);
+}</code></pre>
+          <dl class="kv">
+            <dt>어떻게</dt><dd>Redis는 스크립트 실행 중 다른 명령을 끼워 넣지 않음 → 확인과 차감 사이 틈이 없음. 키: <code>coupon:stock:1</code>.</dd>
+            <dt>결과</dt><dd>250 요청 → 성공 200, Redis 값 <code>"0"</code>.</dd>
+            <dt>트레이드오프</dt><dd>Redis가 재고의 기준 저장소가 됨 → DB 동기화 전략 필요, 장애·복제 지연 고려 필요 (README 한계). <b>DB에는 아무것도 기록하지 않음</b>.</dd>
+            <dt>코드</dt><dd><code>labs/coupon-issue/src/main/java/dev/deepdive/coupon/service/RedisAtomicCouponIssueService.java</code></dd>
+          </dl>
+        </div>
+
+        <div class="tabpanel card" id="t-redisson">
+          <h3>Redisson 분산락 (RLock) <span class="badge good">재고 0</span></h3>
+          <p>직접 짠 SET NX 루프 대신 Redisson이 획득·대기·해제를 처리합니다.</p>
+<pre><code>public void issue(Long couponId) {
+    RLock lock = redissonClient.getLock(LOCK_KEY_PREFIX + couponId);  // "coupon:issue:redisson-lock:"
+    lock.lock();
+    try {
+        couponIssueService.issue(couponId);
+    } finally {
+        lock.unlock();
+    }
+}</code></pre>
+          <dl class="kv">
+            <dt>어떻게</dt><dd>스핀 루프·TTL·해제 코드를 라이브러리에 위임. <code>lock()</code>을 leaseTime 없이 쓰면 watchdog이 락을 자동 연장 <span class="badge info">일반 지식</span>.</dd>
+            <dt>주의</dt><dd>이 클래스는 <code>@Service</code>가 아닌 일반 클래스이고, 테스트가 <code>Redisson.create(config)</code>로 클라이언트를 직접 만들어 주입합니다.</dd>
+            <dt>트레이드오프</dt><dd>여전히 직렬화, Redis와 DB 모두 의존, lease/watchdog 동작 이해 필요 (README 한계).</dd>
+            <dt>코드</dt><dd><code>labs/coupon-issue/src/main/java/dev/deepdive/coupon/service/RedissonLockCouponIssueService.java</code></dd>
+          </dl>
+        </div>
+      </div>
+    </section>
+
+    <section id="results">
+      <h2><span class="num">04</span>결과·수치</h2>
+      <p class="sub">수치의 출처를 반드시 함께 표기합니다.</p>
+      <div class="card">
+        <h3 style="margin-top:0">실행 시간 (짧을수록 빠름, 최대 3,156ms 기준 비율)</h3>
+        <div class="bars">
+          <div class="bar good" style="--v:.013"><span>Redis Lua ※250</span><div class="track"><div class="fill"></div></div><span class="val">41.137 ms</span></div>
+          <div class="bar bad" style="--v:.052"><span>락 없음 (틀림)</span><div class="track"><div class="fill"></div></div><span class="val">163.157 ms</span></div>
+          <div class="bar good" style="--v:.117"><span>원자적 UPDATE ※250</span><div class="track"><div class="fill"></div></div><span class="val">369.100 ms</span></div>
+          <div class="bar" style="--v:.136"><span>비관적 락</span><div class="track"><div class="fill"></div></div><span class="val">429.167 ms</span></div>
+          <div class="bar" style="--v:.296"><span>synchronized</span><div class="track"><div class="fill"></div></div><span class="val">933.327 ms</span></div>
+          <div class="bar" style="--v:.349"><span>네임드 락</span><div class="track"><div class="fill"></div></div><span class="val">1101.326 ms</span></div>
+          <div class="bar warn" style="--v:.416"><span>Redis 분산락</span><div class="track"><div class="fill"></div></div><span class="val">1312.485 ms</span></div>
+          <div class="bar warn" style="--v:.416"><span>Redisson</span><div class="track"><div class="fill"></div></div><span class="val">1312.510 ms</span></div>
+          <div class="bar bad" style="--v:1"><span>낙관적 락(재시도)</span><div class="track"><div class="fill"></div></div><span class="val">3156.127 ms</span></div>
+        </div>
+        <div class="source">출처: README "실행 시간" 예시 출력 (테스트 콘솔 <code>System.out.printf</code>, 1회 실행, 환경에 따라 다름). ※250 = 요청 250개(성공 200 + 거절 50), 나머지는 요청 200개. "락 없음"은 빠르지만 결과가 틀린 기준선입니다.</div>
+      </div>
+
+      <div class="callout warn"><strong>비교할 때 주의:</strong> ① 1회 측정값이라 통계적 의미는 약합니다. ② <code>CouponIssueServiceTest</code>의 MySQL 케이스만 <code>warmUpOnce()</code>(각 경로 1,000회)로 콜드 스타트를 제거했고, <code>RedisCouponIssueServiceTest</code>의 Redis 3케이스는 웜업이 없습니다. ③ 요청 수가 200/250으로 다릅니다. 순위는 "경향" 정도로만 읽으세요.</div>
+
+      <h3>테스트가 실제로 단언하는 것 (수치보다 확실한 근거)</h3>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>테스트</th><th>단언</th></tr></thead>
+          <tbody>
+            <tr><td>락 없음</td><td><code>remainingQuantity()).isNotEqualTo(0)</code></td></tr>
+            <tr><td>synchronized · 비관적 · 낙관적 · 네임드 · Redis 분산락 · Redisson</td><td><code>remainingQuantity()).isEqualTo(0)</code></td></tr>
+            <tr><td>원자적 UPDATE (250 요청)</td><td><code>issuedCount.get()).isEqualTo(200)</code> + 재고 <code>0</code></td></tr>
+            <tr><td>Redis Lua (250 요청)</td><td><code>issuedCount.get()).isEqualTo(200)</code> + Redis 값 <code>"0"</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="source">테스트 환경: 스레드 풀 32 (<code>THREAD_POOL_SIZE</code>), Hikari 최대 풀 40 (<code>MySQLContainerTest</code>), 재고 200 (<code>QUANTITY</code>).</p>
+    </section>
+
+    <section id="limits">
+      <h2><span class="num">05</span>한계·약점</h2>
+      <p class="sub">README가 스스로 밝힌 한계와, 코드에서 확인되는 약점. 면접관이 파고들 수 있는 지점입니다.</p>
+
+      <h3><span class="badge info">README 명시</span> 방식별 한계</h3>
+      <ul class="plain">
+        <li><b>synchronized</b>: 단일 JVM에서만 유효, 전 구간 직렬화.</li>
+        <li><b>원자적 UPDATE</b>: 단순 증감에만 적합, 복잡한 정책은 한 문장으로 어려움.</li>
+        <li><b>비관적·네임드 락</b>: 직렬화로 처리량 저하, 커넥션 점유 → 풀 고갈·락 타임아웃·데드락 위험. 네임드 락은 MySQL 종속.</li>
+        <li><b>낙관적 락</b>: 충돌 = 실패라 재시도 필수, 경합이 심하면 재시도 폭주로 가장 느림.</li>
+        <li><b>Redis SET NX</b>: TTL 길이 딜레마(짧으면 작업 중 만료, 길면 장애 시 대기).</li>
+        <li><b>Redis Lua</b>: Redis가 기준 저장소가 됨 → DB 동기화 전략·장애·복제 지연 설계 필요.</li>
+        <li><b>Redisson</b>: 직렬화, Redis+DB 이중 의존, lease/watchdog 이해 필요.</li>
+      </ul>
+
+      <h3><span class="badge bad">코드 분석</span> README에 없는 약점</h3>
+      <details class="qa risk"><summary>Redis 락 값이 고정 "LOCK"이고, 해제 시 소유자 확인 없이 delete</summary><div class="a">
+        <p><code>RedisLockCouponIssueService</code>는 모든 요청이 같은 값 <code>"LOCK"</code>으로 <code>setIfAbsent</code>하고, <code>finally</code>에서 무조건 <code>redisTemplate.delete(lockKey)</code>합니다.</p>
+        <p>시나리오: A의 작업이 TTL(30초)보다 길어져 락이 만료 → B가 락 획득 → A가 끝나며 <b>B의 락을 삭제</b> → C도 진입 → 동시 실행. 이 테스트(짧은 작업)에서는 드러나지 않습니다.</p>
+        <p>개선 <span class="badge info">일반 지식</span>: 값에 요청별 UUID를 넣고, "값이 내 것일 때만 DEL"을 Lua로 원자 실행. 또는 Redisson 사용.</p>
+      </div></details>
+      <details class="qa risk"><summary>네임드 락이 GET_LOCK 반환값을 무시</summary><div class="a">
+        <p><code>NamedLockRepository</code> 주석에 "성공 1, 타임아웃 0, 에러 NULL"이라고 적어 놓고, <code>NamedLockCouponIssueService.issue()</code>는 반환값을 확인하지 않고 바로 <code>self.issueOnce()</code>를 호출합니다. 10초 안에 락을 못 얻으면 <b>락 없이 차감</b>이 실행되고, <code>finally</code>에서 잡지도 않은 락을 해제합니다.</p>
+        <p>개선: 반환값이 1이 아니면 예외로 중단하고, 획득한 경우에만 해제.</p>
+      </div></details>
+      <details class="qa risk"><summary>실행 시간 비교 조건이 같지 않다 (웜업·요청 수·1회 측정)</summary><div class="a">
+        <ul>
+          <li>웜업(<code>warmUpOnce</code>, 경로별 1,000회)은 <code>CouponIssueServiceTest</code>(MySQL 5케이스: 락 없음·비관적·원자적·낙관적·네임드)에만 있고 synchronized는 같은 클래스라 JIT·풀 예열 효과는 공유. <code>RedisCouponIssueServiceTest</code>의 Redis·Lua·Redisson은 웜업 없이 측정.</li>
+          <li>원자적 UPDATE·Lua는 250건, 나머지는 200건.</li>
+          <li>각 값은 <code>System.nanoTime()</code> 1회 측정 (JMH 아님).</li>
+        </ul>
+      </div></details>
+      <details class="qa risk"><summary>낙관적 락 재시도에 상한·지터가 없다</summary><div class="a">
+        <p><code>while (true)</code> + 고정 5ms. 충돌이 계속되면 무한히 돌 수 있고, 모든 스레드가 같은 간격으로 재충돌할 수 있습니다. 운영이라면 최대 재시도 횟수와 지수 백오프+지터를 둡니다 <span class="badge info">일반 지식</span>.</p>
+      </div></details>
+      <details class="qa risk"><summary>"락 없음" 테스트는 비결정적</summary><div class="a">
+        <p><code>isNotEqualTo(0)</code>은 경합이 "운 좋게" 안 생기면 실패할 수 있습니다. <code>Thread.yield()</code>로 확률을 높였을 뿐 보장은 아닙니다.</p>
+      </div></details>
+      <details class="qa risk"><summary>빈 구성이 케이스마다 다르다</summary><div class="a">
+        <p><code>SynchronizedCouponIssueService</code>, <code>AtomicUpdateCouponIssueService</code>는 <code>final</code> 클래스로 <code>@Service</code>가 아니고 테스트에서 <code>new</code>로 생성. <code>RedissonLockCouponIssueService</code>도 빈이 아니며 RedissonClient를 테스트가 직접 만듭니다. 실제 앱에 붙이려면 빈 등록·설정이 추가로 필요합니다.</p>
+      </div></details>
+    </section>
+
+    <section id="interview">
+      <h2><span class="num">06</span>면접 Q&amp;A</h2>
+      <p class="sub">질문을 먼저 읽고 스스로 답해 본 뒤 펼쳐 보세요.</p>
+      <div class="qa-tools"><button type="button" data-qa="open">모두 펼치기</button><button type="button" data-qa="close">모두 접기</button></div>
+
+      <details class="qa"><summary>선착순 쿠폰에서 동시성 문제가 왜 생기나요? @Transactional이면 안전하지 않나요?</summary><div class="a">
+        <ul>
+          <li>"읽기 → 계산 → 쓰기"가 원자적이지 않아, 두 트랜잭션이 같은 값(200)을 읽고 같은 값(199)을 쓰는 lost update.</li>
+          <li><code>@Transactional</code>은 원자성(전부 커밋/롤백)을 주지만 다른 트랜잭션과의 <b>상호 배제</b>를 주지 않음. 일반 SELECT는 락 없이 읽음 <span class="badge info">일반 지식</span>.</li>
+          <li>이 모듈은 <code>Thread.yield()</code>로 끼어들기를 유도해 200건 후 재고 ≠ 0을 재현.</li>
+        </ul>
+      </div></details>
+      <details class="qa"><summary>9가지 중 실무에서 하나를 고른다면? 이유는?</summary><div class="a">
+        <ul>
+          <li>단순 재고 차감이면 <b>원자적 UPDATE</b>(<code>WHERE quantity &gt;= 1</code>): 락 코드 없음, DB가 정합성 보장, 실패 여부를 <code>affected rows</code>로 즉시 앎. 이 실험에서도 250건 중 정확히 200건만 성공.</li>
+          <li>트래픽이 DB를 넘어서면 <b>Redis Lua</b>로 앞단에서 걸러내고 DB 기록은 비동기로(→ seat-reservation 모듈의 Kafka 구조). 단 Redis가 기준 저장소가 되는 부담.</li>
+          <li>로직이 복잡해 한 문장으로 안 되면 비관적 락 또는 분산락.</li>
+        </ul>
+      </div></details>
+      <details class="qa"><summary>비관적 락 vs 낙관적 락, 언제 무엇을 쓰나요?</summary><div class="a">
+        <ul>
+          <li>비관적: 충돌이 잦을 때. 미리 막아 재시도 비용 없음. 대신 대기·커넥션 점유·데드락 위험.</li>
+          <li>낙관적: 충돌이 드물 때. 락 비용 없음. 충돌 시 예외 → 재시도 코드 필수.</li>
+          <li>근거: README 예시에서 같은 row에 200개를 몰았더니 낙관적 락 3,156ms vs 비관적 락 429ms.</li>
+        </ul>
+      </div></details>
+      <details class="qa"><summary>낙관적 락 재시도를 왜 @Transactional 메서드 밖에 두었고, self 주입은 왜 필요했나요?</summary><div class="a">
+        <ul>
+          <li>충돌은 <b>커밋 시점</b>에 감지되고 그 트랜잭션은 롤백 대상 → 같은 트랜잭션 안에서는 재시도 불가. 그래서 "시도 1회 = 트랜잭션 1개"(<code>issueOnce</code>), 루프(<code>issue</code>)는 바깥.</li>
+          <li><code>this.issueOnce()</code>는 프록시를 거치지 않아 <code>@Transactional</code>이 적용되지 않음(self-invocation). 그래서 <code>@Lazy</code>로 자기 프록시를 주입받아 <code>self.issueOnce()</code> 호출.</li>
+          <li>대안: 재시도 로직을 별도 퍼사드 클래스로 분리하면 self 주입 불필요 (README).</li>
+        </ul>
+      </div></details>
+      <details class="qa"><summary>네임드 락에서 REQUIRES_NEW를 쓴 이유와 그 비용은?</summary><div class="a">
+        <ul>
+          <li><code>GET_LOCK</code>/<code>RELEASE_LOCK</code>은 같은 세션(커넥션)에서 해야 하므로 바깥 <code>@Transactional</code>로 커넥션 고정.</li>
+          <li>차감을 같은 트랜잭션에 두면 락 해제 시점에 아직 커밋 전 → 다음 스레드가 옛 값을 읽음. 그래서 <code>REQUIRES_NEW</code>로 먼저 커밋.</li>
+          <li>비용: 요청당 커넥션 2개. 이 테스트는 Hikari 40, 스레드 32라 버티지만, 풀이 작으면 고갈 위험(README 한계).</li>
+          <li>후속 질문 대비: 현재 코드는 <code>GET_LOCK</code> 반환값을 확인하지 않음 → 개선 포인트.</li>
+        </ul>
+      </div></details>
+      <details class="qa"><summary>직접 만든 Redis SET NX 락의 문제점은? Redisson과 무엇이 다른가요?</summary><div class="a">
+        <ul>
+          <li>이 코드: 고정 값 <code>"LOCK"</code> + 소유자 확인 없는 <code>delete</code> → TTL 만료 후 남의 락을 지울 수 있음. 10ms 스핀 → Redis에 부하.</li>
+          <li>Redisson <span class="badge info">일반 지식</span>: 스레드 식별 값으로 소유자 확인 후 해제, pub/sub 기반 대기(스핀 감소), watchdog으로 작업 중 자동 연장, 재진입 지원.</li>
+          <li>공통 한계: 락이 결국 직렬화라 처리량은 비슷 (README 예시 1,312ms 대 1,312ms).</li>
+        </ul>
+      </div></details>
+      <details class="qa"><summary>Redis Lua가 왜 가장 빨랐고, 그대로 운영에 쓰면 무엇이 문제인가요?</summary><div class="a">
+        <ul>
+          <li>네트워크 왕복 1회 + Redis 내부 원자 실행, DB 접근 없음 → README 예시 41ms.</li>
+          <li>문제: DB에 발급 기록이 없음. Redis 장애·유실 시 재고 기준이 사라짐. 발급 이력 동기화(비동기 큐 등), 장애·복제 지연 설계 필요 (README 한계).</li>
+          <li>공정 비교 주의: 이 케이스는 웜업 없이 250건 측정.</li>
+        </ul>
+      </div></details>
+      <details class="qa"><summary>synchronized에 @Transactional을 같이 붙이면 어떻게 되나요?</summary><div class="a">
+        <ul>
+          <li>프록시가 메서드 <b>반환 후</b> 커밋 → 모니터가 이미 풀린 상태에서 다음 스레드가 커밋 전 값을 읽어 lost update 가능 <span class="badge info">일반 지식</span>.</li>
+          <li>이 모듈의 <code>SynchronizedCouponIssueService</code>는 <code>@Transactional</code>이 없어 리포지토리 호출이 즉시 커밋되므로 테스트가 통과.</li>
+          <li>그리고 다중 서버면 어차피 무력.</li>
+        </ul>
+      </div></details>
+      <details class="qa"><summary>이 실험의 측정 방식에서 신뢰도를 높이려면?</summary><div class="a">
+        <ul>
+          <li>모든 케이스에 같은 웜업, 같은 요청 수, 여러 번 반복 측정 후 평균·분산 제시.</li>
+          <li>지금은 1회 <code>System.nanoTime()</code> 값이고 MySQL 케이스만 웜업 → 순위는 경향으로만 해석.</li>
+          <li>실서버 처리량은 nGrinder/k6 같은 부하 도구로 별도 측정 <span class="badge info">일반 지식</span>.</li>
+        </ul>
+      </div></details>
+    </section>
+
+    <section id="files">
+      <h2><span class="num">07</span>파일 지도</h2>
+      <p class="sub">코드를 다시 볼 때 여기서부터. (경로는 <code>labs/coupon-issue/</code> 기준)</p>
+      <ul class="files">
+        <li><code>README.md</code><span>9가지 케이스 설명, Mermaid 시퀀스 다이어그램, 실행 시간 예시 출력</span></li>
+        <li><code>src/main/java/dev/deepdive/coupon/core/CouponStock.java</code><span>재고 엔티티. <code>decrease()</code>에 <code>Thread.yield()</code>로 경합 유도</span></li>
+        <li><code>src/main/java/dev/deepdive/coupon/core/VersionedCouponStock.java</code><span>낙관적 락 전용 엔티티 (<code>@Version</code>)</span></li>
+        <li><code>src/main/java/dev/deepdive/coupon/repository/CouponRepository.java</code><span>비관적 락 조회, 원자적 UPDATE 쿼리</span></li>
+        <li><code>src/main/java/dev/deepdive/coupon/repository/NamedLockRepository.java</code><span><code>GET_LOCK</code>/<code>RELEASE_LOCK</code> 네이티브 쿼리</span></li>
+        <li><code>src/main/java/dev/deepdive/coupon/repository/VersionedCouponRepository.java</code><span><code>LockModeType.OPTIMISTIC</code> 조회</span></li>
+        <li><code>src/main/java/dev/deepdive/coupon/service/CouponIssueService.java</code><span>제어 없음 (락 계열이 내부에서 재사용)</span></li>
+        <li><code>src/main/java/dev/deepdive/coupon/service/SynchronizedCouponIssueService.java</code><span>synchronized</span></li>
+        <li><code>src/main/java/dev/deepdive/coupon/service/AtomicUpdateCouponIssueService.java</code><span>원자적 UPDATE</span></li>
+        <li><code>src/main/java/dev/deepdive/coupon/service/PessimisticLockCouponIssueService.java</code><span>비관적 락</span></li>
+        <li><code>src/main/java/dev/deepdive/coupon/service/OptimisticLockCouponIssueService.java</code><span>낙관적 락 + 재시도 + self 주입</span></li>
+        <li><code>src/main/java/dev/deepdive/coupon/service/NamedLockCouponIssueService.java</code><span>네임드 락 + REQUIRES_NEW</span></li>
+        <li><code>src/main/java/dev/deepdive/coupon/service/RedisLockCouponIssueService.java</code><span>Redis SET NX 스핀락</span></li>
+        <li><code>src/main/java/dev/deepdive/coupon/service/RedisAtomicCouponIssueService.java</code><span>Redis Lua 원자 차감</span></li>
+        <li><code>src/main/java/dev/deepdive/coupon/service/RedissonLockCouponIssueService.java</code><span>Redisson RLock</span></li>
+        <li><code>src/test/java/dev/deepdive/coupon/service/CouponIssueServiceTest.java</code><span>MySQL 6케이스 동시성 테스트 + 웜업</span></li>
+        <li><code>src/test/java/dev/deepdive/coupon/service/RedisCouponIssueServiceTest.java</code><span>Redis 3케이스 동시성 테스트</span></li>
+        <li><code>src/test/java/dev/deepdive/coupon/support/MySQLContainerTest.java</code><span>MySQL 컨테이너, Hikari 40, 측정 헬퍼</span></li>
+        <li><code>src/test/java/dev/deepdive/coupon/support/RedisContainerTest.java</code><span>Redis 컨테이너</span></li>
+      </ul>
+    </section>
+
+    <footer>README와 소스 코드를 근거로 정리한 문서입니다. 수치는 README에 기록된 값이며, 테스트로 검증되지 않은 값은 그렇게 표기했습니다.</footer>
+  </main>
+</div>
+<script>
+/* ===== 공통 스크립트 (모든 모듈 overview.html에서 동일하게 유지) ===== */
+(function(){
+  var root=document.documentElement;
+  try{var saved=localStorage.getItem('deepdive-theme');if(saved)root.setAttribute('data-theme',saved);}catch(e){}
+  var tt=document.querySelector('.theme-toggle');
+  if(tt)tt.addEventListener('click',function(){
+    var cur=root.getAttribute('data-theme');
+    if(!cur)cur=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';
+    var next=cur==='dark'?'light':'dark';root.setAttribute('data-theme',next);
+    try{localStorage.setItem('deepdive-theme',next);}catch(e){}
+  });
+  document.querySelectorAll('[data-flow]').forEach(function(flow){
+    var steps=flow.querySelectorAll('.step');var detail=flow.nextElementSibling;
+    function show(btn){
+      steps.forEach(function(s){s.setAttribute('aria-selected',s===btn?'true':'false');});
+      if(detail)detail.querySelectorAll(':scope>div').forEach(function(d){d.classList.toggle('on',d.id===btn.dataset.target);});
+    }
+    steps.forEach(function(s){s.addEventListener('click',function(){show(s);});});
+    if(steps[0])show(steps[0]);
+  });
+  document.querySelectorAll('[data-tabs]').forEach(function(box){
+    var btns=box.querySelectorAll(':scope>.tabs>button');
+    function show(btn){
+      btns.forEach(function(b){b.setAttribute('aria-selected',b===btn?'true':'false');});
+      box.querySelectorAll(':scope>.tabpanel').forEach(function(p){p.classList.toggle('on',p.id===btn.dataset.target);});
+    }
+    btns.forEach(function(b){b.addEventListener('click',function(){show(b);});});
+    if(btns[0])show(btns[0]);
+  });
+  document.querySelectorAll('[data-qa]').forEach(function(b){
+    b.addEventListener('click',function(){
+      var sec=b.closest('section');var open=b.dataset.qa==='open';
+      sec.querySelectorAll('details.qa').forEach(function(d){d.open=open;});
+    });
+  });
+  var links=document.querySelectorAll('nav.toc a[href^="#"]');
+  if('IntersectionObserver' in window){
+    var io=new IntersectionObserver(function(es){es.forEach(function(e){
+      if(e.isIntersecting){links.forEach(function(l){l.classList.toggle('active',l.getAttribute('href')==='#'+e.target.id);});}
+    });},{rootMargin:'-20% 0px -70% 0px'});
+    document.querySelectorAll('main section[id]').forEach(function(s){io.observe(s);});
+  }
+})();
+</script>
+</body>
+</html>
