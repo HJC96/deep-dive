@@ -90,30 +90,12 @@ public class PaymentEvent {
         return paymentOrders.stream().allMatch(it -> it.paymentStatus() == PaymentStatus.UNKNOWN);
     }
 
-    public void confirmWalletUpdate() {
-        paymentOrders.forEach(PaymentOrder::confirmWalletUpdate);
-    }
-
-    public void confirmLedgerUpdate() {
-        paymentOrders.forEach(PaymentOrder::confirmLedgerUpdate);
-    }
-
-    public void completeIfDone() {
-        if (allPaymentOrdersDone()) {
-            isPaymentDone = true;
-        }
-    }
-
     public boolean isLedgerUpdateDone() {
         return paymentOrders.stream().allMatch(PaymentOrder::isLedgerUpdated);
     }
 
     public boolean isWalletUpdateDone() {
         return paymentOrders.stream().allMatch(PaymentOrder::isWalletUpdated);
-    }
-
-    private boolean allPaymentOrdersDone() {
-        return paymentOrders.stream().allMatch(it -> it.isWalletUpdated() && it.isLedgerUpdated());
     }
 
     public Long id() {

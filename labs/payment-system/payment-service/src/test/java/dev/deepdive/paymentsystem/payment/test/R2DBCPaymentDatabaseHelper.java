@@ -34,6 +34,61 @@ public class R2DBCPaymentDatabaseHelper implements PaymentDatabaseHelper {
                 .block();
     }
 
+    @Override
+    public Map<String, Object> getOutbox(String orderId) {
+        return databaseClient.sql("SELECT status, payload, metadata FROM outboxes WHERE idempotency_key = :orderId")
+                .bind("orderId", orderId)
+                .fetch()
+                .first()
+                .block();
+    }
+
+    @Override
+    public List<Integer> getFailedCounts(String orderId) {
+        return databaseClient.sql("SELECT failed_count FROM payment_orders WHERE order_id = :orderId ORDER BY id")
+                .bind("orderId", orderId)
+                .map(row -> ((Number) row.get("failed_count")).intValue())
+                .all()
+                .collectList()
+                .block();
+    }
+
+    @Override
+    public List<String> getHistoryReasons(String orderId) {
+        return databaseClient.sql("""
+                        SELECT h.reason
+                        FROM payment_order_histories h
+                        INNER JOIN payment_orders po ON po.id = h.payment_order_id
+                        WHERE po.order_id = :orderId
+                        ORDER BY h.id
+                        """)
+                .bind("orderId", orderId)
+                .map(row -> (String) row.get("reason"))
+                .all()
+                .collectList()
+                .block();
+    }
+
+    @Override
+    public void setPaymentOrderUpdatedAtMinutesAgo(String orderId, int minutes) {
+        databaseClient.sql("UPDATE payment_orders SET updated_at = NOW() - INTERVAL %d MINUTE WHERE order_id = :orderId"
+                        .formatted(minutes))
+                .bind("orderId", orderId)
+                .fetch()
+                .rowsUpdated()
+                .block();
+    }
+
+    @Override
+    public void setOutboxCreatedAtMinutesAgo(String orderId, int minutes) {
+        databaseClient.sql("UPDATE outboxes SET created_at = NOW() - INTERVAL %d MINUTE WHERE idempotency_key = :orderId"
+                        .formatted(minutes))
+                .bind("orderId", orderId)
+                .fetch()
+                .rowsUpdated()
+                .block();
+    }
+
     private PaymentEvent toPaymentEvent(List<Map<String, Object>> rows) {
         if (rows.isEmpty()) {
             return null;
@@ -75,6 +130,7 @@ public class R2DBCPaymentDatabaseHelper implements PaymentDatabaseHelper {
         return delete("payment_order_histories")
                 .flatMap(rows -> delete("payment_orders"))
                 .flatMap(rows -> delete("payment_events"))
+                .flatMap(rows -> delete("outboxes"))
                 .as(transactionalOperator::transactional)
                 .then();
     }
@@ -93,5 +149,6 @@ public class R2DBCPaymentDatabaseHelper implements PaymentDatabaseHelper {
             FROM payment_events pe
             INNER JOIN payment_orders po ON pe.order_id = po.order_id
             WHERE pe.order_id = :orderId
+            ORDER BY po.id
             """;
 }

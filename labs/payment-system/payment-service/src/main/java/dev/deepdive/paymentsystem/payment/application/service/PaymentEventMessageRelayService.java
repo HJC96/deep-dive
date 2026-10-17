@@ -6,23 +6,18 @@ import dev.deepdive.paymentsystem.payment.application.port.out.DispatchEventMess
 import dev.deepdive.paymentsystem.payment.application.port.out.LoadPendingPaymentEventMessagePort;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.context.annotation.Profile;
-import org.springframework.scheduling.annotation.Scheduled;
-import reactor.core.scheduler.Scheduler;
-import reactor.core.scheduler.Schedulers;
+import reactor.core.publisher.Mono;
 
-import java.util.concurrent.TimeUnit;
-
+/**
+ * 아웃박스에 남아 있는(INIT/FAILURE) 메시지를 다시 발행한다. 주기 실행은 {@code PaymentScheduler} 가 맡는다.
+ */
 @UseCase
-@Profile("dev")
 public class PaymentEventMessageRelayService implements PaymentEventMessageRelayUseCase {
 
     private static final Logger log = LoggerFactory.getLogger(PaymentEventMessageRelayService.class);
 
     private final LoadPendingPaymentEventMessagePort loadPendingPaymentEventMessagePort;
     private final DispatchEventMessagePort dispatchEventMessagePort;
-
-    private final Scheduler scheduler = Schedulers.newSingle("message-relay");
 
     public PaymentEventMessageRelayService(
             LoadPendingPaymentEventMessagePort loadPendingPaymentEventMessagePort,
@@ -32,13 +27,15 @@ public class PaymentEventMessageRelayService implements PaymentEventMessageRelay
         this.dispatchEventMessagePort = dispatchEventMessagePort;
     }
 
-    @Scheduled(fixedDelay = 180, initialDelay = 180, timeUnit = TimeUnit.SECONDS)
     @Override
-    public void relay() {
-        loadPendingPaymentEventMessagePort.getPendingPaymentEventMessage()
-                .doOnNext(dispatchEventMessagePort::dispatch)
-                .onErrorContinue((err, obj) -> log.error("messageRelay - failed to relay message.", err))
-                .subscribeOn(scheduler)
-                .subscribe();
+    public Mono<Void> relay() {
+        return loadPendingPaymentEventMessagePort.getPendingPaymentEventMessage()
+                .concatMap(message -> Mono.fromRunnable(() -> dispatchEventMessagePort.dispatch(message))
+                        // 한 건이 실패해도 나머지는 계속 보낸다. 실패한 건은 아웃박스에 남아 다음 회차에 다시 시도된다.
+                        .onErrorResume(error -> {
+                            log.error("messageRelay - failed to relay message. orderId={}", message.orderId(), error);
+                            return Mono.empty();
+                        }))
+                .then();
     }
 }

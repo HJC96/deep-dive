@@ -1,4 +1,4 @@
-package dev.deepdive.paymentsystem.payment.adapter.out.persistent.exception;
+package dev.deepdive.paymentsystem.payment.application.exception;
 
 public class PaymentValidationException extends RuntimeException {
 

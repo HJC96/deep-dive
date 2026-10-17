@@ -9,8 +9,8 @@ public class PaymentOrder {
     private final String orderId;
     private final long amount;
     private final PaymentStatus paymentStatus;
-    private boolean isLedgerUpdated;
-    private boolean isWalletUpdated;
+    private final boolean isLedgerUpdated;
+    private final boolean isWalletUpdated;
 
     public PaymentOrder(Long sellerId, String orderId, Long productId, long amount, PaymentStatus paymentStatus) {
         this(null, null, sellerId, productId, orderId, amount, paymentStatus, false, false);
@@ -36,14 +36,6 @@ public class PaymentOrder {
         this.paymentStatus = paymentStatus;
         this.isLedgerUpdated = isLedgerUpdated;
         this.isWalletUpdated = isWalletUpdated;
-    }
-
-    public void confirmWalletUpdate() {
-        isWalletUpdated = true;
-    }
-
-    public void confirmLedgerUpdate() {
-        isLedgerUpdated = true;
     }
 
     public Long id() {

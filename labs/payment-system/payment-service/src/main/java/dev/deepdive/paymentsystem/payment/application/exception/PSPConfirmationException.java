@@ -1,4 +1,4 @@
-package dev.deepdive.paymentsystem.payment.adapter.out.web.toss.exception;
+package dev.deepdive.paymentsystem.payment.application.exception;
 
 import dev.deepdive.paymentsystem.payment.domain.PaymentStatus;
 

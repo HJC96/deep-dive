@@ -1,6 +1,7 @@
 package dev.deepdive.paymentsystem.payment.adapter.out.persistent.repository;
 
-import dev.deepdive.paymentsystem.payment.adapter.out.persistent.exception.PaymentValidationException;
+import dev.deepdive.paymentsystem.payment.application.exception.PaymentNotFoundException;
+import dev.deepdive.paymentsystem.payment.application.exception.PaymentValidationException;
 import org.springframework.r2dbc.core.DatabaseClient;
 import org.springframework.stereotype.Repository;
 import reactor.core.publisher.Mono;
@@ -23,7 +24,13 @@ public class R2DBCPaymentValidationRepository implements PaymentValidationReposi
                 .fetch()
                 .first()
                 .<Boolean>handle((row, sink) -> {
-                    if (((BigDecimal) row.get("total_amount")).longValue() == amount) {
+                    // 주문이 없으면 SUM 이 NULL 이다. 예전에는 여기서 NPE 가 나 UNKNOWN 으로 기록됐다.
+                    if (((Number) row.get("order_count")).longValue() == 0) {
+                        sink.error(new PaymentNotFoundException(orderId));
+                        return;
+                    }
+                    BigDecimal totalAmount = (BigDecimal) row.get("total_amount");
+                    if (totalAmount.compareTo(BigDecimal.valueOf(amount)) == 0) {
                         sink.next(true);
                     } else {
                         sink.error(new PaymentValidationException(
@@ -33,7 +40,7 @@ public class R2DBCPaymentValidationRepository implements PaymentValidationReposi
     }
 
     private static final String SELECT_PAYMENT_TOTAL_AMOUNT_QUERY = """
-            SELECT SUM(amount) as total_amount
+            SELECT COUNT(*) AS order_count, SUM(amount) AS total_amount
             FROM payment_orders
             WHERE order_id = :orderId
             """;

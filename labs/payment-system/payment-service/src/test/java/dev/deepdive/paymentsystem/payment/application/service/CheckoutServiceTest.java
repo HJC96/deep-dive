@@ -3,14 +3,12 @@ package dev.deepdive.paymentsystem.payment.application.service;
 import dev.deepdive.paymentsystem.payment.application.port.in.CheckoutCommand;
 import dev.deepdive.paymentsystem.payment.application.port.in.CheckoutUseCase;
 import dev.deepdive.paymentsystem.payment.domain.PaymentEvent;
+import dev.deepdive.paymentsystem.payment.domain.PaymentStatus;
 import dev.deepdive.paymentsystem.payment.test.PaymentDatabaseHelper;
-import dev.deepdive.paymentsystem.payment.test.PaymentTestConfiguration;
+import dev.deepdive.paymentsystem.payment.test.PaymentIntegrationTestSupport;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataIntegrityViolationException;
 import reactor.test.StepVerifier;
 
@@ -20,10 +18,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-@SpringBootTest
-@Import(PaymentTestConfiguration.class)
-@Tag("ExternalIntegration")
-class CheckoutServiceTest {
+class CheckoutServiceTest extends PaymentIntegrationTestSupport {
 
     @Autowired
     private CheckoutUseCase checkoutUseCase;
@@ -50,6 +45,7 @@ class CheckoutServiceTest {
         assertThat(paymentEvent.orderId()).isEqualTo(orderId);
         assertThat(paymentEvent.totalAmount()).isEqualTo(60000L);
         assertThat(paymentEvent.paymentOrders()).hasSize(command.productIds().size());
+        assertThat(paymentEvent.paymentOrders()).allMatch(it -> it.paymentStatus() == PaymentStatus.NOT_STARTED);
     }
 
     @Test

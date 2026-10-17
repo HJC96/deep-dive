@@ -6,7 +6,6 @@ import dev.deepdive.paymentsystem.payment.adapter.out.persistent.repository.Paym
 import dev.deepdive.paymentsystem.payment.adapter.out.persistent.repository.PaymentStatusUpdateRepository;
 import dev.deepdive.paymentsystem.payment.adapter.out.persistent.repository.PaymentValidationRepository;
 import dev.deepdive.paymentsystem.payment.application.port.out.CompletePaymentPort;
-import dev.deepdive.paymentsystem.payment.application.port.out.LoadPaymentPort;
 import dev.deepdive.paymentsystem.payment.application.port.out.LoadPendingPaymentEventMessagePort;
 import dev.deepdive.paymentsystem.payment.application.port.out.LoadPendingPaymentPort;
 import dev.deepdive.paymentsystem.payment.application.port.out.PaymentStatusUpdateCommand;
@@ -26,7 +25,6 @@ public class PaymentPersistentAdapter implements
         PaymentValidationPort,
         LoadPendingPaymentPort,
         LoadPendingPaymentEventMessagePort,
-        LoadPaymentPort,
         CompletePaymentPort {
 
     private final PaymentRepository paymentRepository;
@@ -57,6 +55,11 @@ public class PaymentPersistentAdapter implements
     }
 
     @Override
+    public Mono<Boolean> updatePaymentStatusToExecutingForRecovery(String orderId) {
+        return paymentStatusUpdateRepository.updatePaymentStatusToExecutingForRecovery(orderId);
+    }
+
+    @Override
     public Mono<Boolean> updatePaymentStatus(PaymentStatusUpdateCommand command) {
         return paymentStatusUpdateRepository.updatePaymentStatus(command);
     }
@@ -77,12 +80,12 @@ public class PaymentPersistentAdapter implements
     }
 
     @Override
-    public Mono<PaymentEvent> getPayment(String orderId) {
-        return paymentRepository.getPayment(orderId);
+    public Mono<Void> completeWalletUpdate(String orderId) {
+        return paymentRepository.completeWalletUpdate(orderId);
     }
 
     @Override
-    public Mono<Void> complete(PaymentEvent paymentEvent) {
-        return paymentRepository.complete(paymentEvent);
+    public Mono<Void> completeLedgerUpdate(String orderId) {
+        return paymentRepository.completeLedgerUpdate(orderId);
     }
 }

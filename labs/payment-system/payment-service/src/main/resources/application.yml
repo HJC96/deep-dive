@@ -10,11 +10,22 @@ spring:
     password: ${PAYMENT_DB_PASSWORD:root}
   thymeleaf:
     cache: false
+  sql:
+    init:
+      # schema.sql 을 기동 때마다 적용한다(멱등 DDL).
+      mode: always
+  task:
+    scheduling:
+      pool:
+        # 복구와 아웃박스 릴레이가 서로를 기다리지 않게 스레드를 2개 둔다.
+        size: 2
 
   cloud:
+    function:
+      # 함수 빈이 여러 개(send, wallet, ledger)라 명시해야 바인딩이 생긴다.
+      # 예전 키(spring.cloud.stream.function.definition)는 Spring Cloud Stream 4.x 가 읽지 않아 바인딩이 하나도 생기지 않았다.
+      definition: send;wallet;ledger
     stream:
-      function:
-        definition: send;wallet;ledger
       bindings:
         send-out-0:
           destination: payment
@@ -56,6 +67,18 @@ logging:
         web: DEBUG
         r2dbc: DEBUG
         transaction: DEBUG
+
+payment:
+  scheduler:
+    # 결제 복구(PaymentRecoveryService)와 아웃박스 릴레이(PaymentEventMessageRelayService)를 주기적으로 돌린다.
+    # 테스트는 false 로 끄고 유스케이스를 직접 호출한다.
+    enabled: ${PAYMENT_SCHEDULER_ENABLED:true}
+    recovery:
+      initial-delay: PT3M
+      fixed-delay: PT3M
+    relay:
+      initial-delay: PT3M
+      fixed-delay: PT3M
 
 # Toss가 공식 문서/샘플에서 제공하는 공개 테스트 키. 실제 운영 키는 환경변수로 주입한다.
 PSP:
