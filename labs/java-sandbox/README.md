@@ -11,8 +11,8 @@ Java 언어 기능과 JVM 동작을 작은 코드로 관찰하는 샌드박스.
 
 ### 구조
 
-- `AesUtilBefore`: `encrypt()`마다 `Security.addProvider(new BouncyCastleProvider())` 호출.
-- `AesUtilAfter`: static 유틸이 아니라 `Provider`를 생성자 주입받는 암호화 객체. `encrypt()`에서는 Provider 등록 없이 암호화만 수행.
+- `AesUtilBefore`: `encrypt()`마다 `Security.addProvider(new BouncyCastleProvider())` 호출 후 `Cipher.getInstance(T, "BC")`로 **이름**으로 찾는다.
+- `AesUtilAfter`: static 유틸이 아니라 `Provider`를 생성자 주입받는 암호화 객체. `encrypt()`에서는 Provider 등록 없이 `Cipher.getInstance(T, provider)`로 **객체**를 넘겨 암호화만 수행.
 - `AesProviderRegistrationSingleThreadBenchmark` / `...EightThreadsBenchmark`: 단일/8스레드 벤치마크. `@Threads`만 다르고 메서드는 동일.
 - 벤치마크 메서드: `encrypt_withRepeatedProviderRegistration`, `encrypt_withProviderInitializedOnce`.
 
@@ -241,6 +241,19 @@ sequenceDiagram
 
 > 만약 BC가 null도 캐시했다면(sentinel) → 첫 미스 1번만 락, 이후 전원 락-프리 → 경합 소멸. 이 직렬화는 **null 캐싱 누락**이 만든 특성이다.
 
+### 매번 만든 Provider는 암호화에 쓰이지 않는다 (테스트로 확인)
+
+`AesUtilBefore`가 호출마다 만드는 `new BouncyCastleProvider()`는 첫 호출 이후 **등록되지도, 쓰이지도 않고 버려진다.** `ProviderRegistrationTest`가 확인한 것:
+
+| 확인 | 결과 |
+| --- | --- |
+| 이미 BC가 있을 때 `Security.addProvider(new BouncyCastleProvider())` | `-1` 반환. 목록은 그대로 |
+| `AesUtilBefore.encrypt`를 여러 번 부른 뒤 `Security.getProviders()` | 이름이 `BC`인 Provider는 **처음 등록된 인스턴스 1개** |
+| `Cipher.getInstance(T, "BC").getProvider()` | 방금 만든 인스턴스가 아니라 **등록된 인스턴스**와 같은 객체(`isSameAs`) |
+| `Cipher.getInstance(T, provider).getProvider()` (`AesUtilAfter` 방식) | 주입받은 그 객체 |
+
+`Security.addProvider`는 같은 이름의 Provider가 이미 있으면 추가하지 않고 `-1`을 돌려주고, 이름으로 찾는 `getInstance(T, "BC")`는 목록에 등록된 인스턴스를 꺼낸다. 그래서 repeated 경로의 실제 비용은 "등록"이 아니라 **쓰지도 않을 거대한 객체를 매번 만드는 것**이고, 암호화는 once 경로와 똑같이 **등록된 BC 인스턴스 하나**가 맡는다.
+
 ### 해석 (프로파일러로 확정)
 
 **1) 핵심 — 매 호출 Provider 등록은 압도적으로 느리다.**
@@ -253,6 +266,7 @@ sequenceDiagram
 
 - "전역 락 쓰는 느린 repeated가 멀티스레드에서 더 손해 볼 것"이란 직관과 **반대**.
 - repeated: ×6.7로 잘 확장(559 → 3,756). 지배 비용(객체 생성/할당)이 스레드 로컬이라 코어를 나눠 병렬 처리. `addProvider`의 전역 락은 전체에서 티끌.
+- repeated도 암호화는 **등록된 BC 인스턴스 하나**로 하므로(위 절) once와 같은 `synchronized getService`를 거친다. 경합 지점이 없어서 확장되는 게 아니라, 할당 비용이 압도적이라 그 경합이 전체 시간에서 묻히는 것이다.
 - once: ×1.4로 거의 확장 안 됨(853k → 1.22M). stack 프로파일상 시간의 51%를 `BouncyCastleProvider.getService`(synchronized) **락 대기**로 소모 → 18코어가 있어도 공유 Provider 모니터 하나에 줄 서느라 직렬화.
 - 그래서 격차가 1,526배 → 325배로 좁혀짐. repeated가 빨라져서가 아니라, **둘 다 확장하되 repeated가 훨씬 더 잘 확장**해서.
 
@@ -262,4 +276,22 @@ sequenceDiagram
 - "멀티스레드면 차이가 무조건 커진다"는 추측은 측정 앞에서 빗나갔고, 프로파일러 없이는 원인을 거꾸로 짚을 뻔했다.
 - 단 **결론(매 호출 Provider 등록을 피하라)** 은 불변. once 경로의 `getService` 경합은 그와 별개인 BC 내부 특성이라 여기선 관찰까지만.
 
-> Provider 목록은 JVM 전역 상태고 같은 fork 안에서 두 벤치마크가 순차 실행되므로 한쪽 등록분이 다른 쪽에 남음. 초점은 "실제 추가 횟수"가 아니라 "매 호출 생성·등록을 **시도하는** 경로의 비용".
+> JMH는 벤치마크 메서드마다 따로 JVM을 fork한다(출력에 벤치마크별로 `# Fork: 1 of 1`). 그래서 한 벤치마크가 등록한 Provider가 다른 벤치마크에 남지 않는다. 각 fork 안에서 BC는 once 경로라면 `@Setup`에서, repeated 경로라면 첫 `encrypt()`에서 한 번만 실제로 등록되고, 그 뒤 repeated의 `addProvider`는 매번 `-1`이다. 초점은 "실제 추가 횟수"가 아니라 "매 호출 생성·등록을 **시도하는** 경로의 비용".
+
+## 그 밖의 예제
+
+AES 실험 말고도 Java 언어 기능을 작은 테스트로 정리해 두었다. 테스트 이름이 곧 결론이다.
+
+```bash
+./gradlew :java-sandbox:test
+```
+
+| 예제 | 코드 · 테스트 | 테스트가 보여 주는 것 |
+| --- | --- | --- |
+| 제네릭 | `GenericsExamples` · `GenericsExamplesTest` | 타입 파라미터를 밖에서 정하고 메서드는 호출부 값으로 추론한다. raw type으로 잘못된 값을 넣으면 꺼낼 때 `ClassCastException`. `? extends Number`는 읽기(Number 메서드 사용), `? super Integer`는 쓰기(읽으면 Object), `Box<?>`와 `Box<Object>`의 차이 |
+| 가변인자 | `VarargsExamples` · `VarargsExamplesTest` | 가변인자는 배열이다. 쉼표로도 배열로도 넘길 수 있고, 제네릭 가변인자는 배열을 통해 잘못된 타입이 섞일 수 있어(heap pollution) 안전한 메서드에만 `@SafeVarargs`. 받은 배열을 그대로 저장하면 외부 변경이 새므로 복사해서 보관 |
+| 컬렉션 팩토리 | `CollectionFactoryMethodExamples` · `CollectionFactoryMethodExamplesTest` | `List.of`/`Set.of`는 수정 불가·null 불가·얕은 복사(요소 객체는 공유), `Set.of`는 중복 값이면 예외. `Arrays.asList`는 크기 변경 불가·값 교체 가능, `Collections.unmodifiableList`는 원본을 비추는 view, `List.copyOf`는 수정 불가 복사본 |
+| record | `RecordTest` (record 정의도 테스트 안) | 요청 DTO → Command 매핑, compact 생성자에서 규칙 검증, 받은 리스트를 `List.copyOf`로 복사해 원본 변경과 분리하고 수정 불가로 노출. VO(`EmailAddress`, `Money`)는 값이 같으면 `equals`, 팩토리 메서드, 바꾸는 대신 새 값 반환 |
+| 리플렉션 | `Person` · `ReflectionTest` | `new` 대신 `Class`·문자열(`Class.forName`)로 객체 생성, 없는 클래스는 `ClassNotFoundException`. 필드·메서드·생성자 목록 조회, `setAccessible(true)`로 private 생성자·필드·메서드와 static 멤버 접근 |
+| LazyHolder 싱글턴 | `LazyHolderSingleton` · `LazyHolderSingletonTest` | 항상 같은 인스턴스. 여러 스레드가 동시에 처음 접근해도 인스턴스는 하나 (클래스 초기화를 JVM이 한 번만 보장) |
+| 파사드 | `OrderFacade` · `OrderFacadeTest` | 재고 예약 → 결제 → 배송 요청 → 알림, 네 하위 시스템의 호출 순서를 `placeOrder` 하나로 감싸 호출하는 쪽이 순서와 세부 구현을 몰라도 되게 한다 |

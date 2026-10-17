@@ -33,7 +33,11 @@ import org.openjdk.jmh.infra.Blackhole;
  * (gc 프로파일: op당 ~2.85MB 할당 → 무거운 {@code new BouncyCastleProvider()} 생성이 지배 비용이며
  * 이는 스레드 로컬이라 병렬화된다), 빠른 once가 ×1.4로 거의 확장되지 않는다. stack 프로파일을 보면
  * 8스레드 once는 시간의 51%를 <b>{@code BouncyCastleProvider.getService}(synchronized) 락 대기</b>로
- * 소모한다 — {@code Cipher.getInstance(..., "BC")}가 부르는 이 동기화 메서드에 8스레드가 줄을 서기 때문.
+ * 소모한다 — {@link AesUtilAfter}의 {@code Cipher.getInstance(TRANSFORMATION, provider)}(이름이 아니라
+ * 주입받은 Provider 객체로 찾는다)가 부르는 이 동기화 메서드에 8스레드가 줄을 서기 때문.
+ * repeated 경로의 {@code Cipher.getInstance(..., "BC")}도 이름으로 찾은 <em>등록된</em> BC 인스턴스
+ * 하나의 같은 메서드를 거친다. 호출마다 만든 Provider는 이미 BC가 있어 등록되지 않고 쓰이지도 않는다
+ * ({@code ProviderRegistrationTest}). 다만 그쪽은 할당 비용이 훨씬 커서 이 경합이 드러나지 않는다.
  * 결국 "직렬 구간 비중이 큰 쪽(=일이 적은 once)"이 확장을 못 하는 암달의 법칙 사례다.
  * 자세한 수치·프로파일 결과는 모듈 README의 "프로파일링으로 검증"·"해석" 절 참고.
  *
@@ -65,7 +69,8 @@ public class AesProviderRegistrationEightThreadsBenchmark {
     }
 
     /** "Provider 1회 등록 후 재사용" 경로. 단일 스레드는 빠르지만, 8스레드에서는
-     *  Cipher.getInstance가 부르는 synchronized getService 경합으로 확장이 거의 안 된다(×1.4). */
+     *  Cipher.getInstance(TRANSFORMATION, provider)가 부르는 synchronized getService 경합으로
+     *  확장이 거의 안 된다(×1.4). */
     @Benchmark
     public void encrypt_withProviderInitializedOnce(CryptoInput input, Blackhole blackhole) throws Exception {
         blackhole.consume(input.aesUtilAfter.encrypt(input.plainText, input.key, input.iv));

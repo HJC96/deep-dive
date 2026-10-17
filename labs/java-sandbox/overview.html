@@ -196,8 +196,8 @@ ul.plain{margin:6px 0;padding-left:20px}ul.plain li{margin:3px 0}
       </div>
       <div class="flow-detail">
         <div id="f-b-new"><p><b>비용의 본체.</b> gc 프로파일상 repeated는 op당 <b>2,848,583 B</b>(약 2.85MB)를 할당, once(4,032 B)의 약 707배. README 설명: 생성자가 BC 지원 알고리즘 수백 개를 내부 맵에 등록하기 때문. 이 할당은 스레드마다 따로 일어나므로 <b>병렬화가 잘 됩니다</b>.</p></div>
-        <div id="f-b-add"><p>JVM 전역 <code>java.security.Security</code>의 Provider 목록에 등록을 <em>시도</em>. 같은 이름이 이미 있으면 추가되지 않고 -1을 반환합니다 <span class="badge info">일반 지식: JCA API 문서</span>. README도 "초점은 실제 추가 횟수가 아니라 매 호출 생성·등록을 <b>시도하는</b> 경로의 비용"이라고 적습니다.</p></div>
-        <div id="f-b-get"><p>이름 <code>"BC"</code>로 Provider를 찾습니다. 그래서 <b>방금 만든 인스턴스가 아니라 이미 등록된 BC 인스턴스</b>가 쓰일 가능성이 높습니다 — <span class="badge warn">확인 필요</span> (README·코드 어디에도 검증 없음).</p></div>
+        <div id="f-b-add"><p>JVM 전역 <code>java.security.Security</code>의 Provider 목록에 등록을 <em>시도</em>. 같은 이름이 이미 있으면 추가되지 않고 -1을 반환합니다 — <code>ProviderRegistrationTest</code>로 확인. README도 "초점은 실제 추가 횟수가 아니라 매 호출 생성·등록을 <b>시도하는</b> 경로의 비용"이라고 적습니다.</p></div>
+        <div id="f-b-get"><p>이름 <code>"BC"</code>로 Provider를 찾습니다. 그래서 <b>방금 만든 인스턴스가 아니라 이미 등록된 BC 인스턴스</b>가 쓰입니다 — <span class="badge good">테스트로 확인</span> <code>ProviderRegistrationTest</code>: <code>cipher.getProvider()</code>가 등록된 인스턴스와 <code>isSameAs</code>, 방금 만든 것과는 다름. 즉 repeated도 once와 같은 공유 인스턴스의 <code>getService</code>를 거칩니다.</p></div>
         <div id="f-b-enc"><p><code>cipher.init(ENCRYPT_MODE, SecretKeySpec, IvParameterSpec)</code> → <code>doFinal(plainText)</code>. 이 부분은 After와 동일. 변환: <code>AES/CBC/PKCS7Padding</code>.</p></div>
       </div>
 
@@ -330,7 +330,7 @@ assertThat(after).isEqualTo(before);</code></pre>
         </div>
       </div>
 
-      <h3 style="margin-top:28px">그 밖의 예제 <span class="badge warn">README 설명 없음</span></h3>
+      <h3 style="margin-top:28px">그 밖의 예제 <span class="badge info">README "그 밖의 예제" 절</span></h3>
       <p class="sub">코드와 테스트만 있는 학습 예제들. 테스트 이름이 곧 결론입니다.</p>
       <div data-tabs>
         <div class="tabs" role="tablist">
@@ -505,28 +505,34 @@ public static LazyHolderSingleton getInstance() {
       <h3><span class="badge info">README 명시</span></h3>
       <ul class="plain">
         <li>절대값은 머신·JVM·부하에 따라 다름. once 8스레드는 run마다 55만~122만으로 변동이 큼.</li>
-        <li>Provider 목록은 JVM 전역 상태이고 같은 fork 안에서 두 벤치마크가 순차 실행되므로 한쪽 등록분이 다른 쪽에 남음.</li>
+        <li><span class="badge good">README 정정함</span> README는 "같은 fork 안에서 두 벤치마크가 순차 실행되므로 한쪽 등록분이 다른 쪽에 남음"이라 적었지만, JMH는 벤치마크마다 따로 fork합니다(실행 출력에 벤치마크별 <code># Fork: 1 of 1</code>). 각 fork 안에서 BC는 한 번만 실제로 등록되고, repeated의 이후 <code>addProvider</code>는 매번 -1입니다.</li>
         <li>once 경로의 <code>getService</code> 경합은 BC 내부 특성이라 "관찰까지만" — 해결책은 다루지 않음.</li>
       </ul>
 
       <h3><span class="badge bad">코드·문서 분석</span></h3>
-      <details class="qa risk"><summary>repeated에서 새로 만든 Provider가 실제 암호화에 쓰이는가? — 확인 필요</summary><div class="a">
-        <p><code>AesUtilBefore</code>는 새 인스턴스를 <code>addProvider</code>한 뒤 <b>이름</b> <code>"BC"</code>로 <code>Cipher.getInstance</code>합니다. 같은 이름이 이미 등록돼 있으면 <code>addProvider</code>는 추가하지 않으므로(<span class="badge info">일반 지식</span>), 암호화에는 처음 등록된 인스턴스가 쓰이고 새 인스턴스는 버려질 가능성이 높습니다. 그렇다면 repeated도 공유 Provider의 <code>getService</code>를 거치는 셈인데, 이를 검증한 측정은 저장소에 없습니다. 면접에서는 "확인 필요"로 답하는 게 안전합니다.</p>
+      <details class="qa risk"><summary>repeated에서 새로 만든 Provider가 실제 암호화에 쓰이는가? — 쓰이지 않음, 확인함 <span class="badge good">수정함</span></summary><div class="a">
+        <p><b>확인 결과</b> (<code>ProviderRegistrationTest</code>): BC가 이미 있으면 <code>Security.addProvider(new BouncyCastleProvider())</code>는 <b>-1</b>을 돌려주고 목록을 바꾸지 않습니다. <code>AesUtilBefore.encrypt</code>를 여러 번 불러도 이름이 BC인 Provider는 처음 그 인스턴스 하나이고, <code>Cipher.getInstance(T, "BC").getProvider()</code>는 그 등록 인스턴스와 같은 객체입니다. 매번 만든 Provider는 할당 비용(op당 약 2.85MB)만 남기고 버려집니다.</p>
+        <p><b>해석에 주는 영향</b>: repeated도 once와 같은 공유 인스턴스의 <code>synchronized getService</code>를 거칩니다. 그런데도 ×6.7로 확장되는 것은 경합 지점이 없어서가 아니라 할당 비용이 압도적이라 경합이 묻히기 때문입니다. README "매번 만든 Provider는 암호화에 쓰이지 않는다" 절과 해석 2)에 반영했습니다.</p>
+        <p>원래 분석: <code>AesUtilBefore</code>는 새 인스턴스를 <code>addProvider</code>한 뒤 <b>이름</b> <code>"BC"</code>로 <code>Cipher.getInstance</code>합니다. 같은 이름이 이미 등록돼 있으면 <code>addProvider</code>는 추가하지 않으므로(<span class="badge info">일반 지식</span>), 암호화에는 처음 등록된 인스턴스가 쓰이고 새 인스턴스는 버려질 가능성이 높습니다. 그렇다면 repeated도 공유 Provider의 <code>getService</code>를 거치는 셈인데, 이를 검증한 측정은 저장소에 없습니다. 면접에서는 "확인 필요"로 답하는 게 안전합니다.</p>
       </div></details>
-      <details class="qa risk"><summary>Javadoc의 실행 경로가 틀림: <code>:labs:java-sandbox:jmh</code></summary><div class="a">
+      <details class="qa risk"><summary>Javadoc의 실행 경로가 틀림: <code>:labs:java-sandbox:jmh</code> <span class="badge good">수정함</span></summary><div class="a">
+        <p><b>어떻게 고쳤나</b>: javadoc을 <code>./gradlew :java-sandbox:jmh</code>로 바꿨습니다.</p>
         <p><code>AesProviderRegistrationSingleThreadBenchmark</code> javadoc은 <code>./gradlew :labs:java-sandbox:jmh</code>라고 적지만, <code>settings.gradle</code>은 프로젝트를 <code>:java-sandbox</code>로 등록합니다. README와 EightThreads javadoc의 <code>:java-sandbox:jmh</code>가 맞습니다.</p>
       </div></details>
-      <details class="qa risk"><summary>오차 설명 불일치: javadoc "±95% 신뢰구간" vs README "99.9% 신뢰구간"</summary><div class="a">
+      <details class="qa risk"><summary>오차 설명 불일치: javadoc "±95% 신뢰구간" vs README "99.9% 신뢰구간" <span class="badge good">수정함</span></summary><div class="a">
+        <p><b>어떻게 고쳤나</b>: javadoc을 "99.9% 신뢰구간의 절반(JMH 기본값)"으로 바꿨습니다. 실제 JMH 출력도 <code>±(99.9%)</code>, <code>CI (99.9%)</code>로 찍힙니다.</p>
         <p>SingleThread javadoc은 Error를 "±95% 신뢰구간"이라 하고, README는 "99.9% 신뢰구간의 절반"이라 합니다. JMH 기본 출력은 99.9% 신뢰구간입니다 <span class="badge info">일반 지식</span>.</p>
       </div></details>
-      <details class="qa risk"><summary>EightThreads javadoc이 once 경로를 <code>Cipher.getInstance(..., "BC")</code>로 설명</summary><div class="a">
+      <details class="qa risk"><summary>EightThreads javadoc이 once 경로를 <code>Cipher.getInstance(..., "BC")</code>로 설명 <span class="badge good">수정함</span></summary><div class="a">
+        <p><b>어떻게 고쳤나</b>: once 경로는 <code>AesUtilAfter</code>의 <code>Cipher.getInstance(TRANSFORMATION, provider)</code>(객체로 찾음)로, repeated 경로는 이름 <code>"BC"</code>로 찾은 등록 인스턴스를 쓴다고 나눠 적었습니다.</p>
         <p>once 경로(<code>AesUtilAfter</code>)는 이름 <code>"BC"</code>가 아니라 Provider 객체로 <code>getInstance</code>합니다. 경합 지점(<code>getService</code>)에 대한 결론은 같지만 설명이 코드와 다릅니다.</p>
       </div></details>
       <details class="qa risk"><summary>통계적 근거가 얇다: fork 1, 측정 5회</summary><div class="a">
         <p>fork 1 × 5 iteration은 JVM 간 편차를 보지 못합니다. README도 once 8스레드 값이 크게 흔들렸다고 적습니다. 결론의 "방향"(수백~천 배 차이, 확장 배수 역전)은 크지만, 정확한 배수를 인용할 때는 단서를 붙이세요.</p>
       </div></details>
-      <details class="qa risk"><summary>README가 AES 실험만 다룬다</summary><div class="a">
-        <p>제네릭·가변인자·컬렉션 팩토리·record·리플렉션·싱글턴·파사드 예제는 README에 설명이 없고, 코드 주석과 테스트 이름이 유일한 문서입니다(이 페이지의 "그 밖의 예제" 탭 참고). 측정 수치 없음 — 모두 동작을 단언하는 단위 테스트입니다.</p>
+      <details class="qa risk"><summary>README가 AES 실험만 다룬다 <span class="badge good">수정함</span></summary><div class="a">
+        <p><b>어떻게 고쳤나</b>: README에 "그 밖의 예제" 절을 추가해 제네릭·가변인자·컬렉션 팩토리·record·리플렉션·LazyHolder 싱글턴·파사드 각각의 코드·테스트 파일과 테스트가 보여 주는 내용을 표로 정리했습니다.</p>
+        <p>원래 제네릭·가변인자·컬렉션 팩토리·record·리플렉션·싱글턴·파사드 예제는 README에 설명이 없고, 코드 주석과 테스트 이름이 유일한 문서입니다(이 페이지의 "그 밖의 예제" 탭 참고). 측정 수치 없음 — 모두 동작을 단언하는 단위 테스트입니다.</p>
       </div></details>
     </section>
 
@@ -554,7 +560,7 @@ public static LazyHolderSingleton getInstance() {
         <ul>
           <li><code>-prof stack</code>: 51% BLOCKED, 그중 99.9%가 <code>BouncyCastleProvider.getService</code>.</li>
           <li>getService는 DCL 구조지만 null 결과를 캐시하지 않아, <code>Cipher.getInstance</code>가 조회하는 이름 변형 중 매칭 없는 키는 매번 <code>synchronized</code>에 들어감 → 공유 Provider 하나에 8스레드가 줄 섬 (README 분석).</li>
-          <li>암달의 법칙: 일이 적은 쪽은 직렬 구간 비중이 커서 확장이 막힘. repeated는 스레드 로컬 할당이 지배라 ×6.7.</li>
+          <li>암달의 법칙: 일이 적은 쪽은 직렬 구간 비중이 커서 확장이 막힘. repeated는 스레드 로컬 할당이 지배라 ×6.7. repeated도 같은 등록 BC 인스턴스의 <code>getService</code>를 거치지만(<code>ProviderRegistrationTest</code>) 할당 비용에 묻힘.</li>
           <li>프로파일 전 가설("JCE 내부 검증")이 틀렸다는 점도 README에 기록 — 측정의 가치.</li>
         </ul>
       </div></details>
@@ -577,7 +583,7 @@ public static LazyHolderSingleton getInstance() {
         <ul>
           <li>Mode <code>thrpt</code> = 처리량, Units <code>ops/s</code>는 클수록 빠름. <code>@Threads(8)</code>의 값은 8스레드 합계.</li>
           <li>Cnt = 집계된 측정 반복 수(5), 워밍업 제외.</li>
-          <li>Error = 신뢰구간 절반. README는 99.9%라 하고 javadoc은 95%라 함 → JMH 기본은 99.9% <span class="badge info">일반 지식</span>.</li>
+          <li>Error = 신뢰구간 절반. JMH 기본은 99.9%(출력의 <code>±(99.9%)</code>). javadoc의 95% 표기는 99.9%로 고쳤습니다.</li>
         </ul>
       </div></details>
       <details class="qa"><summary>(기타 예제) <code>List&lt;? extends T&gt;</code>와 <code>List&lt;? super T&gt;</code>는 언제 쓰나요?</summary><div class="a">
@@ -611,6 +617,7 @@ public static LazyHolderSingleton getInstance() {
         <li><code>src/jmh/java/dev/deepdive/sandbox/crypto/AesProviderRegistrationSingleThreadBenchmark.java</code><span>1스레드 벤치마크 (어노테이션 설명 주석 풍부)</span></li>
         <li><code>src/jmh/java/dev/deepdive/sandbox/crypto/AesProviderRegistrationEightThreadsBenchmark.java</code><span>8스레드 벤치마크</span></li>
         <li><code>src/test/java/dev/deepdive/sandbox/crypto/AesUtilComparisonTest.java</code><span>두 방식 암호문 동일성</span></li>
+        <li><code>src/test/java/dev/deepdive/sandbox/crypto/ProviderRegistrationTest.java</code><span>addProvider -1, Cipher가 쓰는 Provider 인스턴스 확인</span></li>
         <li><code>src/main/java/dev/deepdive/sandbox/GenericsExamples.java</code><span>제네릭·와일드카드 (테스트: <code>GenericsExamplesTest</code>)</span></li>
         <li><code>src/main/java/dev/deepdive/sandbox/VarargsExamples.java</code><span>가변인자·heap pollution (테스트: <code>VarargsExamplesTest</code>)</span></li>
         <li><code>src/test/java/dev/deepdive/sandbox/CollectionFactoryMethodExamplesTest.java</code><span>List.of / Set.of / asList / unmodifiable / copyOf</span></li>
