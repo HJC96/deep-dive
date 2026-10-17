@@ -2,6 +2,7 @@ package dev.deepdive.seat.support;
 
 import dev.deepdive.seat.repository.FailedEventRepository;
 import dev.deepdive.seat.repository.SeatReservationRepository;
+import dev.deepdive.seat.repository.UnsafeSeatReservationRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -42,9 +43,13 @@ public abstract class MySQLContainerTest {
     @Autowired
     protected FailedEventRepository failedEventRepository;
 
+    @Autowired
+    protected UnsafeSeatReservationRepository unsafeSeatReservationRepository;
+
     @BeforeEach
     void resetDatabase() {
         seatReservationRepository.deleteAllInBatch();
         failedEventRepository.deleteAllInBatch();
+        unsafeSeatReservationRepository.deleteAllInBatch();
     }
 }

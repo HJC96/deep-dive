@@ -1,29 +1,33 @@
 package dev.deepdive.seat.redis;
 
 import dev.deepdive.seat.core.SeatReservationStatus;
-import java.time.Duration;
+import java.util.List;
 import java.util.Objects;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.stereotype.Component;
 
 /**
- * Redis Set({@code SADD})으로 좌석을 선점한다. 두 불변식을 "유니크 멤버십"으로 보장한다.
+ * Redis Set으로 좌석을 선점한다. 두 불변식을 "유니크 멤버십"으로 보장한다.
  *
  * <ul>
  *   <li>한 사람은 한 좌석만 선점한다 — 좌석을 가진 사용자 집합({@code seat:applied-users}).</li>
  *   <li>한 좌석은 한 명만 선점한다 — 잡힌 좌석 집합({@code seat:held-seats}).</li>
  * </ul>
  *
- * <p>{@code SADD}는 새로 추가됐을 때만 1을 반환하므로, 1이면 그 멤버를 처음 넣은 요청 = 선점 성공이다.
- * 사용자를 먼저 집합에 넣고 좌석을 넣되, 좌석 선점에 실패하면 넣어 둔 사용자를 {@code SREM}으로 빼
- * 밀린 사용자가 다른 좌석을 다시 시도하게 한다. (강의 8강의 {@code SADD applied-users}와 같은 결)
+ * <p><b>원자성</b>: 사용자 확인 → 좌석 확인 → 두 집합에 {@code SADD}를 Lua 스크립트 하나로 실행한다.
+ * 예전처럼 {@code SADD 사용자} → {@code SADD 좌석} → (실패 시) {@code SREM 사용자}를 따로 보내면,
+ * 좌석에서 밀린 사용자가 SREM으로 빠지기 전 잠깐 동안 "좌석 보유 중"으로 보여
+ * 같은 사용자의 다른 좌석 요청이 잘못 거절될 수 있었다. 스크립트는 둘 다 비어 있을 때만 넣으므로
+ * 되돌리기(SREM)가 필요 없다.
  *
- * <p><b>TTL 주의</b>: Redis Set은 멤버 단위 TTL이 없어 좌석/사용자 하나하나에 만료를 걸 수 없고,
- * 키 전체({@code seat:held-seats}·{@code seat:applied-users})에만 걸 수 있다. 그래서 여기서는
- * "선점 윈도우"처럼 키 레벨 TTL을 둔다 — 선점 후 확정 전에 앱이 죽어도 집합이 영원히 남지 않고
- * {@code hold-ttl-seconds} 뒤 통째로 비워진다. 좌석별 정밀 TTL이 필요하면 키 1개=좌석 1개인
- * {@code SET NX EX} 방식이 맞다.
+ * <p><b>TTL 선택</b>: Redis Set은 멤버 단위 TTL이 없어 키 전체({@code seat:held-seats}·
+ * {@code seat:applied-users})에만 만료를 걸 수 있다. 예전에는 새 멤버가 들어올 때마다 키 TTL을 다시 걸어
+ * 요청이 계속 들어오면 집합이 영영 만료되지 않았다(고아 선점이 쌓임). 지금은 {@code EXPIRE ... NX}로
+ * <b>키가 처음 생길 때만</b> TTL을 건다 → 첫 선점부터 {@code hold-ttl-seconds}짜리 고정 "선점 윈도우".
+ * 대가로 윈도우가 끝나면 최근 선점까지 통째로 비워지는데, 그 순간의 이중 배정은 DB 유니크 제약이 막는다.
+ * 좌석별 정밀 TTL이 필요하면 키 1개=좌석 1개인 {@code SET NX EX} 방식이 맞다.
  */
 @Component
 public class SeatHoldStore {
@@ -31,39 +35,72 @@ public class SeatHoldStore {
     private static final String HELD_SEATS_KEY = "seat:held-seats";
     private static final String APPLIED_USERS_KEY = "seat:applied-users";
 
+    private static final long RESULT_ACCEPTED = 0L;
+    private static final long RESULT_USER_ALREADY_HAS_SEAT = 1L;
+    private static final long RESULT_SEAT_ALREADY_TAKEN = 2L;
+
+    // KEYS[1]=사용자 집합, KEYS[2]=좌석 집합, ARGV[1]=userId, ARGV[2]=seatNo, ARGV[3]=TTL(초)
+    private static final RedisScript<Long> HOLD_SCRIPT = RedisScript.of("""
+            if redis.call('SISMEMBER', KEYS[1], ARGV[1]) == 1 then
+                return 1
+            end
+            if redis.call('SISMEMBER', KEYS[2], ARGV[2]) == 1 then
+                return 2
+            end
+            redis.call('SADD', KEYS[1], ARGV[1])
+            redis.call('SADD', KEYS[2], ARGV[2])
+            redis.call('EXPIRE', KEYS[1], ARGV[3], 'NX')
+            redis.call('EXPIRE', KEYS[2], ARGV[3], 'NX')
+            return 0
+            """, Long.class);
+
     private final StringRedisTemplate redisTemplate;
-    private final Duration holdTtl;
+    private final long holdTtlSeconds;
 
     public SeatHoldStore(
             StringRedisTemplate redisTemplate,
             @Value("${seat.redis.hold-ttl-seconds:300}") long holdTtlSeconds
     ) {
         this.redisTemplate = Objects.requireNonNull(redisTemplate, "RedisTemplate은 필수입니다.");
-        this.holdTtl = Duration.ofSeconds(holdTtlSeconds);
+        if (holdTtlSeconds <= 0) {
+            throw new IllegalArgumentException("선점 TTL은 0보다 커야 합니다.");
+        }
+        this.holdTtlSeconds = holdTtlSeconds;
     }
 
     public SeatReservationStatus hold(long userId, String seatNo) {
-        // 1인 1좌석: 사용자를 집합에 추가, 이미 있으면 좌석 보유 중
-        if (!added(APPLIED_USERS_KEY, String.valueOf(userId))) {
+        Long result = redisTemplate.execute(
+                HOLD_SCRIPT,
+                List.of(APPLIED_USERS_KEY, HELD_SEATS_KEY),
+                String.valueOf(userId), Objects.requireNonNull(seatNo, "좌석 번호는 필수입니다."), String.valueOf(holdTtlSeconds));
+        if (result == null) {
+            throw new IllegalStateException("좌석 선점 스크립트 결과가 없습니다.");
+        }
+        if (result == RESULT_ACCEPTED) {
+            return SeatReservationStatus.ACCEPTED;
+        }
+        if (result == RESULT_USER_ALREADY_HAS_SEAT) {
             return SeatReservationStatus.USER_ALREADY_HAS_SEAT;
         }
-        // 이중 배정 방지: 좌석을 집합에 추가, 이미 있으면 선점됨
-        if (!added(HELD_SEATS_KEY, seatNo)) {
-            redisTemplate.opsForSet().remove(APPLIED_USERS_KEY, String.valueOf(userId));   // 좌석 밀림 → 사용자 되돌림
+        if (result == RESULT_SEAT_ALREADY_TAKEN) {
             return SeatReservationStatus.SEAT_ALREADY_TAKEN;
         }
-        return SeatReservationStatus.ACCEPTED;
+        throw new IllegalStateException("알 수 없는 좌석 선점 결과입니다. result=" + result);
     }
 
-    // SADD 결과가 1이면 집합에 새로 추가된 것 = 그 멤버를 처음 넣은 요청 = 선점 성공
-    private boolean added(String setKey, String member) {
-        Long addedCount = redisTemplate.opsForSet().add(setKey, member);
-        boolean isNew = addedCount != null && addedCount == 1L;
-        if (isNew) {
-            // 선점 집합이 영원히 남지 않도록 키 레벨 TTL을 갱신한다.
-            // (멤버 단위 TTL은 Set에 없어 키 전체에만 건다 — 클래스 주석의 TTL 주의 참고)
-            redisTemplate.expire(setKey, holdTtl);
-        }
-        return isNew;
+    // 선점을 통째로 되돌린다. (DB 확정 예외, Kafka 전송 실패처럼 이 선점이 확정될 수 없을 때)
+    public void release(long userId, String seatNo) {
+        releaseUser(userId);
+        releaseSeat(seatNo);
+    }
+
+    // 사용자만 되돌린다. (DB에 이미 다른 사람이 이 좌석을 확정해 둔 경우 — 좌석은 실제로 잡혀 있다)
+    public void releaseUser(long userId) {
+        redisTemplate.opsForSet().remove(APPLIED_USERS_KEY, String.valueOf(userId));
+    }
+
+    // 좌석만 되돌린다. (DB에 이 사용자가 이미 다른 좌석을 확정해 둔 경우 — 사용자는 실제로 좌석이 있다)
+    public void releaseSeat(String seatNo) {
+        redisTemplate.opsForSet().remove(HELD_SEATS_KEY, seatNo);
     }
 }

@@ -185,42 +185,45 @@ ul.plain{margin:6px 0;padding-left:20px}ul.plain li{margin:3px 0}
       <p class="sub">단계를 클릭하면 상세 설명이 나옵니다. 최종 구조(케이스 3: Redis + Kafka) 기준이며 실패 경로를 포함합니다.</p>
       <h3>정상 경로</h3>
       <div class="flow" data-flow>
-        <button class="step" data-target="f-user"><span class="k">STEP 1</span><span class="t">SADD 사용자</span></button>
+        <button class="step" data-target="f-user"><span class="k">STEP 1</span><span class="t">Lua: 사용자·좌석 확인</span></button>
         <span class="arrow">→</span>
-        <button class="step" data-target="f-seat"><span class="k">STEP 2</span><span class="t">SADD 좌석</span></button>
+        <button class="step" data-target="f-seat"><span class="k">STEP 2</span><span class="t">Lua: SADD 둘 다</span></button>
         <span class="arrow">→</span>
         <button class="step" data-target="f-pub"><span class="k">STEP 3</span><span class="t">Kafka publish → 즉시 ACCEPTED</span></button>
         <span class="arrow">→</span>
         <button class="step" data-target="f-consume"><span class="k">STEP 4</span><span class="t">Consumer가 DB 확정</span></button>
       </div>
       <div class="flow-detail">
-        <div id="f-user"><p><code>SeatHoldStore.hold()</code>가 먼저 사용자를 <code>seat:applied-users</code> Set에 넣습니다. <code>SADD</code>는 <b>새로 추가됐을 때만 1</b>을 반환하고 Redis는 명령을 하나씩 실행하므로, 동시에 넣어도 1을 받는 요청은 정확히 하나입니다. 새로 추가되면 키 전체 TTL을 <code>hold-ttl-seconds</code>(기본 300초)로 갱신합니다.</p></div>
-        <div id="f-seat"><p>이어서 좌석을 <code>seat:held-seats</code>에 <code>SADD</code>. 1이면 이 요청이 좌석을 처음 잡은 것 → <code>ACCEPTED</code>. <b>이중 배정 금지</b> 불변식을 지키는 지점.</p></div>
-        <div id="f-pub"><p><code>RedisKafkaSeatReservationService</code>는 DB를 건드리지 않고 <code>commandPublisher.publish(userId, seatNo)</code>만 호출하고 바로 반환합니다. 메시지: 키 = 좌석 번호, 값 = <code>"userId|seatNo"</code>, 토픽 <code>seat-reservation</code>.</p></div>
+        <div id="f-user"><p><code>SeatHoldStore.hold()</code>는 Lua 스크립트 하나를 실행합니다. 먼저 <code>SISMEMBER</code>로 사용자가 <code>seat:applied-users</code>에, 좌석이 <code>seat:held-seats</code>에 이미 있는지 확인합니다. Redis는 스크립트 실행 중 다른 명령을 끼워 넣지 않으므로 확인과 추가 사이에 다른 요청이 끼지 못합니다. <span class="badge good">수정함</span> 예전엔 <code>SADD</code>·<code>SADD</code>·<code>SREM</code>이 따로 실행됐습니다.</p></div>
+        <div id="f-seat"><p>둘 다 없으면 같은 스크립트 안에서 사용자와 좌석을 <code>SADD</code>하고 <code>ACCEPTED</code>. <b>이중 배정 금지·1인 1좌석</b> 불변식을 함께 지키는 지점. 키가 새로 생길 때만 <code>EXPIRE ... NX</code>로 <code>hold-ttl-seconds</code>(기본 300초) TTL을 겁니다(고정 선점 윈도우). <span class="badge good">수정함</span> 예전엔 새 멤버마다 TTL을 다시 걸어 트래픽이 이어지면 영영 만료되지 않았습니다.</p></div>
+        <div id="f-pub"><p><code>RedisKafkaSeatReservationService</code>는 DB를 건드리지 않고 <code>commandPublisher.publish(userId, seatNo)</code>만 호출하고 바로 반환합니다. 메시지: 키 = 좌석 번호, 값 = <code>"userId|seatNo"</code>, 토픽 <code>seat-reservation</code>. 전송 결과 future는 기다리지 않고 실패 콜백만 걸어 둡니다(실패 시 선점 해제) <span class="badge good">수정함</span>.</p></div>
         <div id="f-consume"><p><code>@KafkaListener(groupId = "seat-reservation-confirm")</code>인 <code>SeatReservationConfirmConsumer</code>가 메시지를 꺼내 <code>SeatReservationWriter.save()</code>로 INSERT. DB가 감당할 속도로 소비하니 스파이크는 토픽이 버퍼처럼 받아 둡니다. 테스트는 Awaitility로 DB 건수가 50이 될 때까지(최대 15초) 기다립니다.</p></div>
       </div>
       <h3>실패·예외 경로</h3>
       <div class="flow" data-flow>
         <button class="step fail" data-target="f-userfail"><span class="k">실패 ①</span><span class="t">이미 좌석 있음</span></button>
         <span class="arrow">·</span>
-        <button class="step fail" data-target="f-seatfail"><span class="k">실패 ②</span><span class="t">좌석 선점됨 → SREM</span></button>
+        <button class="step fail" data-target="f-seatfail"><span class="k">실패 ②</span><span class="t">좌석 선점됨</span></button>
         <span class="arrow">·</span>
         <button class="step fail" data-target="f-dup"><span class="k">실패 ③</span><span class="t">중복 메시지</span></button>
         <span class="arrow">·</span>
         <button class="step fail" data-target="f-dbfail"><span class="k">실패 ④</span><span class="t">DB 확정 실패 → FailedEvent</span></button>
+        <span class="arrow">·</span>
+        <button class="step fail" data-target="f-sendfail"><span class="k">실패 ⑤</span><span class="t">Kafka 전송 실패 → 선점 해제</span></button>
       </div>
       <div class="flow-detail">
-        <div id="f-userfail"><p><code>SADD seat:applied-users {userId}</code>가 0을 반환 = 이 사용자는 이미 어떤 좌석을 선점함 → <code>USER_ALREADY_HAS_SEAT</code>. <b>1인 1좌석</b> 불변식을 지키는 지점.</p></div>
-        <div id="f-seatfail"><p>사용자는 넣었는데 <code>SADD seat:held-seats {seatNo}</code>가 0 = 다른 사람이 먼저 잡음. 넣어 둔 사용자를 <code>SREM</code>으로 되돌리고 <code>SEAT_ALREADY_TAKEN</code>. 되돌려야 이 사용자가 다른 좌석을 다시 시도할 수 있습니다.</p></div>
-        <div id="f-dup"><p>Kafka는 at-least-once라 같은 메시지가 두 번 올 수 있습니다. <code>SeatReservationWriter.save()</code>가 <code>existsBySeatNo || existsByUserId</code>면 저장하지 않고 <code>false</code> 반환(멱등). 테스트: 같은 메시지 2번 전송 → 2초 동안 계속 1건인지 확인.</p></div>
-        <div id="f-dbfail"><p>Consumer가 <code>save()</code> 중 예외를 만나면 <code>catch</code>에서 로그 + <code>failedEventRepository.save(new FailedEvent(...))</code>. 예외를 삼키므로 리스너는 정상 종료 → 오프셋 커밋 → 무한 재시도 방지. 테스트는 30자 좌석 번호(컬럼 길이 20 초과)로 INSERT를 실패시켜 <code>failedEventRepository.count() == 1</code>을 확인. <b>재처리 배치는 README에 "향후 구현"</b>으로만 있음.</p></div>
+        <div id="f-userfail"><p>스크립트의 <code>SISMEMBER seat:applied-users {userId}</code>가 참 = 이 사용자는 이미 어떤 좌석을 선점함 → <code>USER_ALREADY_HAS_SEAT</code>. <b>1인 1좌석</b> 불변식을 지키는 지점.</p></div>
+        <div id="f-seatfail"><p><code>SISMEMBER seat:held-seats {seatNo}</code>가 참 = 다른 사람이 먼저 잡음 → 아무것도 추가하지 않고 <code>SEAT_ALREADY_TAKEN</code>. 사용자를 넣었다 빼는 과정이 없으니 이 사용자는 바로 다른 좌석을 시도할 수 있습니다. <span class="badge good">수정함</span> 예전엔 사용자를 먼저 넣고 <code>SREM</code>으로 되돌려서, 그 사이 같은 사용자의 빈 좌석 요청이 잘못 거절될 수 있었습니다.</p></div>
+        <div id="f-dup"><p>Kafka는 at-least-once라 같은 메시지가 두 번 올 수 있습니다. <code>SeatReservationWriter.save()</code>는 같은 사용자·같은 좌석이 이미 있으면 저장 없이 <code>ACCEPTED</code>(멱등), 다른 예약과 겹치면 거절 상태를 반환합니다. 조회와 저장 사이에 끼어든 중복은 DB 유니크 제약(<code>seat_no</code>, <code>user_id</code>)이 막고, 중복 키 예외를 "이미 예약됨"으로 분류합니다 <span class="badge good">수정함</span>. 테스트: 같은 메시지 2번 전송 → 2초 동안 계속 1건인지 확인.</p></div>
+        <div id="f-dbfail"><p>Consumer가 <code>save()</code> 중 예외를 만나면 <code>catch</code>에서 로그 + <code>failedEventRepository.save(new FailedEvent(...))</code>. 예외를 삼키므로 리스너는 정상 종료 → 오프셋 커밋 → 무한 재시도 방지. 테스트는 30자 좌석 번호(컬럼 길이 20 초과)로 INSERT를 실패시켜 <code>failedEventRepository.count() == 1</code>을 확인. 형식이 깨진 메시지도 파싱을 try 안에서 해 원문(<code>payload</code>)으로 FailedEvent에 남깁니다 <span class="badge good">수정함</span>. <b>재처리 배치는 README에 "향후 구현"</b>으로만 있음.</p></div>
+        <div id="f-sendfail"><p><code>kafkaTemplate.send()</code>의 future가 실패로 끝나면 <code>whenComplete</code> 콜백이 <code>seatHoldStore.release(userId, seatNo)</code>로 선점을 풉니다. 요청 경로는 이 결과를 기다리지 않으므로 클라이언트는 이미 <code>ACCEPTED</code>("접수")를 받은 상태입니다. <code>send()</code>가 즉시 던지면 선점을 풀고 예외를 그대로 전파합니다. <span class="badge good">수정함</span> (<code>RedisKafkaSeatReservationServiceUnitTest</code>)</p></div>
       </div>
       <svg viewBox="0 0 640 210" role="img" aria-label="요청 경로와 비동기 확정 경로의 분리" style="width:100%;height:auto;display:block;margin:14px 0 4px">
         <text x="10" y="18" style="fill:var(--muted);font-size:12px;font-weight:600">요청 경로 (빠름)</text>
         <rect x="10" y="28" width="120" height="44" rx="8" style="fill:var(--surface);stroke:var(--border)"/>
         <text x="70" y="55" text-anchor="middle" style="fill:var(--text);font-size:13px">요청 x N</text>
         <rect x="170" y="28" width="150" height="44" rx="8" style="fill:var(--accent-soft);stroke:var(--accent)"/>
-        <text x="245" y="47" text-anchor="middle" style="fill:var(--text);font-size:12px">Redis SADD x2</text>
+        <text x="245" y="47" text-anchor="middle" style="fill:var(--text);font-size:12px">Redis Lua (SADD x2)</text>
         <text x="245" y="63" text-anchor="middle" style="fill:var(--muted);font-size:11px">users / held-seats</text>
         <rect x="360" y="28" width="130" height="44" rx="8" style="fill:var(--warn-soft);stroke:var(--warn)"/>
         <text x="425" y="55" text-anchor="middle" style="fill:var(--text);font-size:13px">Kafka 토픽</text>
@@ -236,7 +239,7 @@ ul.plain{margin:6px 0;padding-left:20px}ul.plain li{margin:3px 0}
         <text x="425" y="167" text-anchor="middle" style="fill:var(--text);font-size:13px">Consumer</text>
         <rect x="170" y="140" width="150" height="44" rx="8" style="fill:var(--surface-2);stroke:var(--border)"/>
         <text x="245" y="160" text-anchor="middle" style="fill:var(--text);font-size:12px">MySQL INSERT</text>
-        <text x="245" y="176" text-anchor="middle" style="fill:var(--muted);font-size:11px">exists 체크로 멱등</text>
+        <text x="245" y="176" text-anchor="middle" style="fill:var(--muted);font-size:11px">유니크 제약 + 멱등</text>
         <rect x="520" y="140" width="110" height="44" rx="8" style="fill:var(--bad-soft);stroke:var(--bad)"/>
         <text x="575" y="160" text-anchor="middle" style="fill:var(--text);font-size:12px">실패 시</text>
         <text x="575" y="176" text-anchor="middle" style="fill:var(--text);font-size:12px">FailedEvent</text>
@@ -257,6 +260,7 @@ ul.plain{margin:6px 0;padding-left:20px}ul.plain li{margin:3px 0}
             <tr><td>2 Redis SADD</td><td><span class="badge good">보장</span></td><td><span class="badge good">보장</span></td><td>요청 스레드 (동기)</td><td>DB 지연이 요청으로 전파</td></tr>
             <tr class="hl"><td>3 Redis + Kafka</td><td><span class="badge good">보장</span></td><td><span class="badge good">보장</span></td><td>Consumer (비동기)</td><td>확정 실패 처리 필요</td></tr>
             <tr><td>4 버스트 + 실패 처리</td><td colspan="2">느린 DB에서 2 vs 3 비교, FailedEvent 기록</td><td>—</td><td>재처리 배치 미구현</td></tr>
+            <tr><td>5 정합성 보강 <span class="badge good">수정함</span></td><td colspan="2">Lua 원자 선점 + DB 유니크 제약</td><td>—</td><td>Kafka 경로의 <code>ACCEPTED</code>는 "접수"</td></tr>
           </tbody>
         </table>
       </div>
@@ -267,6 +271,7 @@ ul.plain{margin:6px 0;padding-left:20px}ul.plain li{margin:3px 0}
           <button role="tab" data-target="t-sadd">2 Redis SADD 선점</button>
           <button role="tab" data-target="t-kafka">3 Redis + Kafka</button>
           <button role="tab" data-target="t-burst">4 버스트 부하·실패 처리</button>
+          <button role="tab" data-target="t-fix">5 정합성 보강</button>
         </div>
 
         <div class="tabpanel card" id="t-unsafe">
@@ -274,18 +279,18 @@ ul.plain{margin:6px 0;padding-left:20px}ul.plain li{margin:3px 0}
           <p>"이미 예약됐나?" 확인 후 없으면 저장. 확인과 저장 사이에 다른 요청이 같은 확인을 통과합니다.</p>
 <pre><code>@Transactional
 public SeatReservationRequestResult reserve(long userId, String seatNo) {
-    if (seatReservationRepository.existsBySeatNo(seatNo)) {
+    if (seatReservationRepository.existsBySeatNo(seatNo)) {   // UnsafeSeatReservationRepository
         return new SeatReservationRequestResult(userId, seatNo, SeatReservationStatus.SEAT_ALREADY_TAKEN);
     }
     // 조회와 저장 사이 간격을 벌려 동시 요청이 같은 빈 좌석을 함께 통과하는 상황을 재현
     Thread.yield();
-    seatReservationRepository.save(new SeatReservation(seatNo, userId));
+    seatReservationRepository.save(new UnsafeSeatReservation(seatNo, userId));
     return new SeatReservationRequestResult(userId, seatNo, SeatReservationStatus.ACCEPTED);
 }</code></pre>
           <dl class="kv">
             <dt>설정</dt><dd>좌석 <code>A-0</code>~<code>A-49</code>, 좌석마다 5명 → 요청 250개, 스레드 풀 32. 같은 좌석 5명을 인접 인덱스로 배치해 같은 배치에서 동시 실행되게 함.</dd>
             <dt>결과</dt><dd><code>assertThat(reservationCount).isGreaterThan(SEATS)</code>. README 실행 예: 53건.</dd>
-            <dt>포인트</dt><dd>coupon-issue의 lost update와 같은 뿌리(check-then-act). <code>seat_no</code>에 unique 제약도 없어 DB가 막아 주지 않음.</dd>
+            <dt>포인트</dt><dd>coupon-issue의 lost update와 같은 뿌리(check-then-act). 비교군은 일부러 unique 제약이 없는 <code>unsafe_seat_reservation</code> 테이블에 써서 DB도 막아 주지 않음. (확정 테이블 <code>seat_reservation</code>에는 케이스 5에서 unique 제약을 추가했기 때문에 테이블을 분리)</dd>
             <dt>코드</dt><dd><code>labs/seat-reservation/src/main/java/dev/deepdive/seat/service/UnsafeSeatReservationService.java</code></dd>
           </dl>
         </div>
@@ -293,33 +298,34 @@ public SeatReservationRequestResult reserve(long userId, String seatNo) {
         <div class="tabpanel card" id="t-sadd">
           <h3>케이스 2. Redis SADD 선점 + 동기 DB 저장 <span class="badge good">두 불변식 보장</span></h3>
           <p>불변식의 본질이 "유니크 멤버십"이라 Set이 자연스럽다는 설계(README). 분산락 <code>SET NX</code>·<code>INCR</code>은 coupon-issue 주제라 여기선 Set.</p>
-<pre><code>public SeatReservationStatus hold(long userId, String seatNo) {
-    // 1인 1좌석: 사용자를 집합에 추가, 이미 있으면 좌석 보유 중
-    if (!added(APPLIED_USERS_KEY, String.valueOf(userId))) {
-        return SeatReservationStatus.USER_ALREADY_HAS_SEAT;
-    }
-    // 이중 배정 방지: 좌석을 집합에 추가, 이미 있으면 선점됨
-    if (!added(HELD_SEATS_KEY, seatNo)) {
-        redisTemplate.opsForSet().remove(APPLIED_USERS_KEY, String.valueOf(userId));   // 좌석 밀림 → 사용자 되돌림
-        return SeatReservationStatus.SEAT_ALREADY_TAKEN;
-    }
-    return SeatReservationStatus.ACCEPTED;
-}
-
-private boolean added(String setKey, String member) {
-    Long addedCount = redisTemplate.opsForSet().add(setKey, member);
-    boolean isNew = addedCount != null &amp;&amp; addedCount == 1L;
-    if (isNew) {
-        redisTemplate.expire(setKey, holdTtl);   // 키 레벨 TTL (기본 300초)
-    }
-    return isNew;
-}</code></pre>
+<pre><code>// KEYS[1]=사용자 집합, KEYS[2]=좌석 집합, ARGV[1]=userId, ARGV[2]=seatNo, ARGV[3]=TTL(초)
+private static final RedisScript&lt;Long&gt; HOLD_SCRIPT = RedisScript.of("""
+        if redis.call('SISMEMBER', KEYS[1], ARGV[1]) == 1 then
+            return 1                                   -- USER_ALREADY_HAS_SEAT
+        end
+        if redis.call('SISMEMBER', KEYS[2], ARGV[2]) == 1 then
+            return 2                                   -- SEAT_ALREADY_TAKEN
+        end
+        redis.call('SADD', KEYS[1], ARGV[1])
+        redis.call('SADD', KEYS[2], ARGV[2])
+        redis.call('EXPIRE', KEYS[1], ARGV[3], 'NX')   -- 키가 처음 생길 때만 TTL
+        redis.call('EXPIRE', KEYS[2], ARGV[3], 'NX')
+        return 0                                       -- ACCEPTED
+        """, Long.class);</code></pre>
 <pre><code>// RedisSeatReservationService: 선점 성공 시 요청 스레드가 직접 DB 확정
-seatReservationWriter.save(userId, seatNo);
-return new SeatReservationRequestResult(userId, seatNo, SeatReservationStatus.ACCEPTED);</code></pre>
+SeatReservationStatus confirmed;
+try {
+    confirmed = seatReservationWriter.save(userId, seatNo);
+} catch (RuntimeException e) {
+    seatHoldStore.release(userId, seatNo);   // DB 확정 실패 → 선점 되돌림
+    throw e;
+}
+releaseMismatchedHold(userId, seatNo, confirmed);   // DB가 거절하면 잘못 잡은 쪽만 되돌림
+return new SeatReservationRequestResult(userId, seatNo, confirmed);</code></pre>
           <dl class="kv">
             <dt>결과</dt><dd>250 요청 → <code>acceptedCount == 50</code>, <code>takenCount == 200</code>, DB 50건, 좌석마다 정확히 1건. 같은 사용자(9999)가 50좌석을 동시에 노리면 <code>acceptedCount == 1</code>, <code>userBlockedCount == 49</code>.</dd>
-            <dt>TTL</dt><dd>Set은 멤버 단위 TTL이 없어 키 전체에 300초 TTL을 겁니다. 선점 후 앱이 죽어도 집합이 영원히 남지 않게 하려는 장치. 좌석별 정밀 TTL이 필요하면 키 1개 = 좌석 1개인 <code>SET NX EX</code>가 맞다고 클래스 주석에 적혀 있습니다. (README 스니펫에는 이 TTL 코드가 빠져 있음)</dd>
+            <dt>TTL</dt><dd>Set은 멤버 단위 TTL이 없어 키 전체에 300초 TTL을 겁니다. 선점 후 앱이 죽어도 집합이 영원히 남지 않게 하려는 장치. <span class="badge good">수정함</span> 이제 <code>EXPIRE ... NX</code>로 키가 처음 생길 때만 걸어 첫 선점부터 고정 윈도우가 되고(README에도 반영), 윈도우가 끝나 집합이 비워진 뒤의 중복은 DB 유니크 제약이 막습니다. 좌석별 정밀 TTL이 필요하면 키 1개 = 좌석 1개인 <code>SET NX EX</code>가 맞습니다.</dd>
+            <dt>결과 반영</dt><dd><span class="badge good">수정함</span> DB 결과를 그대로 반환합니다. DB에 다른 사람 좌석이면 <code>SEAT_ALREADY_TAKEN</code> + 사용자 선점만 해제, 이미 다른 좌석을 가진 사용자면 <code>USER_ALREADY_HAS_SEAT</code> + 좌석 선점만 해제, 예외면 선점을 통째로 되돌리고 예외 전파.</dd>
             <dt>한계 (README)</dt><dd>요청 경로에 DB 쓰기가 결합 → 트래픽이 몰리면 DB 지연이 요청으로 전파. Redis 상태는 메모리라 내구성 기준이 아님(선점 후 DB 확정 전 앱이 죽으면 좌석만 잡힘).</dd>
             <dt>코드</dt><dd><code>labs/seat-reservation/src/main/java/dev/deepdive/seat/redis/SeatHoldStore.java</code>, <code>.../service/RedisSeatReservationService.java</code>, <code>.../store/SeatReservationWriter.java</code></dd>
           </dl>
@@ -333,22 +339,30 @@ public SeatReservationRequestResult reserve(long userId, String seatNo) {
     if (status != SeatReservationStatus.ACCEPTED) {
         return new SeatReservationRequestResult(userId, seatNo, status);
     }
-    commandPublisher.publish(userId, seatNo);
+    commandPublisher.publish(userId, seatNo).whenComplete((result, failure) -&gt; {
+        if (failure != null) {
+            seatHoldStore.release(userId, seatNo);   // 전송 최종 실패 → 선점 해제 (요청은 기다리지 않음)
+        }
+    });
     return new SeatReservationRequestResult(userId, seatNo, SeatReservationStatus.ACCEPTED);
 }
 
-// 프로듀서: 좌석 번호를 메시지 키로
-kafkaTemplate.send(TOPIC, seatNo, new SeatReservationCommand(userId, seatNo).serialize());
+// 프로듀서: 좌석 번호를 메시지 키로, 전송 결과 future를 반환
+return kafkaTemplate.send(TOPIC, seatNo, new SeatReservationCommand(userId, seatNo).serialize());
 
-// 기록기: 좌석/사용자 단위 멱등
-@Transactional
-public boolean save(long userId, String seatNo) {
-    if (seatReservationRepository.existsBySeatNo(seatNo) || seatReservationRepository.existsByUserId(userId)) {
-        return false;
+// 기록기: 좌석/사용자 단위 멱등 + DB 유니크 제약 (트랜잭션은 일부러 걸지 않음)
+public SeatReservationStatus save(long userId, String seatNo) {
+    Optional&lt;SeatReservationStatus&gt; existing = existingStatus(userId, seatNo);
+    if (existing.isPresent()) {
+        return existing.get();      // 같은 예약이면 ACCEPTED(멱등), 겹치면 거절 상태
     }
-    simulateSlowDb();     // seat.db.write-delay-millis (기본 0)
-    seatReservationRepository.save(new SeatReservation(seatNo, userId));
-    return true;
+    simulateSlowDb();               // seat.db.write-delay-millis (기본 0)
+    try {
+        seatReservationRepository.save(new SeatReservation(seatNo, userId));
+        return SeatReservationStatus.ACCEPTED;
+    } catch (DataIntegrityViolationException e) {
+        return existingStatus(userId, seatNo).orElseThrow(() -&gt; e);   // 중복 키 → 이미 예약됨
+    }
 }</code></pre>
           <dl class="kv">
             <dt>결과</dt><dd>250 요청 → <code>acceptedCount == 50</code>, Awaitility로 최대 15초 기다려 DB 50건·좌석마다 1건. 중복 메시지 테스트: 같은 메시지 2번 → 1건 유지(2초간 <code>during</code>으로 확인).</dd>
@@ -369,17 +383,46 @@ static void burstProperties(DynamicPropertyRegistry registry) {
 }
 // BURST = 100, 스레드 풀 100 — 사용자마다 다른 좌석(D-*, K-*)을 한꺼번에 요청</code></pre>
 <pre><code>// 실패 처리: SeatReservationConfirmConsumer
+SeatReservationCommand command;
+try {
+    command = SeatReservationCommand.parse(message);     // 파싱도 try 안 (깨진 메시지도 적재)
+} catch (RuntimeException e) {
+    failedEventRepository.save(FailedEvent.unparseable(message));
+    return;
+}
 try {
     seatReservationWriter.save(command.userId(), command.seatNo());
 } catch (Exception e) {
     log.error("좌석 예약 확정 실패. userId={}, seatNo={}", command.userId(), command.seatNo(), e);
-    failedEventRepository.save(new FailedEvent(command.userId(), command.seatNo()));
+    failedEventRepository.save(new FailedEvent(command.userId(), command.seatNo(), message));
 }</code></pre>
           <dl class="kv">
             <dt>단언</dt><dd><code>kafka.failed()).isZero()</code>, <code>kafka.elapsedMillis()).isLessThan(direct.elapsedMillis())</code>, <code>direct.failed()).isGreaterThan(0)</code>, <code>countBySeatNoStartingWith("K-")).isEqualTo(100)</code></dd>
             <dt>왜 분리된 테스트</dt><dd>풀 2로 바꾼 컨텍스트에서 250개 동시 요청 테스트를 돌리면 망가지므로 <code>BurstLoadSeatReservationTest</code>로 분리.</dd>
-            <dt>측정 공정성</dt><dd>Kafka 쪽은 측정 전에 <code>warmUpKafkaProducer()</code>로 첫 publish 메타데이터 비용을 제거.</dd>
+            <dt>측정 공정성</dt><dd>Kafka 쪽은 측정 전에 <code>warmUpKafkaProducer()</code>로 첫 publish 메타데이터 비용을 제거. Kafka 쪽 "요청 반환까지" 시간은 <code>send()</code>가 비동기라 브로커 ack이 아니라 <b>프로듀서 버퍼에 넣기(enqueue)까지</b>입니다(README에 명시).</dd>
             <dt>코드</dt><dd><code>labs/seat-reservation/src/test/java/dev/deepdive/seat/service/BurstLoadSeatReservationTest.java</code>, <code>.../core/FailedEvent.java</code></dd>
+          </dl>
+        </div>
+
+        <div class="tabpanel card" id="t-fix">
+          <h3>케이스 5. 정합성 보강 <span class="badge good">수정함</span></h3>
+          <p>해피 패스 테스트로는 드러나지 않던 구멍을 막고, 각 구멍을 재현하는 테스트를 추가했습니다(<code>SeatReservationFailureHandlingTest</code>, <code>RedisKafkaSeatReservationServiceUnitTest</code>).</p>
+          <div class="tablewrap">
+            <table>
+              <thead><tr><th>구멍</th><th>예전</th><th>지금</th></tr></thead>
+              <tbody>
+                <tr><td>선점 원자성</td><td>SADD·SADD·SREM 따로 → 빈 좌석 거짓 거절</td><td>Lua 하나로 확인 + SADD</td></tr>
+                <tr><td>선점 TTL</td><td>새 멤버마다 연장 → 영영 안 만료</td><td><code>EXPIRE NX</code>: 첫 선점부터 고정 윈도우</td></tr>
+                <tr><td>DB 유니크</td><td>없음 (exists 체크만)</td><td><code>seat_no</code>·<code>user_id</code> unique, 중복 키 → 이미 예약됨</td></tr>
+                <tr><td>직접 쓰기 결과</td><td>항상 ACCEPTED, 실패해도 선점 유지</td><td>DB 결과 반환, 실패·거절 시 선점 해제</td></tr>
+                <tr><td>Kafka 전송</td><td>future 버림</td><td>실패 콜백에서 선점 해제 (비차단)</td></tr>
+                <tr><td>깨진 메시지</td><td>parse가 try 밖 → 유실</td><td>원문 payload로 FailedEvent</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <dl class="kv">
+            <dt>남은 한계</dt><dd>Kafka 경로의 <code>ACCEPTED</code>는 "접수"라, 전송이 늦게 실패하면 선점은 풀려도 클라이언트에 알릴 방법이 없음(아웃박스·결과 조회 API 필요). 선점 해제의 SREM 두 번은 원자적이지 않음(이중 배정으로 이어지진 않음 — DB가 막음).</dd>
+            <dt>코드</dt><dd><code>.../redis/SeatHoldStore.java</code>, <code>.../store/SeatReservationWriter.java</code>, <code>.../core/SeatReservation.java</code>, <code>.../core/UnsafeSeatReservation.java</code></dd>
           </dl>
         </div>
       </div>
@@ -423,6 +466,10 @@ try {
             <tr><td>케이스3 Kafka 확정</td><td class="num">250</td><td>ACCEPTED 50, 15초 내 DB 50건, 좌석별 1건</td></tr>
             <tr><td>케이스3 중복 메시지</td><td class="num">2</td><td>DUP-1 좌석 1건 유지 (2초간)</td></tr>
             <tr><td>케이스4 FailedEvent</td><td class="num">1</td><td>30자 좌석 번호 → FailedEvent 1건, 예약 없음</td></tr>
+            <tr><td>케이스5 원자적 선점</td><td class="num">32 x 20회</td><td>31좌석이 잡힌 상태에서 한 사용자가 32좌석 동시 요청 → 매번 ACCEPTED 정확히 1</td></tr>
+            <tr><td>케이스5 유니크 경합</td><td class="num">32</td><td>같은 좌석을 32명이 동시에 <code>save()</code> → ACCEPTED 1, SEAT_ALREADY_TAKEN 31, 예외 0</td></tr>
+            <tr><td>케이스5 선점 해제</td><td class="num">—</td><td>DB 거절·예외·Kafka 전송 실패 시 해당 선점이 Redis에서 빠짐</td></tr>
+            <tr><td>케이스5 깨진 메시지</td><td class="num">1</td><td><code>"not-a-command"</code> → FailedEvent(payload만) 1건</td></tr>
           </tbody>
         </table>
       </div>
@@ -438,33 +485,41 @@ try {
         <li>버스트 테스트는 구조적 인과만 재현. 실제 RDB 장애 재현은 nGrinder·AWS 같은 실부하 환경 필요.</li>
         <li>케이스 2: 요청 경로·DB 쓰기 결합, Redis 선점 상태는 내구성 기준이 아님.</li>
         <li>예시 수치는 환경에 따라 달라짐.</li>
+        <li>Kafka 경유 "요청 반환" 시간(예시 21ms)은 비동기 <code>send()</code>의 enqueue 시간 — 브로커 기록까지가 아님.</li>
+        <li>Kafka 경로의 <code>ACCEPTED</code>는 "접수". 늦은 전송 실패는 선점만 풀고 클라이언트엔 알리지 못함.</li>
       </ul>
 
       <h3><span class="badge bad">코드 분석</span> README에 없거나 다른 점</h3>
-      <details class="qa risk"><summary>Kafka 발행 결과를 확인하지 않는다 → 발행 실패 시 Redis 선점만 남음</summary><div class="a">
-        <p><code>SeatReservationCommandPublisher.publish()</code>는 <code>kafkaTemplate.send(...)</code>의 반환(future)을 버립니다. 브로커 장애로 발행이 실패해도 요청은 이미 <code>ACCEPTED</code>를 받았고, Redis에는 좌석·사용자가 잡혀 있지만 DB 예약은 영영 생기지 않습니다. 버스트 테스트의 "Kafka 실패 0건"도 동기적으로 던져진 예외만 센 것입니다.</p>
-        <p>개선 <span class="badge info">일반 지식</span>: 발행 결과 확인 후 실패 시 Redis 선점 되돌리기, 또는 Transactional Outbox 패턴.</p>
+      <details class="qa risk"><summary><span class="badge good">수정함</span> Kafka 발행 결과를 확인하지 않는다 → 발행 실패 시 Redis 선점만 남음</summary><div class="a">
+        <p>예전 <code>SeatReservationCommandPublisher.publish()</code>는 <code>kafkaTemplate.send(...)</code>의 반환(future)을 버렸습니다. 브로커 장애로 발행이 실패해도 Redis에는 좌석·사용자가 잡혀 있지만 DB 예약은 영영 생기지 않았습니다. 버스트 테스트의 "Kafka 실패 0건"도 동기적으로 던져진 예외만 센 것입니다.</p>
+        <p>수정: <code>publish()</code>가 future를 반환하고, 서비스가 <code>whenComplete</code>로 실패 시 선점을 해제합니다(요청 경로는 기다리지 않음). <code>send()</code>가 즉시 던지면 선점 해제 후 예외 전파. 남은 한계: 클라이언트는 이미 <code>ACCEPTED</code>를 받았으므로 최종 결과 보장은 Transactional Outbox·결과 조회 API 몫 <span class="badge info">일반 지식</span>.</p>
       </div></details>
       <details class="qa risk"><summary>README는 "좌석 키로 같은 파티션에서 순서 처리"라 하지만 토픽은 partitions(1)</summary><div class="a">
-        <p><code>KafkaTopicConfig</code>가 <code>.partitions(1)</code>로 토픽을 만듭니다. 파티션이 하나라 모든 메시지가 한 줄로 처리되고, 좌석 키에 따른 파티셔닝 효과는 이 실험에서 관찰되지 않습니다. (README에 "지금은 파티션 1개라 키는 파티션을 늘렸을 때를 위한 것"이라는 설명을 덧붙였습니다.) 반대로 말하면 지금의 멱등 체크가 안전한 이유도 "Consumer 스레드가 하나"이기 때문일 수 있습니다(아래 항목).</p>
+        <p><code>KafkaTopicConfig</code>가 <code>.partitions(1)</code>로 토픽을 만듭니다. 파티션이 하나라 모든 메시지가 한 줄로 처리되고, 좌석 키에 따른 파티셔닝 효과는 이 실험에서 관찰되지 않습니다. (README에 "지금은 파티션 1개라 키는 파티션을 늘렸을 때를 위한 것"이라는 설명을 덧붙였습니다.) 파티션·Consumer를 늘려도 이제 DB 유니크 제약이 최종 방어선이 됩니다(아래 항목).</p>
       </div></details>
-      <details class="qa risk"><summary>DB에 unique 제약이 없다 — 멱등성이 exists 체크에만 의존</summary><div class="a">
-        <p><code>SeatReservation</code>의 <code>seat_no</code>, <code>user_id</code>에 unique 제약이 없습니다. <code>SeatReservationWriter.save()</code>의 <code>exists → save</code>는 케이스 1과 같은 check-then-act라, 파티션·Consumer를 늘려 동시에 처리하면 중복 저장이 가능해집니다. 최후 방어선으로 unique 인덱스 + 위반 예외 처리가 필요합니다.</p>
+      <details class="qa risk"><summary><span class="badge good">수정함</span> DB에 unique 제약이 없다 — 멱등성이 exists 체크에만 의존</summary><div class="a">
+        <p>예전 <code>SeatReservation</code>의 <code>seat_no</code>, <code>user_id</code>에는 unique 제약이 없었고, <code>SeatReservationWriter.save()</code>의 <code>exists → save</code>는 케이스 1과 같은 check-then-act라 동시에 처리하면 중복 저장이 가능했습니다.</p>
+        <p>수정: 두 컬럼에 unique 제약을 걸고, <code>save()</code>는 중복 키 예외(<code>DataIntegrityViolationException</code>)를 다시 조회해 "이미 예약됨"으로 분류합니다(같은 사용자·같은 좌석이면 멱등 <code>ACCEPTED</code>). 바깥 트랜잭션이 rollback-only가 되지 않도록 <code>save()</code>에는 <code>@Transactional</code>을 걸지 않습니다. 케이스 1 비교군은 이 제약 때문에 별도 테이블 <code>unsafe_seat_reservation</code>으로 분리했습니다.</p>
       </div></details>
-      <details class="qa risk"><summary>save()의 false(거절) 반환을 호출부가 무시한다</summary><div class="a">
-        <p><code>RedisSeatReservationService</code>는 <code>seatReservationWriter.save(...)</code>의 반환값을 보지 않고 무조건 <code>ACCEPTED</code>를 돌려줍니다. 예: Redis 키가 TTL(300초)로 통째로 사라진 뒤 새 요청이 같은 좌석을 선점하면, DB에는 이미 다른 사람 예약이 있어 저장은 거절되는데 응답은 성공입니다. Consumer도 반환값을 기록하지 않습니다.</p>
+      <details class="qa risk"><summary><span class="badge good">수정함</span> save()의 false(거절) 반환을 호출부가 무시한다</summary><div class="a">
+        <p>예전 <code>RedisSeatReservationService</code>는 <code>save(...)</code>의 반환값을 보지 않고 무조건 <code>ACCEPTED</code>를 돌려줬습니다. 예: Redis 키가 TTL로 통째로 사라진 뒤 새 요청이 같은 좌석을 선점하면, DB에는 이미 다른 사람 예약이 있어 저장은 거절되는데 응답은 성공이었습니다.</p>
+        <p>수정: <code>save()</code>가 <code>SeatReservationStatus</code>를 반환하고 서비스가 그대로 돌려줍니다. Consumer는 거절이면 경고 로그를 남깁니다(재처리 대상 아님).</p>
       </div></details>
-      <details class="qa risk"><summary>직접 쓰기 실패 시 Redis 선점을 되돌리지 않는다</summary><div class="a">
-        <p>케이스 2 경로에서 DB 저장이 예외(예: 커넥션 타임아웃)로 실패하면 <code>SeatHoldStore</code>의 좌석·사용자는 그대로 남습니다. 버스트 테스트의 실패 88건(README 예시)은 TTL이 만료될 때까지 좌석이 "잡혔지만 아무도 없는" 상태가 됩니다.</p>
+      <details class="qa risk"><summary><span class="badge good">수정함</span> 직접 쓰기 실패 시 Redis 선점을 되돌리지 않는다</summary><div class="a">
+        <p>예전엔 케이스 2 경로에서 DB 저장이 예외(예: 커넥션 타임아웃)로 실패해도 <code>SeatHoldStore</code>의 좌석·사용자가 그대로 남아, 버스트 테스트의 실패 건(README 예시 88건)은 TTL이 만료될 때까지 "잡혔지만 아무도 없는" 좌석이 됐습니다.</p>
+        <p>수정: 예외면 선점을 통째로 되돌리고 예외 전파, DB 거절이면 잘못 잡은 쪽(사용자 또는 좌석)만 되돌립니다.</p>
       </div></details>
-      <details class="qa risk"><summary>두 번의 SADD + SREM이 원자적이지 않다</summary><div class="a">
-        <p>사용자 SADD → 좌석 SADD → (실패 시) SREM이 별도 명령입니다. 그 사이 같은 사용자의 다른 요청은 <code>USER_ALREADY_HAS_SEAT</code>로 거절될 수 있는데, 정작 첫 요청은 좌석 선점에 실패해 사용자가 아무 좌석도 못 가질 수 있습니다(거짓 거절). 불변식 위반(이중 배정)은 아니지만 공정성 문제. Lua 스크립트로 묶으면 해결 <span class="badge info">일반 지식</span>.</p>
+      <details class="qa risk"><summary><span class="badge good">수정함</span> 두 번의 SADD + SREM이 원자적이지 않다</summary><div class="a">
+        <p>예전엔 사용자 SADD → 좌석 SADD → (실패 시) SREM이 별도 명령이라, 그 사이 같은 사용자의 다른 요청이 <code>USER_ALREADY_HAS_SEAT</code>로 거절되고 정작 첫 요청은 좌석 선점에 실패해 사용자가 아무 좌석도 못 가질 수 있었습니다(거짓 거절).</p>
+        <p>수정: "사용자·좌석 둘 다 없을 때만 둘 다 추가"를 Lua 스크립트 하나로 실행합니다. 테스트는 31좌석이 잡힌 상태에서 한 사용자가 32좌석을 동시에 요청하는 시나리오를 20회 반복해 매번 빈 좌석 하나가 그 사용자에게 가는지 확인합니다.</p>
       </div></details>
-      <details class="qa risk"><summary>TTL이 README 스니펫에 없고, 키 전체가 한꺼번에 만료된다</summary><div class="a">
-        <p>코드에는 <code>@Value("${seat.redis.hold-ttl-seconds:300}")</code>와 <code>expire(setKey, holdTtl)</code>가 있지만 README의 선점 코드에는 없습니다. 새 멤버가 추가될 때마다 TTL을 갱신하므로, 마지막 추가 후 300초가 지나면 <b>모든 좌석·사용자 선점이 동시에 사라집니다</b>. 그 뒤엔 DB 확정 여부와 무관하게 Redis가 다시 선점을 허용합니다.</p>
+      <details class="qa risk"><summary><span class="badge good">수정함</span> TTL이 README 스니펫에 없고, 키 전체가 한꺼번에 만료된다</summary><div class="a">
+        <p>예전 코드는 새 멤버가 추가될 때마다 키 TTL을 다시 걸어, 요청이 이어지는 동안엔 영영 만료되지 않고(고아 선점 누적) 마지막 추가 후 300초가 지나면 <b>모든 선점이 동시에 사라졌습니다</b>. README 선점 코드에도 TTL이 빠져 있었습니다.</p>
+        <p>수정: <code>EXPIRE ... NX</code>로 키가 처음 생길 때만 TTL을 걸어 첫 선점부터 고정 윈도우로 만들고, README에 선택 이유를 적었습니다. 윈도우 끝에 통째로 비워지는 성질은 Set 구조상 남지만, 그 뒤의 중복은 DB 유니크 제약이 막습니다. 좌석별 만료가 필요하면 좌석당 키(<code>SET NX EX</code>)가 맞습니다.</p>
       </div></details>
-      <details class="qa risk"><summary>파싱 실패는 FailedEvent로 가지 않는다</summary><div class="a">
-        <p><code>SeatReservationCommand.parse(message)</code>는 <code>try</code> 바깥에 있어, 형식이 잘못된 메시지는 catch되지 않고 리스너 밖으로 예외가 나갑니다(spring-kafka 기본 에러 핸들러로 처리). 테스트의 독성 메시지는 형식은 맞고 길이만 넘는 경우입니다.</p>
+      <details class="qa risk"><summary><span class="badge good">수정함</span> 파싱 실패는 FailedEvent로 가지 않는다</summary><div class="a">
+        <p>예전엔 <code>SeatReservationCommand.parse(message)</code>가 <code>try</code> 바깥에 있어, 형식이 잘못된 메시지는 리스너 밖으로 예외가 나가 spring-kafka 기본 에러 핸들러가 로그만 남기고 버렸습니다.</p>
+        <p>수정: 파싱도 try 안에서 하고, 실패하면 원문을 <code>payload</code> 컬럼에 담은 FailedEvent(userId·seatNo는 비움)로 적재합니다.</p>
       </div></details>
       <details class="qa risk"><summary>케이스 1 단언은 비결정적</summary><div class="a">
         <p><code>isGreaterThan(SEATS)</code>는 경합이 실제로 일어나야 통과합니다. <code>Thread.yield()</code>와 인접 인덱스 배치로 확률을 높였을 뿐 보장은 아닙니다.</p>
@@ -491,16 +546,17 @@ try {
       </div></details>
       <details class="qa"><summary>Kafka 메시지가 중복으로 오면 어떻게 하나요? exactly-once는?</summary><div class="a">
         <ul>
-          <li>이 모듈: Consumer 측 멱등 — <code>existsBySeatNo || existsByUserId</code>면 저장 안 함. 테스트로 중복 2건 → 1건 유지 확인.</li>
-          <li>약점: unique 제약이 없어 동시 처리 시 깨질 수 있음 → 운영이면 unique 인덱스로 DB가 최종 보장하게.</li>
+          <li>이 모듈: Consumer 측 멱등 — 같은 예약이 이미 있으면 저장 없이 <code>ACCEPTED</code>. 테스트로 중복 2건 → 1건 유지 확인.</li>
+          <li>조회-저장 사이 경합은 <code>seat_no</code>·<code>user_id</code> unique 제약이 최종 보장하고, 중복 키 예외를 "이미 예약됨"으로 분류 <span class="badge good">수정함</span>.</li>
           <li><span class="badge info">일반 지식</span> Kafka의 idempotent producer·트랜잭션은 Kafka 내부 exactly-once이고, 외부 DB 쓰기까지 포함하면 결국 Consumer 멱등이 필요.</li>
         </ul>
       </div></details>
       <details class="qa"><summary>Redis에서 선점은 됐는데 Kafka 발행이나 DB 확정이 실패하면?</summary><div class="a">
         <ul>
           <li>DB 확정 실패: Consumer가 catch → FailedEvent 저장 → 오프셋 커밋(무한 재시도 방지). 재처리 배치는 README상 향후 구현.</li>
-          <li>발행 실패: 현재 코드는 <code>send()</code> 결과를 확인하지 않아 감지 불가 → 개선 필요. 결과 콜백에서 실패 시 Redis 선점 롤백, 또는 Outbox 패턴 <span class="badge info">일반 지식</span>.</li>
-          <li>최후 안전망: 키 TTL 300초로 선점이 영원히 남지는 않음.</li>
+          <li>발행 실패: <code>send()</code> future의 실패 콜백에서 Redis 선점 해제 <span class="badge good">수정함</span>. 다만 클라이언트는 이미 "접수"를 받았으므로 최종 결과 보장은 Outbox 패턴·결과 조회 API <span class="badge info">일반 지식</span>.</li>
+          <li>직접 쓰기 경로의 DB 실패: 선점을 되돌리고 예외 전파 <span class="badge good">수정함</span>.</li>
+          <li>최후 안전망: 키 TTL 300초(첫 선점부터 고정)로 선점이 영원히 남지는 않음.</li>
         </ul>
       </div></details>
       <details class="qa"><summary>FailedEvent 테이블 대신 Kafka의 다른 방법은 없나요?</summary><div class="a">
@@ -519,20 +575,20 @@ try {
       <details class="qa"><summary>Redis가 죽으면 이 구조는 어떻게 되나요?</summary><div class="a">
         <ul>
           <li>선점 판정을 할 수 없어 예약이 막힘(현재 코드에 대체 경로 없음). Redis 상태는 메모리라 재시작 시 선점 정보 유실 가능 → README도 "Redis 카운트는 내구성 기준이 아님"이라 명시.</li>
-          <li>진실의 원천은 DB여야 하고, Redis는 빠른 1차 필터. 그래서 DB unique 제약이 필요.</li>
+          <li>진실의 원천은 DB여야 하고, Redis는 빠른 1차 필터. 그래서 DB unique 제약을 둠 <span class="badge good">수정함</span>.</li>
           <li><span class="badge info">일반 지식</span> 복제·Sentinel/Cluster, AOF 등으로 가용성·내구성 보완.</li>
         </ul>
       </div></details>
       <details class="qa"><summary>좌석 키로 메시지를 보내면 순서가 보장된다고 했는데, 파티션을 늘리면 무엇을 확인해야 하나요?</summary><div class="a">
         <ul>
           <li>같은 키는 같은 파티션 → 같은 좌석 커맨드끼리는 순서 유지 <span class="badge info">일반 지식</span>. 현재는 <code>partitions(1)</code>이라 실험에선 의미가 드러나지 않음.</li>
-          <li>파티션·Consumer 동시성을 늘리면 <b>다른 좌석이지만 같은 사용자</b>의 커맨드가 다른 파티션에서 동시에 처리될 수 있음 → <code>existsByUserId</code> 체크가 경합. user_id unique 제약 필요.</li>
+          <li>파티션·Consumer 동시성을 늘리면 <b>다른 좌석이지만 같은 사용자</b>의 커맨드가 다른 파티션에서 동시에 처리될 수 있음 → <code>existsByUserId</code> 체크가 경합. 그래서 <code>user_id</code> unique 제약을 둠 <span class="badge good">수정함</span>.</li>
         </ul>
       </div></details>
       <details class="qa"><summary>SADD 두 번과 SREM 롤백을 Lua로 묶어야 할까요?</summary><div class="a">
         <ul>
-          <li>지금도 이중 배정·1인 1좌석은 깨지지 않음(각 SADD가 원자적). 다만 중간 상태 때문에 같은 사용자의 다른 요청이 잘못 거절될 수 있음.</li>
-          <li>Lua로 "사용자·좌석 둘 다 없을 때만 둘 다 추가"를 원자 실행하면 중간 상태와 롤백 코드가 사라지고 네트워크 왕복도 줄어듦 (coupon-issue의 Lua 케이스와 같은 아이디어).</li>
+          <li>따로 실행해도 이중 배정·1인 1좌석은 깨지지 않음(각 SADD가 원자적). 다만 중간 상태 때문에 같은 사용자의 다른 요청이 잘못 거절될 수 있음.</li>
+          <li>그래서 Lua로 "사용자·좌석 둘 다 없을 때만 둘 다 추가"를 원자 실행하도록 바꿈 <span class="badge good">수정함</span> → 중간 상태와 롤백 코드가 사라지고 네트워크 왕복도 줄어듦 (coupon-issue의 Lua 케이스와 같은 아이디어).</li>
         </ul>
       </div></details>
     </section>
@@ -541,21 +597,24 @@ try {
       <h2><span class="num">07</span>파일 지도</h2>
       <p class="sub">코드를 다시 볼 때 여기서부터. (경로는 <code>labs/seat-reservation/</code> 기준)</p>
       <ul class="files">
-        <li><code>README.md</code><span>불변식, 케이스 1~4 설명·시퀀스 다이어그램, 버스트 예시 출력, 재처리 배치(예정안)</span></li>
-        <li><code>src/main/java/dev/deepdive/seat/service/UnsafeSeatReservationService.java</code><span>케이스 1: exists → yield → save</span></li>
-        <li><code>src/main/java/dev/deepdive/seat/redis/SeatHoldStore.java</code><span>SADD 선점, SREM 롤백, 키 레벨 TTL</span></li>
-        <li><code>src/main/java/dev/deepdive/seat/service/RedisSeatReservationService.java</code><span>케이스 2: 선점 + 동기 DB 확정</span></li>
-        <li><code>src/main/java/dev/deepdive/seat/service/RedisKafkaSeatReservationService.java</code><span>케이스 3: 선점 + publish 후 즉시 반환</span></li>
-        <li><code>src/main/java/dev/deepdive/seat/store/SeatReservationWriter.java</code><span>멱등 저장 + 느린 DB 흉내(write-delay-millis)</span></li>
-        <li><code>src/main/java/dev/deepdive/seat/kafka/SeatReservationCommandPublisher.java</code><span>프로듀서 (키 = 좌석 번호)</span></li>
-        <li><code>src/main/java/dev/deepdive/seat/kafka/SeatReservationConfirmConsumer.java</code><span>Consumer, 실패 시 FailedEvent</span></li>
+        <li><code>README.md</code><span>불변식, 케이스 1~5 설명·시퀀스 다이어그램, 버스트 예시 출력, 재처리 배치(예정안)</span></li>
+        <li><code>src/main/java/dev/deepdive/seat/service/UnsafeSeatReservationService.java</code><span>케이스 1: exists → yield → save (unique 없는 비교군 테이블)</span></li>
+        <li><code>src/main/java/dev/deepdive/seat/core/UnsafeSeatReservation.java</code><span>케이스 1 비교군 엔티티 (<code>unsafe_seat_reservation</code>, unique 없음)</span></li>
+        <li><code>src/main/java/dev/deepdive/seat/redis/SeatHoldStore.java</code><span>Lua 원자 선점, 선점 해제(release), 키 생성 시에만 TTL</span></li>
+        <li><code>src/main/java/dev/deepdive/seat/service/RedisSeatReservationService.java</code><span>케이스 2: 선점 + 동기 DB 확정, DB 결과 반환·실패 시 선점 해제</span></li>
+        <li><code>src/main/java/dev/deepdive/seat/service/RedisKafkaSeatReservationService.java</code><span>케이스 3: 선점 + publish 후 즉시 반환, 전송 실패 콜백에서 선점 해제</span></li>
+        <li><code>src/main/java/dev/deepdive/seat/store/SeatReservationWriter.java</code><span>멱등 저장 + 중복 키 분류 + 느린 DB 흉내(write-delay-millis)</span></li>
+        <li><code>src/main/java/dev/deepdive/seat/kafka/SeatReservationCommandPublisher.java</code><span>프로듀서 (키 = 좌석 번호), 전송 future 반환</span></li>
+        <li><code>src/main/java/dev/deepdive/seat/kafka/SeatReservationConfirmConsumer.java</code><span>Consumer, 파싱·확정 실패 시 FailedEvent</span></li>
         <li><code>src/main/java/dev/deepdive/seat/kafka/KafkaTopicConfig.java</code><span>토픽 생성 (partitions 1), 프로퍼티 게이팅</span></li>
         <li><code>src/main/java/dev/deepdive/seat/core/SeatReservationCommand.java</code><span><code>userId|seatNo</code> 직렬화 record</span></li>
-        <li><code>src/main/java/dev/deepdive/seat/core/SeatReservation.java</code><span>예약 엔티티 (seat_no length 20, unique 없음)</span></li>
-        <li><code>src/main/java/dev/deepdive/seat/core/FailedEvent.java</code><span>확정 실패 기록 엔티티</span></li>
+        <li><code>src/main/java/dev/deepdive/seat/core/SeatReservation.java</code><span>예약 엔티티 (seat_no length 20, <code>seat_no</code>·<code>user_id</code> unique)</span></li>
+        <li><code>src/main/java/dev/deepdive/seat/core/FailedEvent.java</code><span>확정 실패 기록 엔티티 (원문 payload 포함)</span></li>
         <li><code>src/main/resources/application.yml</code><span>Hikari 30, Kafka 직렬화 설정, auto-offset-reset earliest</span></li>
         <li><code>src/test/java/dev/deepdive/seat/service/SeatReservationConcurrencyTest.java</code><span>케이스 1~3 + FailedEvent 테스트</span></li>
         <li><code>src/test/java/dev/deepdive/seat/service/BurstLoadSeatReservationTest.java</code><span>케이스 4 버스트 비교 (풀 2, 250ms, 20ms)</span></li>
+        <li><code>src/test/java/dev/deepdive/seat/service/SeatReservationFailureHandlingTest.java</code><span>케이스 5: 원자적 선점, TTL, unique 경합, 선점 해제, 깨진 메시지</span></li>
+        <li><code>src/test/java/dev/deepdive/seat/service/RedisKafkaSeatReservationServiceUnitTest.java</code><span>케이스 5: Kafka 전송 실패 시 선점 해제 (mock)</span></li>
         <li><code>src/test/java/dev/deepdive/seat/support/KafkaContainerTest.java</code><span>MySQL → Redis → Kafka 컨테이너 상속 체인의 끝</span></li>
       </ul>
     </section>
