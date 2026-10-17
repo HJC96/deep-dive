@@ -151,6 +151,7 @@ ul.plain{margin:6px 0;padding-left:20px}ul.plain li{margin:3px 0}
 <div class="layout">
   <nav class="toc" aria-label="목차">
     <a class="home" href="../index.html">← 전체 모듈</a>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin:0 0 14px"><a class="chip" style="text-decoration:none" href="../changes.html#m-spring">개선 내역</a><a class="chip" style="text-decoration:none" href="../interview.html#m-spring">질문 모음</a></div>
     <ol>
       <li><a href="#tldr">한눈에</a></li>
       <li><a href="#flow">흐름</a></li>
@@ -450,25 +451,25 @@ public PaymentResult recover(TemporaryPaymentException exception, PaymentRequest
     <section id="limits">
       <h2><span class="num">05</span>한계·약점</h2>
       <p class="sub">README가 스스로 밝힌 한계와, 코드에서 확인되는 약점.</p>
-      <details class="qa risk"><summary><span><span class="badge good">README 수정함</span> README에 @Retryable 실험이 없었음</span></summary><div class="a"><p><code>SpringLabApplication</code>에 <code>@EnableRetry</code>, <code>retry/</code> 패키지, <code>RetryableTest</code>가 있었지만 README는 @Async만 다뤘습니다. 지금은 README에 “@Retryable로 재시도할 오류와 하지 않을 오류 나누기” 섹션과 시작점 항목을 추가했습니다.</p></div></details>
-      <details class="qa risk"><summary><span><span class="badge good">README 수정함</span> “springAsyncExecutor도 fixed thread pool 크기 3”</span></summary><div class="a"><p>README 문장을 실제 설정에 맞게 고쳤습니다. 실제로는 <code>ThreadPoolTaskExecutor</code>(core=max=3, <b>queueCapacity 10</b>)입니다. <code>javaExecutorService</code>만 <code>Executors.newFixedThreadPool(3)</code>. 결과적으로 동시 3개는 같지만 큐 동작이 다릅니다.</p></div></details>
-      <details class="qa risk"><summary><span><span class="badge bad">코드</span> 시간 기반 테스트는 환경에 민감</span></summary><div class="a"><p>병렬 &lt; 500ms 단언은 가장 느린 작업 250ms 대비 여유가 250ms뿐입니다. CI가 느리거나 스레드 풀 워밍업이 늦으면 실패할 수 있습니다.</p><p><b>실측 후 그대로 둠</b>: 두 병렬 테스트를 5회 반복 실행한 소요 시간은 모두 255~257ms였습니다(순차는 670ms 이상). 오버헤드가 5ms 남짓이라 250ms 여유는 그 50배이고, 두 스레드 풀 모두 크기 3이라 세 작업이 큐에서 기다리지 않습니다. 기준을 바꿀 근거가 없어 단언은 유지했습니다. 아주 느린 공유 CI에서 문제가 되면 "병렬 &lt; 순차 × 0.7" 같은 상대 비교를 더하는 것이 다음 단계입니다.</p></div></details>
-      <details class="qa risk"><summary><span><span class="badge bad">코드</span> 풀 포화·예외 전파는 실험하지 않음</span></summary><div class="a"><ul><li>작업이 3개뿐이라 큐(10)가 차는 상황, 거절 정책은 다루지 않습니다. 일반 지식: <code>ThreadPoolTaskExecutor</code>는 기본적으로 큐가 차고 max에 도달하면 <code>TaskRejectedException</code>; <code>newFixedThreadPool</code>은 큐가 무제한이라 메모리가 쌓일 수 있음.</li><li>비동기 작업에서 예외가 났을 때 future로 전파되는 방식, <code>void</code> 반환 @Async의 예외 처리(<code>AsyncUncaughtExceptionHandler</code>, 일반 지식)도 없습니다.</li></ul></div></details>
-      <details class="qa risk"><summary><span><span class="badge bad">코드</span> 재시도 설정 일부는 검증되지 않음</span></summary><div class="a"><p>운영 설정 <code>random: true</code>(지터)와 <code>max-delay</code> 상한은 테스트에서 끄거나(random false) 도달하지 않습니다(10→20ms, 상한 40). <code>PaymentGatewayClient</code>는 항상 성공하는 스텁이라 실패는 <code>@MockitoBean</code>으로만 재현됩니다.</p></div></details>
+      <details id="lim-1" class="qa risk"><summary><span><span class="badge good">README 수정함</span> README에 @Retryable 실험이 없었음</span></summary><div class="a"><p><code>SpringLabApplication</code>에 <code>@EnableRetry</code>, <code>retry/</code> 패키지, <code>RetryableTest</code>가 있었지만 README는 @Async만 다뤘습니다. 지금은 README에 “@Retryable로 재시도할 오류와 하지 않을 오류 나누기” 섹션과 시작점 항목을 추가했습니다.</p></div></details>
+      <details id="lim-2" class="qa risk"><summary><span><span class="badge good">README 수정함</span> “springAsyncExecutor도 fixed thread pool 크기 3”</span></summary><div class="a"><p>README 문장을 실제 설정에 맞게 고쳤습니다. 실제로는 <code>ThreadPoolTaskExecutor</code>(core=max=3, <b>queueCapacity 10</b>)입니다. <code>javaExecutorService</code>만 <code>Executors.newFixedThreadPool(3)</code>. 결과적으로 동시 3개는 같지만 큐 동작이 다릅니다.</p></div></details>
+      <details id="lim-3" class="qa risk"><summary><span><span class="badge bad">코드</span> 시간 기반 테스트는 환경에 민감</span></summary><div class="a"><p>병렬 &lt; 500ms 단언은 가장 느린 작업 250ms 대비 여유가 250ms뿐입니다. CI가 느리거나 스레드 풀 워밍업이 늦으면 실패할 수 있습니다.</p><p><b>실측 후 그대로 둠</b>: 두 병렬 테스트를 5회 반복 실행한 소요 시간은 모두 255~257ms였습니다(순차는 670ms 이상). 오버헤드가 5ms 남짓이라 250ms 여유는 그 50배이고, 두 스레드 풀 모두 크기 3이라 세 작업이 큐에서 기다리지 않습니다. 기준을 바꿀 근거가 없어 단언은 유지했습니다. 아주 느린 공유 CI에서 문제가 되면 "병렬 &lt; 순차 × 0.7" 같은 상대 비교를 더하는 것이 다음 단계입니다.</p></div></details>
+      <details id="lim-4" class="qa risk"><summary><span><span class="badge bad">코드</span> 풀 포화·예외 전파는 실험하지 않음</span></summary><div class="a"><ul><li>작업이 3개뿐이라 큐(10)가 차는 상황, 거절 정책은 다루지 않습니다. 일반 지식: <code>ThreadPoolTaskExecutor</code>는 기본적으로 큐가 차고 max에 도달하면 <code>TaskRejectedException</code>; <code>newFixedThreadPool</code>은 큐가 무제한이라 메모리가 쌓일 수 있음.</li><li>비동기 작업에서 예외가 났을 때 future로 전파되는 방식, <code>void</code> 반환 @Async의 예외 처리(<code>AsyncUncaughtExceptionHandler</code>, 일반 지식)도 없습니다.</li></ul></div></details>
+      <details id="lim-5" class="qa risk"><summary><span><span class="badge bad">코드</span> 재시도 설정 일부는 검증되지 않음</span></summary><div class="a"><p>운영 설정 <code>random: true</code>(지터)와 <code>max-delay</code> 상한은 테스트에서 끄거나(random false) 도달하지 않습니다(10→20ms, 상한 40). <code>PaymentGatewayClient</code>는 항상 성공하는 스텁이라 실패는 <code>@MockitoBean</code>으로만 재현됩니다.</p></div></details>
     </section>
 
     <section id="interview">
       <h2><span class="num">06</span>면접 Q&amp;A</h2>
       <p class="sub">질문을 먼저 읽고 스스로 답해 본 뒤 펼쳐 보세요.</p>
       <div class="qa-tools"><button type="button" data-qa="open">모두 펼치기</button><button type="button" data-qa="close">모두 접기</button></div>
-      <details class="qa"><summary>@Async는 어떻게 동작하고, 같은 클래스 안에서 호출하면 왜 비동기가 안 되나요?</summary><div class="a"><p><code>@EnableAsync</code>가 빈을 프록시로 감싸고, 프록시가 호출을 가로채 TaskExecutor에 제출합니다. 같은 객체 안의 <code>this.method()</code>는 프록시를 거치지 않으므로 그냥 호출자 스레드에서 실행됩니다. 이 모듈의 테스트가 스레드 이름이 호출자와 같은 것으로 증명합니다. 해결은 별도 빈 분리(<code>OrderPreparationAsyncService</code>) 또는 ExecutorService 직접 사용.</p></div></details>
-      <details class="qa"><summary>@Async와 ExecutorService는 언제 각각 쓰나요?</summary><div class="a"><ul><li><b>@Async</b>: 서비스 메서드 하나를 간단히 백그라운드로 — 메일·알림 같은 분리 가능한 후처리.</li><li><b>ExecutorService</b>: 여러 작업의 제출·완료·조합을 직접 제어해야 할 때, 프록시 밖 순수 Java 코드, 같은 클래스 내부 호출.</li></ul><p>(README “언제 쓰나” 표 기준)</p></div></details>
-      <details class="qa"><summary>독립 작업 3개를 병렬화했는데 시간이 안 줄었습니다. 무엇을 의심하나요?</summary><div class="a"><ul><li>제출 직후 <code>join()</code>/<code>get()</code>으로 기다리고 있는지 — 이 모듈의 “@Async before” 케이스가 정확히 이 실수입니다.</li><li>self-invocation으로 @Async가 무시됐는지.</li><li>풀 크기가 동시 작업 수보다 작은지(여기선 3으로 맞춤).</li></ul></div></details>
-      <details class="qa"><summary>@Async를 쓸 때 전용 스레드 풀을 직접 정의하는 이유는?</summary><div class="a"><p>스레드 이름(<code>spring-async-</code>)으로 로그 추적이 쉬워지고, core/max/queue로 동시성과 메모리 상한을 통제할 수 있습니다. <span class="badge info">일반 지식</span> 기본 실행기에 의존하면 큐 크기·거절 정책을 통제하기 어렵고, 작업 종류별로 풀을 나눠(bulkhead) 한 작업이 다른 작업을 굶기지 않게 하는 것도 불가능합니다.</p></div></details>
-      <details class="qa"><summary>어떤 예외는 재시도하고 어떤 예외는 하면 안 되나요?</summary><div class="a"><p>일시적 오류(타임아웃, 일시 장애)는 재시도. 요청 자체가 잘못된 경우(<code>InvalidPaymentRequestException</code>)는 몇 번 해도 같으므로 <code>noRetryFor</code>로 즉시 거절. 결제 성공 여부를 모르는 경우(<code>UnknownPaymentStateException</code>)는 재시도는 해도 <code>notRecoverable</code>로 @Recover가 “실패”로 덮지 못하게 예외를 그대로 올려 상위에서 상태 조회·보정을 하게 합니다.</p></div></details>
-      <details class="qa"><summary>결제 API를 재시도할 때 가장 중요한 것은?</summary><div class="a"><p>멱등성입니다. 첫 요청이 실제로는 처리됐는데 응답만 유실됐다면 재시도가 이중 결제를 만듭니다. 이 모듈의 <code>PaymentRequest</code>는 <code>idempotencyKey</code>를 필수로 하고, 테스트는 3번의 시도가 모두 같은 키(<code>payment-order-2</code>)로 호출됐는지 확인합니다.</p></div></details>
-      <details class="qa"><summary>지수 백오프와 지터(random)는 왜 쓰나요?</summary><div class="a"><p>테스트에서 대기는 10ms → 20ms로 배수 증가합니다. <span class="badge info">일반 지식</span> 장애 중인 서버에 즉시·동시에 재시도가 몰리면 회복을 방해하므로 간격을 늘리고(backoff), 여러 클라이언트가 같은 박자로 재시도하지 않도록 무작위성(jitter)을 섞습니다. 이 모듈의 운영 설정은 <code>random: true</code>입니다.</p></div></details>
-      <details class="qa"><summary>@Recover 메서드는 어떻게 선택되나요?</summary><div class="a"><p>첫 파라미터가 던져진 예외 타입, 이후 파라미터가 원래 메서드 인자와 맞는 @Recover 중 가장 구체적인 타입이 선택됩니다. 그래서 <code>TemporaryPaymentException</code>은 전용 recover, 다른 <code>PaymentException</code>은 범용 recover로 갑니다. 코드 주석: “UnknownPaymentStateException에 notRecoverable이 없다면 이 메서드(범용)가 선택된다.”</p></div></details>
+      <details id="iv-1" class="qa"><summary>@Async는 어떻게 동작하고, 같은 클래스 안에서 호출하면 왜 비동기가 안 되나요?</summary><div class="a"><p><code>@EnableAsync</code>가 빈을 프록시로 감싸고, 프록시가 호출을 가로채 TaskExecutor에 제출합니다. 같은 객체 안의 <code>this.method()</code>는 프록시를 거치지 않으므로 그냥 호출자 스레드에서 실행됩니다. 이 모듈의 테스트가 스레드 이름이 호출자와 같은 것으로 증명합니다. 해결은 별도 빈 분리(<code>OrderPreparationAsyncService</code>) 또는 ExecutorService 직접 사용.</p></div></details>
+      <details id="iv-2" class="qa"><summary>@Async와 ExecutorService는 언제 각각 쓰나요?</summary><div class="a"><ul><li><b>@Async</b>: 서비스 메서드 하나를 간단히 백그라운드로 — 메일·알림 같은 분리 가능한 후처리.</li><li><b>ExecutorService</b>: 여러 작업의 제출·완료·조합을 직접 제어해야 할 때, 프록시 밖 순수 Java 코드, 같은 클래스 내부 호출.</li></ul><p>(README “언제 쓰나” 표 기준)</p></div></details>
+      <details id="iv-3" class="qa"><summary>독립 작업 3개를 병렬화했는데 시간이 안 줄었습니다. 무엇을 의심하나요?</summary><div class="a"><ul><li>제출 직후 <code>join()</code>/<code>get()</code>으로 기다리고 있는지 — 이 모듈의 “@Async before” 케이스가 정확히 이 실수입니다.</li><li>self-invocation으로 @Async가 무시됐는지.</li><li>풀 크기가 동시 작업 수보다 작은지(여기선 3으로 맞춤).</li></ul></div></details>
+      <details id="iv-4" class="qa"><summary>@Async를 쓸 때 전용 스레드 풀을 직접 정의하는 이유는?</summary><div class="a"><p>스레드 이름(<code>spring-async-</code>)으로 로그 추적이 쉬워지고, core/max/queue로 동시성과 메모리 상한을 통제할 수 있습니다. <span class="badge info">일반 지식</span> 기본 실행기에 의존하면 큐 크기·거절 정책을 통제하기 어렵고, 작업 종류별로 풀을 나눠(bulkhead) 한 작업이 다른 작업을 굶기지 않게 하는 것도 불가능합니다.</p></div></details>
+      <details id="iv-5" class="qa"><summary>어떤 예외는 재시도하고 어떤 예외는 하면 안 되나요?</summary><div class="a"><p>일시적 오류(타임아웃, 일시 장애)는 재시도. 요청 자체가 잘못된 경우(<code>InvalidPaymentRequestException</code>)는 몇 번 해도 같으므로 <code>noRetryFor</code>로 즉시 거절. 결제 성공 여부를 모르는 경우(<code>UnknownPaymentStateException</code>)는 재시도는 해도 <code>notRecoverable</code>로 @Recover가 “실패”로 덮지 못하게 예외를 그대로 올려 상위에서 상태 조회·보정을 하게 합니다.</p></div></details>
+      <details id="iv-6" class="qa"><summary>결제 API를 재시도할 때 가장 중요한 것은?</summary><div class="a"><p>멱등성입니다. 첫 요청이 실제로는 처리됐는데 응답만 유실됐다면 재시도가 이중 결제를 만듭니다. 이 모듈의 <code>PaymentRequest</code>는 <code>idempotencyKey</code>를 필수로 하고, 테스트는 3번의 시도가 모두 같은 키(<code>payment-order-2</code>)로 호출됐는지 확인합니다.</p></div></details>
+      <details id="iv-7" class="qa"><summary>지수 백오프와 지터(random)는 왜 쓰나요?</summary><div class="a"><p>테스트에서 대기는 10ms → 20ms로 배수 증가합니다. <span class="badge info">일반 지식</span> 장애 중인 서버에 즉시·동시에 재시도가 몰리면 회복을 방해하므로 간격을 늘리고(backoff), 여러 클라이언트가 같은 박자로 재시도하지 않도록 무작위성(jitter)을 섞습니다. 이 모듈의 운영 설정은 <code>random: true</code>입니다.</p></div></details>
+      <details id="iv-8" class="qa"><summary>@Recover 메서드는 어떻게 선택되나요?</summary><div class="a"><p>첫 파라미터가 던져진 예외 타입, 이후 파라미터가 원래 메서드 인자와 맞는 @Recover 중 가장 구체적인 타입이 선택됩니다. 그래서 <code>TemporaryPaymentException</code>은 전용 recover, 다른 <code>PaymentException</code>은 범용 recover로 갑니다. 코드 주석: “UnknownPaymentStateException에 notRecoverable이 없다면 이 메서드(범용)가 선택된다.”</p></div></details>
     </section>
 
     <section id="files">
@@ -534,6 +535,15 @@ public PaymentResult recover(TemporaryPaymentException exception, PaymentRequest
     });},{rootMargin:'-20% 0px -70% 0px'});
     document.querySelectorAll('main section[id]').forEach(function(s){io.observe(s);});
   }
+  function openHash(){
+    var id='';try{id=decodeURIComponent(location.hash.slice(1));}catch(e){}
+    if(!id)return;var el=document.getElementById(id);if(!el)return;
+    var d=el.tagName==='DETAILS'?el:el.closest('details');if(d)d.open=true;
+    var p=el.closest('.tabpanel');
+    if(p&&!p.classList.contains('on')){var b=p.parentElement.querySelector(':scope>.tabs>button[data-target="'+p.id+'"]');if(b)b.click();}
+    setTimeout(function(){el.scrollIntoView({block:'start'});},0);
+  }
+  window.addEventListener('hashchange',openHash);openHash();
 })();
 </script>
 </body>

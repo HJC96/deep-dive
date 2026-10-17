@@ -151,6 +151,7 @@ ul.plain{margin:6px 0;padding-left:20px}ul.plain li{margin:3px 0}
 <div class="layout">
   <nav class="toc" aria-label="목차">
     <a class="home" href="../index.html">← 전체 모듈</a>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin:0 0 14px"><a class="chip" style="text-decoration:none" href="../changes.html#m-payment-system">개선 내역</a><a class="chip" style="text-decoration:none" href="../interview.html#m-payment-system">질문 모음</a></div>
     <ol>
       <li><a href="#tldr">한눈에</a></li>
       <li><a href="#flow">흐름</a></li>
@@ -808,53 +809,53 @@ if (paymentEvent.isWalletUpdateDone()) { return handleWalletUpdate(paymentEvent)
       <p class="sub">README가 스스로 밝힌 한계와 코드에서 확인되는 약점입니다. 각 항목에 <strong>개선 방향</strong>을 붙였으니, 면접에서 "알고 있고 이렇게 고치겠다"로 말하면 됩니다.</p>
 
       <h3>결제 정합성</h3>
-      <details class="qa risk"><summary>복구·릴레이 스케줄러가 실제로는 한 번도 돌지 않는다 <span class="badge good">확실</span></summary><div class="a">
+      <details id="lim-1" class="qa risk"><summary>복구·릴레이 스케줄러가 실제로는 한 번도 돌지 않는다 <span class="badge good">확실</span></summary><div class="a">
         <p>레포 어디에도 <code>@EnableScheduling</code>이 없어서 <code>@Scheduled</code>가 무시됩니다. 게다가 두 서비스 모두 <code>@Profile("dev")</code>인데 dev 프로필을 켜는 설정이 없어서 빈 자체가 만들어지지 않습니다. 그 결과 UNKNOWN이나 멈춘 EXECUTING은 회복되지 않고, AFTER_COMMIT 발행에 실패한 outbox는 영원히 INIT으로 남습니다.</p>
         <p><strong>개선 방향:</strong> 설정 클래스에 <code>@EnableScheduling</code>을 추가하고 프로필 조건을 운영에서도 켜지게 바꿉니다. 여러 인스턴스로 띄울 때는 ShedLock 같은 분산 락이나 <code>SELECT … FOR UPDATE SKIP LOCKED</code>로 중복 실행을 막습니다. 마지막 실행 시각과 처리 건수를 메트릭으로 노출해 "안 도는 스케줄러"를 탐지합니다.</p>
         <p class="source">근거: <code>payment-service/src/main/java/dev/deepdive/paymentsystem/payment/PaymentServiceApplication.java</code>, <code>payment-service/src/main/resources/application.yml</code></p>
       </div></details>
-      <details class="qa risk"><summary>Toss가 ALREADY_PROCESSED_PAYMENT를 주면 SUCCESS로 저장하려다 예외가 난다 <span class="badge good">확실</span></summary><div class="a">
+      <details id="lim-2" class="qa risk"><summary>Toss가 ALREADY_PROCESSED_PAYMENT를 주면 SUCCESS로 저장하려다 예외가 난다 <span class="badge good">확실</span></summary><div class="a">
         <p><code>TossPaymentError.isSuccess()</code>는 이 코드만 true입니다. 그래서 에러 핸들러가 <code>status = SUCCESS</code>, <code>extraDetails = null</code>로 <code>PaymentStatusUpdateCommand</code>를 만들고, 생성자가 "SUCCESS면 extraDetails 필수" 규칙으로 <code>IllegalArgumentException</code>을 던집니다. 결과적으로 응답은 500이 되고 상태는 EXECUTING이나 UNKNOWN에 머뭅니다. 바로 "응답을 잃어버린 뒤 재시도" 시나리오에서 터지는 구멍입니다.</p>
         <p><strong>개선 방향:</strong> 이 경우 Toss 결제 조회 API(paymentKey 기준)로 승인 상세를 다시 받아 정상적인 SUCCESS 경로를 탑니다. 또는 extraDetails 없이 SUCCESS로 전이하는 별도 경로를 만들고 상세는 나중에 보강합니다.</p>
         <p class="source">근거: <code>payment-service/src/main/java/dev/deepdive/paymentsystem/payment/application/service/PaymentErrorHandler.java</code>, <code>payment-service/src/main/java/dev/deepdive/paymentsystem/payment/application/port/out/PaymentStatusUpdateCommand.java</code></p>
       </div></details>
-      <details class="qa risk"><summary>결제수단 enum이 EASY_PAY 하나뿐: 승인 <em>후</em> 매핑 실패로 UNKNOWN <span class="badge good">확실</span> <span class="badge warn">일부 추정</span></summary><div class="a">
+      <details id="lim-3" class="qa risk"><summary>결제수단 enum이 EASY_PAY 하나뿐: 승인 <em>후</em> 매핑 실패로 UNKNOWN <span class="badge good">확실</span> <span class="badge warn">일부 추정</span></summary><div class="a">
         <p><code>PaymentMethod.get</code>은 응답의 method 문자열이 "간편결제"일 때만 성공하고, 나머지는 <code>IllegalStateException</code>을 던집니다(<code>PaymentType</code>도 NORMAL만 허용). 이 예외는 Toss가 <strong>이미 승인한 뒤</strong> 응답을 매핑하다 나므로 "그 외 예외" → UNKNOWN이 됩니다. 이후 재시도하면 Toss가 ALREADY_PROCESSED_PAYMENT를 줄 것이고(<span class="badge warn">추정</span>), 바로 위 버그 때문에 영영 SUCCESS가 되지 못합니다. 카드 결제 응답의 method가 "카드"라는 점은 Toss API에 대한 <span class="badge warn">추정</span>입니다.</p>
         <p><strong>개선 방향:</strong> 모르는 결제수단은 <code>UNKNOWN_METHOD</code>로 받아 <code>psp_raw_data</code>에 원문을 보존합니다. 승인 성공 판정은 PSP status(DONE)만 보고, 부가 정보 매핑 실패가 결제 상태를 바꾸지 않게 분리합니다.</p>
         <p class="source">근거: <code>payment-service/src/main/java/dev/deepdive/paymentsystem/payment/domain/PaymentMethod.java</code></p>
       </div></details>
-      <details class="qa risk"><summary>복구 쿼리의 LIMIT 10이 주문 '행' 단위라 결제가 잘려 FAILURE로 오판될 수 있다 <span class="badge good">확실</span></summary><div class="a">
+      <details id="lim-4" class="qa risk"><summary>복구 쿼리의 LIMIT 10이 주문 '행' 단위라 결제가 잘려 FAILURE로 오판될 수 있다 <span class="badge good">확실</span></summary><div class="a">
         <p><code>LIMIT 10</code>은 payment_orders 조인 <em>행</em>에 걸리고 ORDER BY도 없습니다. 한 결제의 주문 행이 일부만 들어오면 <code>totalAmount</code>가 작아지고, <code>isValid</code>가 금액 불일치를 던져 <strong>FAILURE로 확정</strong>됩니다. 실제로는 PSP가 승인했을 수도 있는 건입니다.</p>
         <p><strong>개선 방향:</strong> 먼저 대상 <code>payment_event_id</code>를 <code>LIMIT</code>으로 뽑고, 그다음 해당 이벤트의 주문 전부를 조회하는 2단계 쿼리로 바꿉니다. 복구 경로에서는 PSP 조회 API로 실제 상태를 확인한 뒤 전이합니다.</p>
         <p class="source">근거: <code>payment-service/src/main/java/dev/deepdive/paymentsystem/payment/adapter/out/persistent/repository/R2DBCPaymentRepository.java</code></p>
       </div></details>
-      <details class="qa risk"><summary>최종 상태 전이가 이전 상태를 확인하지 않고, EXECUTING 중 동시 confirm도 통과한다 <span class="badge good">확실</span></summary><div class="a">
+      <details id="lim-5" class="qa risk"><summary>최종 상태 전이가 이전 상태를 확인하지 않고, EXECUTING 중 동시 confirm도 통과한다 <span class="badge good">확실</span></summary><div class="a">
         <p><code>updatePaymentStatusToSuccess/Failure/Unknown</code>은 <code>WHERE order_id = ?</code>로 무조건 덮어씁니다. 늦게 끝난 요청이 SUCCESS를 UNKNOWN으로 덮는 것도 가능합니다. 진입 검사도 EXECUTING을 허용하므로, 같은 건에 동시 요청 두 개가 모두 PSP까지 갑니다(이중 승인은 Idempotency-Key로 막힌다는 전제, <span class="badge warn">추정</span>). 덧붙여 존재하지 않는 orderId는 EXECUTING 전이가 0행으로 "성공"하고, <code>SUM(amount)</code>가 NULL이라 NPE가 나서 UNKNOWN 응답을 받습니다.</p>
         <p><strong>개선 방향:</strong> 조건부 UPDATE <code>… WHERE order_id = ? AND payment_order_status IN ('EXECUTING','UNKNOWN')</code>를 쓰고, 영향 행 수로 경쟁에서 이겼는지 판정합니다(상태 기반 낙관적 동시성 제어). 주문이 없으면 404로 처리합니다.</p>
       </div></details>
-      <details class="qa risk"><summary>failed_count가 threshold에 닿으면 UNKNOWN인 채 방치된다 <span class="badge good">확실</span></summary><div class="a">
+      <details id="lim-6" class="qa risk"><summary>failed_count가 threshold에 닿으면 UNKNOWN인 채 방치된다 <span class="badge good">확실</span></summary><div class="a">
         <p>조회 조건이 <code>failed_count &lt; threshold</code>뿐이라 한도를 넘긴 건은 조용히 빠지고, 알림이나 다른 처리가 없습니다.</p>
         <p><strong>개선 방향:</strong> 한도를 넘으면 <code>NEEDS_MANUAL_REVIEW</code> 같은 상태나 별도 테이블로 옮기고 알림을 보냅니다. 대사 작업이 PSP 정산 파일과 대조해 최종 상태를 확정합니다.</p>
       </div></details>
 
       <h3>메시지·소비자</h3>
-      <details class="qa risk"><summary>wallet·ledger가 읽는 로컬 payment_orders를 채우는 코드가 없다 <span class="badge good">확실</span></summary><div class="a">
+      <details id="lim-7" class="qa risk"><summary>wallet·ledger가 읽는 로컬 payment_orders를 채우는 코드가 없다 <span class="badge good">확실</span></summary><div class="a">
         <p>두 서비스 모두 자기 DB의 <code>payment_orders</code>를 orderId로 조회합니다. 하지만 메시지 payload에는 <code>orderId</code>만 있고, 이 테이블에 INSERT하는 코드는 어디에도 없습니다(wallet은 schema.sql에도 테이블이 없고 <code>ddl-auto: update</code>로만 생깁니다). 그래서 실제로 돌리면 정산·기장이 <strong>0건인데 SUCCESS 메시지</strong>가 나가고, 결제는 "완료"로 표시됩니다. 테스트는 이 조회를 mock으로 대체해 이 문제를 가립니다.</p>
         <p><strong>개선 방향:</strong> 이벤트 payload에 주문 행(sellerId, amount, paymentOrderId)을 실어 보내는 event-carried state transfer 방식으로 바꿉니다. 또는 조회 결과가 비면 예외를 던져 재시도와 DLQ로 보냅니다.</p>
       </div></details>
-      <details class="qa risk"><summary>지갑이 없는 판매자는 조용히 건너뛴다 <span class="badge good">확실</span></summary><div class="a">
+      <details id="lim-8" class="qa risk"><summary>지갑이 없는 판매자는 조용히 건너뛴다 <span class="badge good">확실</span></summary><div class="a">
         <p><code>getUpdatedWallets</code>는 <em>찾은</em> 지갑만 순회합니다. 주문에 판매자가 있어도 지갑 행이 없으면 그 금액은 정산되지 않은 채 SUCCESS가 됩니다.</p>
         <p><strong>개선 방향:</strong> 조회한 지갑 수와 판매자 수를 비교해 다르면 실패 처리합니다(또는 지갑 자동 생성). 대사로 "결제 합계 = 정산 합계"를 검증합니다.</p>
       </div></details>
-      <details class="qa risk"><summary>소비자 멱등성이 check-then-act라 동시 재전달에 뚫린다 <span class="badge good">확실</span></summary><div class="a">
+      <details id="lim-9" class="qa risk"><summary>소비자 멱등성이 check-then-act라 동시 재전달에 뚫린다 <span class="badge good">확실</span></summary><div class="a">
         <p><code>existsByOrderId</code> → 처리 → 저장 사이에 원자성이 없고 유니크 제약도 없습니다. 같은 메시지가 리밸런스 등으로 두 컨슈머에 동시에 들어가면 이중 정산이나 이중 기장이 됩니다.</p>
         <p><strong>개선 방향:</strong> <code>processed_messages(message_id PK)</code> 또는 거래 테이블 UNIQUE를 같은 로컬 트랜잭션 안에서 INSERT합니다(inbox 패턴).</p>
       </div></details>
-      <details class="qa risk"><summary>결제 완료 판정에 레이스가 있어 is_payment_done이 영구 0일 수 있다 <span class="badge good">확실</span></summary><div class="a">
+      <details id="lim-10" class="qa risk"><summary>결제 완료 판정에 레이스가 있어 is_payment_done이 영구 0일 수 있다 <span class="badge good">확실</span></summary><div class="a">
         <p>③ "결제 완료" 탭의 타임라인처럼, wallet과 ledger 메시지가 같은 스냅샷을 읽으면 둘 다 "아직 아님"으로 판단합니다. 이 판단은 메모리에서 하고, UPDATE는 트랜잭션 없이 나뉘어 나갑니다.</p>
         <p><strong>개선 방향:</strong> 플래그 갱신과 완료 판정을 한 SQL이나 한 트랜잭션에서 DB 조건으로 처리합니다(탭의 예시 SQL). 결제 단위로 순서를 보장할 수 있게 두 응답 토픽을 같은 키로 파티셔닝하는 방법도 있습니다.</p>
       </div></details>
-      <details class="qa risk"><summary>라이브러리 동작에 기대는 부분들 <span class="badge warn">추정</span></summary><div class="a">
+      <details id="lim-11" class="qa risk"><summary>라이브러리 동작에 기대는 부분들 <span class="badge warn">추정</span></summary><div class="a">
         <ul>
           <li><strong>타임아웃 재시도 필터:</strong> WebClient는 요청 단계의 I/O 오류를 <code>WebClientRequestException</code>으로 감쌉니다. 그래서 <code>instanceof TimeoutException</code>이 맞지 않아 즉시 재시도가 안 될 수 있습니다(에러 분류도 "그 외" → UNKNOWN). 개선: <code>Exceptions.unwrap</code>이나 cause 체인을 검사합니다.</li>
           <li><strong>unicast sink + FAIL_FAST:</strong> 여러 스레드가 동시에 <code>emitNext</code>하면 <code>FAIL_NON_SERIALIZED</code>로 발행에 실패할 수 있습니다. 개선: <code>EmitFailureHandler.busyLooping(...)</code>을 쓰거나 직렬화된 발행 경로를 만듭니다.</li>
@@ -865,7 +866,7 @@ if (paymentEvent.isWalletUpdateDone()) { return handleWalletUpdate(paymentEvent)
       </div></details>
 
       <h3>구조·운영</h3>
-      <details class="qa risk"><summary>헥사고날 의존 방향 위반 <span class="badge good">확실</span></summary><div class="a">
+      <details id="lim-12" class="qa risk"><summary>헥사고날 의존 방향 위반 <span class="badge good">확실</span></summary><div class="a">
         <ul>
           <li><code>application/service/PaymentErrorHandler</code>가 <code>adapter.out.persistent.exception.*</code>과 <code>adapter.out.web.toss.exception.PSPConfirmationException</code>, netty <code>TimeoutException</code>을 import합니다. 애플리케이션 계층이 어댑터와 기술 세부를 아는 것입니다.</li>
           <li><code>domain/PaymentEventMessagePublisher</code>가 <code>@Component</code>이고 Spring <code>ApplicationEventPublisher</code>와 <code>TransactionalEventPublisher</code>에 의존합니다.</li>
@@ -873,7 +874,7 @@ if (paymentEvent.isWalletUpdateDone()) { return handleWalletUpdate(paymentEvent)
         </ul>
         <p><strong>개선 방향:</strong> 예외를 <code>application</code>이나 <code>domain</code>에 정의하고 어댑터가 그것으로 변환해 던집니다. 이벤트 발행은 out 포트로 추상화합니다. ArchUnit으로 의존 규칙을 테스트에 고정합니다.</p>
       </div></details>
-      <details class="qa risk"><summary>테스트가 CI에서 하나도 돌지 않고, 일부는 assert가 없다 <span class="badge good">확실</span></summary><div class="a">
+      <details id="lim-13" class="qa risk"><summary>테스트가 CI에서 하나도 돌지 않고, 일부는 assert가 없다 <span class="badge good">확실</span></summary><div class="a">
         <p>10개 클래스 전부 ExternalIntegration 태그라 기본 빌드에서 제외됩니다. Recovery, Relay, Confirm의 Kafka 테스트는 <code>Thread.sleep(10000)</code>만 있고 무엇도 검증하지 않습니다. Testcontainers 의존성은 선언만 되어 있습니다.</p>
         <p><strong>개선 방향:</strong> Testcontainers(MySQL·Kafka)로 바꿔 CI에 넣고, 비동기 검증은 Awaitility로 "결국 SUCCESS가 된다"를 assert합니다. 도메인 규칙(PaymentEvent, TossPaymentError, DoubleLedgerEntry)은 순수 단위 테스트로 분리합니다.</p>
       </div></details>
@@ -884,7 +885,7 @@ if (paymentEvent.isWalletUpdateDone()) { return handleWalletUpdate(paymentEvent)
       <p class="sub">질문을 먼저 읽고 스스로 답해 본 뒤 펼쳐 보세요. <span class="badge info">일반 지식</span> 표시는 이 레포 밖의 일반 개념입니다.</p>
       <div class="qa-tools"><button type="button" data-qa="open">모두 펼치기</button><button type="button" data-qa="close">모두 접기</button></div>
 
-      <details class="qa"><summary>결제·정산·장부를 왜 하나의 트랜잭션(또는 2PC)으로 묶지 않았나요?</summary><div class="a">
+      <details id="iv-1" class="qa"><summary>결제·정산·장부를 왜 하나의 트랜잭션(또는 2PC)으로 묶지 않았나요?</summary><div class="a">
         <ul>
           <li>서비스마다 DB가 다르고(payment_db / wallet_db / ledger_db), 그 사이에 <strong>외부 PSP(Toss)</strong>가 있습니다. Toss는 우리 트랜잭션 코디네이터에 참여할 수 없으니 2PC는 처음부터 불가능합니다.</li>
           <li>2PC는 코디네이터가 장애 나면 참여자가 락을 쥔 채 블로킹되고, 모든 참여자가 XA를 지원해야 하며, 가장 느린 참여자에 맞춰 지연이 늘어납니다. <span class="badge info">일반 지식</span> 이 문제는 같은 레포의 <a href="../distributed-transaction-2pc/overview.html">distributed-transaction-2pc</a> 실험에서 다룹니다.</li>
@@ -892,7 +893,7 @@ if (paymentEvent.isWalletUpdateDone()) { return handleWalletUpdate(paymentEvent)
         </ul>
       </div></details>
 
-      <details class="qa"><summary>트랜잭셔널 아웃박스가 뭔가요? 이 프로젝트에선 어떻게 구현했나요?</summary><div class="a">
+      <details id="iv-2" class="qa"><summary>트랜잭셔널 아웃박스가 뭔가요? 이 프로젝트에선 어떻게 구현했나요?</summary><div class="a">
         <ul>
           <li>"DB 커밋 + 메시지 발행"이라는 dual write 문제의 해법입니다. 이벤트를 같은 DB의 outbox 테이블에 <strong>같은 트랜잭션으로</strong> 써서 원자성을 확보하고, 발행은 나중에 합니다.</li>
           <li>구현: <code>updatePaymentStatusToSuccess</code> 한 트랜잭션에서 상태 SUCCESS + outbox INSERT + 트랜잭션 이벤트 등록 → <code>@TransactionalEventListener(AFTER_COMMIT)</code>에서 즉시 발행 → 브로커 ack 결과로 outbox를 SUCCESS/FAILURE로 표시 → 릴레이가 1분 넘은 INIT/FAILURE를 재발행합니다.</li>
@@ -900,7 +901,7 @@ if (paymentEvent.isWalletUpdateDone()) { return handleWalletUpdate(paymentEvent)
         </ul>
       </div></details>
 
-      <details class="qa"><summary>아웃박스는 같은 메시지를 두 번 보낼 수 있잖아요. 중복은 어떻게 처리하나요?</summary><div class="a">
+      <details id="iv-3" class="qa"><summary>아웃박스는 같은 메시지를 두 번 보낼 수 있잖아요. 중복은 어떻게 처리하나요?</summary><div class="a">
         <ul>
           <li>맞습니다. outbox는 at-least-once라서 <strong>소비자가 멱등</strong>해야 합니다.</li>
           <li>wallet과 ledger는 처리 전에 <code>existsByOrderId</code>로 이미 처리한 orderId인지 봅니다. 이미 처리했으면 저장 없이 SUCCESS 응답만 다시 보냅니다(<code>SettlementServiceTest</code>가 2번 호출해도 1번만 반영됨을 검증).</li>
@@ -908,7 +909,7 @@ if (paymentEvent.isWalletUpdateDone()) { return handleWalletUpdate(paymentEvent)
         </ul>
       </div></details>
 
-      <details class="qa"><summary>PSP 호출이 타임아웃 나면 왜 FAILURE가 아니라 UNKNOWN인가요?</summary><div class="a">
+      <details id="iv-4" class="qa"><summary>PSP 호출이 타임아웃 나면 왜 FAILURE가 아니라 UNKNOWN인가요?</summary><div class="a">
         <ul>
           <li>타임아웃은 "요청이 PSP에 안 갔다"일 수도, "승인됐는데 응답만 못 받았다"일 수도 있습니다. FAILURE로 확정하면 후자에서 <strong>돈은 빠졌는데 주문은 실패</strong>가 됩니다.</li>
           <li>그래서 <code>PaymentErrorHandler</code>는 타임아웃과 분류 안 된 모든 예외를 UNKNOWN으로 두고 <code>failed_count</code>를 올립니다. UNKNOWN은 같은 Idempotency-Key로 다시 승인을 시도하는 복구 대상입니다.</li>
@@ -916,7 +917,7 @@ if (paymentEvent.isWalletUpdateDone()) { return handleWalletUpdate(paymentEvent)
         </ul>
       </div></details>
 
-      <details class="qa"><summary>어떤 에러를 재시도하고, 왜 지수 백오프 + jitter를 썼나요?</summary><div class="a">
+      <details id="iv-5" class="qa"><summary>어떤 에러를 재시도하고, 왜 지수 백오프 + jitter를 썼나요?</summary><div class="a">
         <ul>
           <li>재시도 대상은 <code>isRetryableError()</code>(= UNKNOWN 계열: PROVIDER_ERROR, CARD_PROCESSING_ERROR, FAILED_INTERNAL_SYSTEM_PROCESSING 등)와 netty 타임아웃입니다. 잔액 부족이나 카드 거절 같은 <strong>확정 실패는 재시도해도 결과가 같으니</strong> 제외합니다.</li>
           <li><code>Retry.backoff(2, 1s).jitter(0.1)</code>: 간격을 지수로 늘려 장애 중인 PSP에 부하를 덜 주고, jitter로 여러 요청의 재시도 시점을 흩어 동시에 몰리지 않게 합니다. <span class="badge info">일반 지식</span></li>
@@ -924,7 +925,7 @@ if (paymentEvent.isWalletUpdateDone()) { return handleWalletUpdate(paymentEvent)
         </ul>
       </div></details>
 
-      <details class="qa"><summary>같은 결제가 두 번 승인되지 않도록 어떤 장치를 겹겹이 두었나요?</summary><div class="a">
+      <details id="iv-6" class="qa"><summary>같은 결제가 두 번 승인되지 않도록 어떤 장치를 겹겹이 두었나요?</summary><div class="a">
         <ul>
           <li>체크아웃: orderId를 요청 해시(UUID v3)로 만들고 <code>uk_payment_events_order_id</code>로 막습니다.</li>
           <li>confirm: <code>checkPreviousPaymentOrderStatus</code>가 SUCCESS·FAILURE면 <code>PaymentAlreadyProcessedException</code>을 던지고, 현재 상태만 돌려줍니다(DB 갱신 없음).</li>
@@ -934,7 +935,7 @@ if (paymentEvent.isWalletUpdateDone()) { return handleWalletUpdate(paymentEvent)
         </ul>
       </div></details>
 
-      <details class="qa"><summary>지갑 정산에 왜 낙관적 락을 썼나요? 다른 선택지와 비교하면?</summary><div class="a">
+      <details id="iv-7" class="qa"><summary>지갑 정산에 왜 낙관적 락을 썼나요? 다른 선택지와 비교하면?</summary><div class="a">
         <ul>
           <li>문제는 같은 판매자 지갑에 정산이 동시에 몰릴 때의 Lost Update입니다. <code>@Version</code>으로 충돌을 감지하고, 최신 잔액을 다시 읽어 이번 금액만 더해 최대 3회(0~100ms 랜덤 대기) 재시도합니다.</li>
           <li>근거: <code>JpaWalletRepositoryTest</code>가 스레드 3개 동시 저장 후 version 3, 잔액 6000을 5회 반복 검증합니다.</li>
@@ -942,7 +943,7 @@ if (paymentEvent.isWalletUpdateDone()) { return handleWalletUpdate(paymentEvent)
         </ul>
       </div></details>
 
-      <details class="qa"><summary>Kafka에서 같은 결제의 이벤트 순서는 어떻게 보장하나요?</summary><div class="a">
+      <details id="iv-8" class="qa"><summary>Kafka에서 같은 결제의 이벤트 순서는 어떻게 보장하나요?</summary><div class="a">
         <ul>
           <li>Kafka는 <strong>파티션 안에서만</strong> 순서를 보장합니다. <span class="badge info">일반 지식</span> 그래서 <code>PartitionKeyUtil</code>이 <code>abs(orderId.hashCode()) % 6</code>을 outbox metadata에 저장하고, 발행할 때 <code>KafkaHeaders.PARTITION</code>으로 지정합니다. 같은 orderId는 항상 같은 파티션으로 갑니다. <code>PaymentEventMessageSenderTest</code>가 이를 검증합니다.</li>
           <li>한계: 메시지 key가 없고 파티션 수 6을 코드에 박아 두어서, 토픽 파티션 수를 바꾸면 깨집니다. 지금은 이벤트 타입이 하나뿐이라 순서 문제가 실제로 드러나는 시나리오도 없습니다. 소비 측(payment의 <code>flatMap</code>)은 병렬이라 순서를 지키지 않습니다.</li>
@@ -950,7 +951,7 @@ if (paymentEvent.isWalletUpdateDone()) { return handleWalletUpdate(paymentEvent)
         </ul>
       </div></details>
 
-      <details class="qa"><summary>DLQ는 어떻게 동작하나요?</summary><div class="a">
+      <details id="iv-9" class="qa"><summary>DLQ는 어떻게 동작하나요?</summary><div class="a">
         <ul>
           <li>설정상 wallet·ledger 소비자는 <code>max-attempts: 5</code> 후 <code>payment_wallet_dlq</code> / <code>payment_ledger_dlq</code>로 격리됩니다. payment 쪽 응답 소비자도 <code>wallet_payment_dlq</code> 등이 설정되어 있습니다.</li>
           <li>솔직한 상태: <strong>설정만 있습니다.</strong> DLQ를 모니터링하거나 재처리하는 코드가 없고, 토픽 자동 생성이 꺼져 있어 DLQ 토픽도 미리 만들어야 합니다. payment의 리액티브 소비자에는 바인더 재시도와 DLQ가 기대대로 적용되지 않을 수 있습니다(<span class="badge warn">추정</span>).</li>
@@ -958,7 +959,7 @@ if (paymentEvent.isWalletUpdateDone()) { return handleWalletUpdate(paymentEvent)
         </ul>
       </div></details>
 
-      <details class="qa"><summary>복식부기와 append-only 장부는 왜 쓰나요? 여기선 어떻게 강제하나요?</summary><div class="a">
+      <details id="iv-10" class="qa"><summary>복식부기와 append-only 장부는 왜 쓰나요? 여기선 어떻게 강제하나요?</summary><div class="a">
         <ul>
           <li>모든 돈의 이동을 차변·대변 한 쌍으로 같은 금액만큼 기록하면, 총합이 0이 아닐 때 오류를 즉시 알 수 있고 "어디서 어디로"가 추적됩니다. 수정이나 삭제 대신 반대 분개를 추가해서 감사 추적을 보존합니다. <span class="badge info">일반 지식</span></li>
           <li>여기서는 주문마다 REVENUE CREDIT + ITEM_BUYER DEBIT을 만들고, <code>DoubleLedgerEntry</code> 생성자가 금액이 같은지 검사합니다. DB 트리거(SIGNAL 45000)로 UPDATE와 DELETE를 막습니다.</li>
@@ -966,7 +967,7 @@ if (paymentEvent.isWalletUpdateDone()) { return handleWalletUpdate(paymentEvent)
         </ul>
       </div></details>
 
-      <details class="qa"><summary>대사(Reconciliation)는 어떻게 설계하겠어요?</summary><div class="a">
+      <details id="iv-11" class="qa"><summary>대사(Reconciliation)는 어떻게 설계하겠어요?</summary><div class="a">
         <ul>
           <li>현재: README에 계획만 있고 코드는 없습니다.</li>
           <li>설계안 <span class="badge info">일반 지식</span>: ① 내부 대사: 일 단위로 payment SUCCESS 합계 = wallet 정산 합계 = ledger CREDIT 합계를 orderId 단위로 대조합니다. ② 외부 대사: PSP 정산 파일이나 조회 API와 payment 상태를 대조해서 UNKNOWN이나 threshold를 초과한 건의 최종 상태를 확정합니다. ③ 불일치는 자동 보정(이벤트 재발행, 반대 분개)이나 수동 검토 큐로 보냅니다.</li>
@@ -974,7 +975,7 @@ if (paymentEvent.isWalletUpdateDone()) { return handleWalletUpdate(paymentEvent)
         </ul>
       </div></details>
 
-      <details class="qa"><summary>wallet과 ledger가 둘 다 끝났는지를 Payment는 어떻게 아나요? 문제는 없나요?</summary><div class="a">
+      <details id="iv-12" class="qa"><summary>wallet과 ledger가 둘 다 끝났는지를 Payment는 어떻게 아나요? 문제는 없나요?</summary><div class="a">
         <ul>
           <li>각자 처리 후 <code>wallet</code>/<code>ledger</code> 토픽으로 SUCCESS를 보내면, payment가 해당 플래그를 세우고 둘 다 서 있으면 <code>is_payment_done</code>을 세웁니다. 오프셋은 처리 후 <code>ReceiverOffset.commit()</code>으로 수동 커밋합니다.</li>
           <li>문제: 두 메시지가 동시에 오면 둘 다 "상대가 아직"이라고 판단해 완료 플래그가 영구히 안 섭니다. 판단은 메모리 스냅샷에서 하고, UPDATE에는 트랜잭션이 없습니다.</li>
@@ -982,7 +983,7 @@ if (paymentEvent.isWalletUpdateDone()) { return handleWalletUpdate(paymentEvent)
         </ul>
       </div></details>
 
-      <details class="qa"><summary>(꼬리 질문) 복구 스케줄러, 실제로 돌려 보셨어요?</summary><div class="a">
+      <details id="iv-13" class="qa"><summary>(꼬리 질문) 복구 스케줄러, 실제로 돌려 보셨어요?</summary><div class="a">
         <ul>
           <li>정직하게 답합니다. "코드를 다시 보니 <code>@EnableScheduling</code>이 없고 <code>@Profile("dev")</code>도 활성화하지 않아서 실제로는 돌지 않습니다. 테스트는 메서드를 직접 호출했고, assert 없이 sleep만 해서 이 문제를 못 잡았습니다."</li>
           <li>배운 점: "스케줄러나 비동기 경로는 <strong>실행됐다는 증거</strong>(메트릭, 로그)와 <strong>결과 assert</strong>(Awaitility)가 있어야 한다. 테스트를 메서드 직접 호출로만 짜면 배선(wiring) 오류를 못 잡는다."</li>
@@ -990,7 +991,7 @@ if (paymentEvent.isWalletUpdateDone()) { return handleWalletUpdate(paymentEvent)
         </ul>
       </div></details>
 
-      <details class="qa"><summary>payment는 왜 WebFlux/R2DBC이고 wallet·ledger는 MVC/JPA인가요? 구조는 왜 헥사고날인가요?</summary><div class="a">
+      <details id="iv-14" class="qa"><summary>payment는 왜 WebFlux/R2DBC이고 wallet·ledger는 MVC/JPA인가요? 구조는 왜 헥사고날인가요?</summary><div class="a">
         <ul>
           <li>payment는 외부 PSP 호출(최대 30초 타임아웃)을 기다리는 I/O 중심 서비스라 논블로킹이 스레드를 덜 씁니다. wallet·ledger는 DB 트랜잭션과 낙관적 락이 핵심이라 JPA·블로킹이 단순합니다(각 build.gradle 주석에 의도가 적혀 있음).</li>
           <li>대가: R2DBC는 JPA가 없어서 <code>DatabaseClient</code>로 SQL을 직접 쓰고, 리액티브 트랜잭션과 이벤트 연동(<code>TransactionalEventPublisher</code>)이 까다롭습니다. 일부 INSERT는 문자열 포맷으로 SQL을 만듭니다.</li>
@@ -1178,6 +1179,15 @@ if (paymentEvent.isWalletUpdateDone()) { return handleWalletUpdate(paymentEvent)
     });},{rootMargin:'-20% 0px -70% 0px'});
     document.querySelectorAll('main section[id]').forEach(function(s){io.observe(s);});
   }
+  function openHash(){
+    var id='';try{id=decodeURIComponent(location.hash.slice(1));}catch(e){}
+    if(!id)return;var el=document.getElementById(id);if(!el)return;
+    var d=el.tagName==='DETAILS'?el:el.closest('details');if(d)d.open=true;
+    var p=el.closest('.tabpanel');
+    if(p&&!p.classList.contains('on')){var b=p.parentElement.querySelector(':scope>.tabs>button[data-target="'+p.id+'"]');if(b)b.click();}
+    setTimeout(function(){el.scrollIntoView({block:'start'});},0);
+  }
+  window.addEventListener('hashchange',openHash);openHash();
 })();
 </script>
 </body>

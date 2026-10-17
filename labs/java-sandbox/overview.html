@@ -151,6 +151,7 @@ ul.plain{margin:6px 0;padding-left:20px}ul.plain li{margin:3px 0}
 <div class="layout">
   <nav class="toc" aria-label="목차">
     <a class="home" href="../index.html">← 전체 모듈</a>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin:0 0 14px"><a class="chip" style="text-decoration:none" href="../changes.html#m-java-sandbox">개선 내역</a><a class="chip" style="text-decoration:none" href="../interview.html#m-java-sandbox">질문 모음</a></div>
     <ol>
       <li><a href="#tldr">한눈에</a></li>
       <li><a href="#flow">흐름</a></li>
@@ -510,27 +511,27 @@ public static LazyHolderSingleton getInstance() {
       </ul>
 
       <h3><span class="badge bad">코드·문서 분석</span></h3>
-      <details class="qa risk"><summary>repeated에서 새로 만든 Provider가 실제 암호화에 쓰이는가? — 쓰이지 않음, 확인함 <span class="badge good">수정함</span></summary><div class="a">
+      <details id="lim-1" class="qa risk"><summary>repeated에서 새로 만든 Provider가 실제 암호화에 쓰이는가? — 쓰이지 않음, 확인함 <span class="badge good">수정함</span></summary><div class="a">
         <p><b>확인 결과</b> (<code>ProviderRegistrationTest</code>): BC가 이미 있으면 <code>Security.addProvider(new BouncyCastleProvider())</code>는 <b>-1</b>을 돌려주고 목록을 바꾸지 않습니다. <code>AesUtilBefore.encrypt</code>를 여러 번 불러도 이름이 BC인 Provider는 처음 그 인스턴스 하나이고, <code>Cipher.getInstance(T, "BC").getProvider()</code>는 그 등록 인스턴스와 같은 객체입니다. 매번 만든 Provider는 할당 비용(op당 약 2.85MB)만 남기고 버려집니다.</p>
         <p><b>해석에 주는 영향</b>: repeated도 once와 같은 공유 인스턴스의 <code>synchronized getService</code>를 거칩니다. 그런데도 ×6.7로 확장되는 것은 경합 지점이 없어서가 아니라 할당 비용이 압도적이라 경합이 묻히기 때문입니다. README "매번 만든 Provider는 암호화에 쓰이지 않는다" 절과 해석 2)에 반영했습니다.</p>
         <p>원래 분석: <code>AesUtilBefore</code>는 새 인스턴스를 <code>addProvider</code>한 뒤 <b>이름</b> <code>"BC"</code>로 <code>Cipher.getInstance</code>합니다. 같은 이름이 이미 등록돼 있으면 <code>addProvider</code>는 추가하지 않으므로(<span class="badge info">일반 지식</span>), 암호화에는 처음 등록된 인스턴스가 쓰이고 새 인스턴스는 버려질 가능성이 높습니다. 그렇다면 repeated도 공유 Provider의 <code>getService</code>를 거치는 셈인데, 이를 검증한 측정은 저장소에 없습니다. 면접에서는 "확인 필요"로 답하는 게 안전합니다.</p>
       </div></details>
-      <details class="qa risk"><summary>Javadoc의 실행 경로가 틀림: <code>:labs:java-sandbox:jmh</code> <span class="badge good">수정함</span></summary><div class="a">
+      <details id="lim-2" class="qa risk"><summary>Javadoc의 실행 경로가 틀림: <code>:labs:java-sandbox:jmh</code> <span class="badge good">수정함</span></summary><div class="a">
         <p><b>어떻게 고쳤나</b>: javadoc을 <code>./gradlew :java-sandbox:jmh</code>로 바꿨습니다.</p>
         <p><code>AesProviderRegistrationSingleThreadBenchmark</code> javadoc은 <code>./gradlew :labs:java-sandbox:jmh</code>라고 적지만, <code>settings.gradle</code>은 프로젝트를 <code>:java-sandbox</code>로 등록합니다. README와 EightThreads javadoc의 <code>:java-sandbox:jmh</code>가 맞습니다.</p>
       </div></details>
-      <details class="qa risk"><summary>오차 설명 불일치: javadoc "±95% 신뢰구간" vs README "99.9% 신뢰구간" <span class="badge good">수정함</span></summary><div class="a">
+      <details id="lim-3" class="qa risk"><summary>오차 설명 불일치: javadoc "±95% 신뢰구간" vs README "99.9% 신뢰구간" <span class="badge good">수정함</span></summary><div class="a">
         <p><b>어떻게 고쳤나</b>: javadoc을 "99.9% 신뢰구간의 절반(JMH 기본값)"으로 바꿨습니다. 실제 JMH 출력도 <code>±(99.9%)</code>, <code>CI (99.9%)</code>로 찍힙니다.</p>
         <p>SingleThread javadoc은 Error를 "±95% 신뢰구간"이라 하고, README는 "99.9% 신뢰구간의 절반"이라 합니다. JMH 기본 출력은 99.9% 신뢰구간입니다 <span class="badge info">일반 지식</span>.</p>
       </div></details>
-      <details class="qa risk"><summary>EightThreads javadoc이 once 경로를 <code>Cipher.getInstance(..., "BC")</code>로 설명 <span class="badge good">수정함</span></summary><div class="a">
+      <details id="lim-4" class="qa risk"><summary>EightThreads javadoc이 once 경로를 <code>Cipher.getInstance(..., "BC")</code>로 설명 <span class="badge good">수정함</span></summary><div class="a">
         <p><b>어떻게 고쳤나</b>: once 경로는 <code>AesUtilAfter</code>의 <code>Cipher.getInstance(TRANSFORMATION, provider)</code>(객체로 찾음)로, repeated 경로는 이름 <code>"BC"</code>로 찾은 등록 인스턴스를 쓴다고 나눠 적었습니다.</p>
         <p>once 경로(<code>AesUtilAfter</code>)는 이름 <code>"BC"</code>가 아니라 Provider 객체로 <code>getInstance</code>합니다. 경합 지점(<code>getService</code>)에 대한 결론은 같지만 설명이 코드와 다릅니다.</p>
       </div></details>
-      <details class="qa risk"><summary>통계적 근거가 얇다: fork 1, 측정 5회</summary><div class="a">
+      <details id="lim-5" class="qa risk"><summary>통계적 근거가 얇다: fork 1, 측정 5회</summary><div class="a">
         <p>fork 1 × 5 iteration은 JVM 간 편차를 보지 못합니다. README도 once 8스레드 값이 크게 흔들렸다고 적습니다. 결론의 "방향"(수백~천 배 차이, 확장 배수 역전)은 크지만, 정확한 배수를 인용할 때는 단서를 붙이세요.</p>
       </div></details>
-      <details class="qa risk"><summary>README가 AES 실험만 다룬다 <span class="badge good">수정함</span></summary><div class="a">
+      <details id="lim-6" class="qa risk"><summary>README가 AES 실험만 다룬다 <span class="badge good">수정함</span></summary><div class="a">
         <p><b>어떻게 고쳤나</b>: README에 "그 밖의 예제" 절을 추가해 제네릭·가변인자·컬렉션 팩토리·record·리플렉션·LazyHolder 싱글턴·파사드 각각의 코드·테스트 파일과 테스트가 보여 주는 내용을 표로 정리했습니다.</p>
         <p>원래 제네릭·가변인자·컬렉션 팩토리·record·리플렉션·싱글턴·파사드 예제는 README에 설명이 없고, 코드 주석과 테스트 이름이 유일한 문서입니다(이 페이지의 "그 밖의 예제" 탭 참고). 측정 수치 없음 — 모두 동작을 단언하는 단위 테스트입니다.</p>
       </div></details>
@@ -541,7 +542,7 @@ public static LazyHolderSingleton getInstance() {
       <p class="sub">질문을 먼저 읽고 스스로 답해 본 뒤 펼쳐 보세요.</p>
       <div class="qa-tools"><button type="button" data-qa="open">모두 펼치기</button><button type="button" data-qa="close">모두 접기</button></div>
 
-      <details class="qa"><summary>왜 System.nanoTime 루프 대신 JMH를 썼나요?</summary><div class="a">
+      <details id="iv-1" class="qa"><summary>왜 System.nanoTime 루프 대신 JMH를 썼나요?</summary><div class="a">
         <ul>
           <li>JIT 워밍업: 초반 인터프리터 구간이 평균을 왜곡 → <code>@Warmup</code>으로 제외.</li>
           <li>죽은 코드 제거: 결과를 안 쓰면 JIT가 호출을 지움 → <code>Blackhole.consume</code>.</li>
@@ -549,14 +550,14 @@ public static LazyHolderSingleton getInstance() {
           <li>근거: SingleThread 벤치마크 javadoc "왜 직접 재지 않고 JMH를 쓰나".</li>
         </ul>
       </div></details>
-      <details class="qa"><summary>repeated가 1,500배 가까이 느린 원인을 어떻게 확정했나요?</summary><div class="a">
+      <details id="iv-2" class="qa"><summary>repeated가 1,500배 가까이 느린 원인을 어떻게 확정했나요?</summary><div class="a">
         <ul>
           <li>추측(객체 생성 비용)을 <code>-prof gc</code>로 검증: <code>gc.alloc.rate.norm</code> repeated 2,848,583 B/op vs once 4,032 B/op.</li>
           <li>범인은 암호화 연산이 아니라 매 호출 <code>new BouncyCastleProvider()</code>(수백 개 알고리즘 매핑을 채우는 생성자).</li>
           <li>교훈: 무거운 객체는 한 번 만들어 재사용·주입.</li>
         </ul>
       </div></details>
-      <details class="qa"><summary>빠른 once가 8스레드에서 ×1.4밖에 확장되지 않은 이유는?</summary><div class="a">
+      <details id="iv-3" class="qa"><summary>빠른 once가 8스레드에서 ×1.4밖에 확장되지 않은 이유는?</summary><div class="a">
         <ul>
           <li><code>-prof stack</code>: 51% BLOCKED, 그중 99.9%가 <code>BouncyCastleProvider.getService</code>.</li>
           <li>getService는 DCL 구조지만 null 결과를 캐시하지 않아, <code>Cipher.getInstance</code>가 조회하는 이름 변형 중 매칭 없는 키는 매번 <code>synchronized</code>에 들어감 → 공유 Provider 하나에 8스레드가 줄 섬 (README 분석).</li>
@@ -564,7 +565,7 @@ public static LazyHolderSingleton getInstance() {
           <li>프로파일 전 가설("JCE 내부 검증")이 틀렸다는 점도 README에 기록 — 측정의 가치.</li>
         </ul>
       </div></details>
-      <details class="qa"><summary>운영에서 once의 경합까지 줄이려면 어떤 선택지가 있나요?</summary><div class="a">
+      <details id="iv-4" class="qa"><summary>운영에서 once의 경합까지 줄이려면 어떤 선택지가 있나요?</summary><div class="a">
         <ul>
           <li>README는 "관찰까지만"이라 저장소에 검증된 해법은 없음. 아래는 아이디어 수준(검증 필요).</li>
           <li>스레드별 <code>Cipher</code> 재사용(<code>ThreadLocal</code>) → <code>getInstance</code> 호출 자체를 줄임. <code>Cipher</code>는 스레드 안전하지 않으므로 공유 금지 <span class="badge info">일반 지식</span>.</li>
@@ -572,33 +573,33 @@ public static LazyHolderSingleton getInstance() {
           <li>무엇이든 바꾼 뒤 같은 JMH·프로파일로 재측정.</li>
         </ul>
       </div></details>
-      <details class="qa"><summary>static 유틸 대신 생성자 주입으로 바꾼 설계상 이점은?</summary><div class="a">
+      <details id="iv-5" class="qa"><summary>static 유틸 대신 생성자 주입으로 바꾼 설계상 이점은?</summary><div class="a">
         <ul>
           <li>전역 상태(<code>Security</code> 등록)와 비즈니스 로직(암호화) 분리 → 등록은 애플리케이션 초기화에서 1회.</li>
           <li>테스트 용이성: <code>new AesUtilAfter(new BouncyCastleProvider())</code>로 전역 상태를 건드리지 않고 생성.</li>
           <li>스프링이라면 Provider나 <code>AesUtilAfter</code>를 빈으로 등록해 주입하는 형태와 자연스럽게 연결.</li>
         </ul>
       </div></details>
-      <details class="qa"><summary>JMH 결과의 Score, Error, Cnt는 어떻게 읽나요?</summary><div class="a">
+      <details id="iv-6" class="qa"><summary>JMH 결과의 Score, Error, Cnt는 어떻게 읽나요?</summary><div class="a">
         <ul>
           <li>Mode <code>thrpt</code> = 처리량, Units <code>ops/s</code>는 클수록 빠름. <code>@Threads(8)</code>의 값은 8스레드 합계.</li>
           <li>Cnt = 집계된 측정 반복 수(5), 워밍업 제외.</li>
           <li>Error = 신뢰구간 절반. JMH 기본은 99.9%(출력의 <code>±(99.9%)</code>). javadoc의 95% 표기는 99.9%로 고쳤습니다.</li>
         </ul>
       </div></details>
-      <details class="qa"><summary>(기타 예제) <code>List&lt;? extends T&gt;</code>와 <code>List&lt;? super T&gt;</code>는 언제 쓰나요?</summary><div class="a">
+      <details id="iv-7" class="qa"><summary>(기타 예제) <code>List&lt;? extends T&gt;</code>와 <code>List&lt;? super T&gt;</code>는 언제 쓰나요?</summary><div class="a">
         <ul>
           <li>PECS: Producer Extends, Consumer Super. 꺼내 읽으면 extends(<code>sum</code>), 넣으면 super(<code>addDefaultScores</code>).</li>
           <li><code>&lt;?&gt;</code>는 아무 타입이나 받지만 넣을 수 없고, <code>&lt;Object&gt;</code>는 정확히 Object 컨테이너만 받음 — 제네릭은 무공변.</li>
         </ul>
       </div></details>
-      <details class="qa"><summary>(기타 예제) List.of, Collections.unmodifiableList, List.copyOf의 차이는?</summary><div class="a">
+      <details id="iv-8" class="qa"><summary>(기타 예제) List.of, Collections.unmodifiableList, List.copyOf의 차이는?</summary><div class="a">
         <ul>
           <li>셋 다 구조 변경 불가. <code>unmodifiableList</code>는 원본의 view라 원본 변경이 보이고, <code>copyOf</code>/<code>of</code>는 별도 리스트.</li>
           <li><code>List.of</code>는 null 불가, 요소 객체를 deep copy하지 않음. record compact constructor에서 <code>List.copyOf</code>로 방어적 복사하는 이유.</li>
         </ul>
       </div></details>
-      <details class="qa"><summary>(기타 예제) LazyHolder 싱글턴이 synchronized 없이 스레드 안전한 이유는?</summary><div class="a">
+      <details id="iv-9" class="qa"><summary>(기타 예제) LazyHolder 싱글턴이 synchronized 없이 스레드 안전한 이유는?</summary><div class="a">
         <ul>
           <li>중첩 클래스 <code>Holder</code>는 <code>getInstance()</code> 첫 호출 시 초기화되고, 클래스 초기화는 JVM이 한 번만, 스레드 안전하게 수행 <span class="badge info">일반 지식: JLS 클래스 초기화</span>.</li>
           <li>테스트: 100번 동시 호출해도 인스턴스 1개.</li>
@@ -674,6 +675,15 @@ public static LazyHolderSingleton getInstance() {
     });},{rootMargin:'-20% 0px -70% 0px'});
     document.querySelectorAll('main section[id]').forEach(function(s){io.observe(s);});
   }
+  function openHash(){
+    var id='';try{id=decodeURIComponent(location.hash.slice(1));}catch(e){}
+    if(!id)return;var el=document.getElementById(id);if(!el)return;
+    var d=el.tagName==='DETAILS'?el:el.closest('details');if(d)d.open=true;
+    var p=el.closest('.tabpanel');
+    if(p&&!p.classList.contains('on')){var b=p.parentElement.querySelector(':scope>.tabs>button[data-target="'+p.id+'"]');if(b)b.click();}
+    setTimeout(function(){el.scrollIntoView({block:'start'});},0);
+  }
+  window.addEventListener('hashchange',openHash);openHash();
 })();
 </script>
 </body>
