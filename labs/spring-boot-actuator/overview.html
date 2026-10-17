@@ -174,7 +174,7 @@ ul.plain{margin:6px 0;padding-left:20px}ul.plain li{margin:3px 0}
       <p class="sub">30초 요약</p>
       <div class="grid c3">
         <div class="card bad"><div class="label">문제</div><p>로그만으로는 “지금 트래픽을 받아도 되나”, “어느 버전이 떠 있나”, “p99가 얼마나 느린가”에 답할 수 없습니다.</p></div>
-        <div class="card"><div class="label">접근</div><p>관리 포트 9090에 health·info·metrics·features만 노출. 섹션마다 앱 API를 호출 → <code>/actuator/metrics/{name}?tag=k:v</code>로 값 변화를 관찰(README + Postman, 자동 테스트는 contextLoads뿐).</p></div>
+        <div class="card"><div class="label">접근</div><p>관리 포트 9090에 health·info·metrics·features만 노출. 섹션마다 앱 API를 호출 → <code>/actuator/metrics/{name}?tag=k:v</code>로 값 변화를 관찰(README + Postman). 대표 동작은 <code>ActuatorEndpointTest</code>·<code>CustomMetricsTest</code>가 HTTP로 검증.</p></div>
         <div class="card good"><div class="label">결론</div><p>질문에 맞는 타입을 고르는 것이 핵심: <b>상태</b>=Health, <b>버전</b>=Info, <b>횟수</b>=Counter, <b>현재 개수</b>=Gauge, <b>시간</b>=Timer, <b>꼬리 지연</b>=Percentile. 태그는 값 종류가 적은 것만.</p></div>
       </div>
     </section>
@@ -280,29 +280,30 @@ builder.withDetail("release", new ReleaseInfo(
         </div>
         <div class="tabpanel card" id="ac-t2">
           <h3>Counter · @Counted · Tags <span class="badge info">횟수</span></h3>
-          <pre><code>// NotificationService 생성자
-this.notificationSentCounter = Counter.builder("app.notification.sent")
-        .register(meterRegistry);                       // 태그 없음
-this.emailNotificationCounter = Counter.builder("app.notification.sent")
-        .tag("channel", "email")
-        .tag("region", "kr")
-        .register(meterRegistry);
-// ... sms도 동일
+          <pre><code>// NotificationService 생성자 — 태그 없는 "전체" counter는 두지 않는다
+this.emailNotificationCounter = sentCounter(meterRegistry, "email");
+this.smsNotificationCounter = sentCounter(meterRegistry, "sms");
+this.otherNotificationCounter = sentCounter(meterRegistry, "other"); // 나머지 channel 값
+
+private static Counter sentCounter(MeterRegistry meterRegistry, String channel) {
+    return Counter.builder("app.notification.sent")
+            .tag("channel", channel)
+            .tag("region", "kr")
+            .register(meterRegistry);
+}
 
 @Counted(value = "app.notification.requested", description = "알림 발송 요청 횟수")
 public NotificationReceipt send(String channel, String recipient, String message) {
     NotificationReceipt receipt = new NotificationReceipt(channel, recipient, message, "SENT");
-    notificationSentCounter.increment();
-    if ("email".equals(channel)) {
-        emailNotificationCounter.increment();
-    } // ...
+    counterFor(channel).increment(); // email / sms / other 중 하나만
+    return receipt;
 }
 
 // MetricsTagConfig
 return MeterFilter.commonTags(List.of(Tag.of("hostname", hostname())));</code></pre>
           <dl class="kv">
             <dt>Counter vs @Counted</dt><dd>Counter: 성공한 경우만 코드에서 직접 증가. @Counted: 메서드 호출 횟수를 AOP로 자동 기록.</dd>
-            <dt>필터</dt><dd><code>?tag=channel:email</code>, 복수 태그 <code>?tag=channel:email&amp;tag=region:kr</code>.</dd>
+            <dt>필터</dt><dd><code>?tag=channel:email</code>, 복수 태그 <code>?tag=channel:email&amp;tag=region:kr</code>. 필터 없이 조회하면 같은 이름의 시계열을 <b>모두 더한</b> 값 — 그래서 전체 합계용 태그 없는 counter를 따로 두면 이중 집계된다.</dd>
             <dt>좋은/나쁜 태그</dt><dd>좋음: application, environment, region, hostname. 나쁨: userId, email, requestId, 전체 URL — 값 종류가 무한히 늘면 카디널리티 폭발.</dd>
           </dl>
         </div>
@@ -329,10 +330,11 @@ return fileConversionTimer.record(() -&gt; doConvert(fileName, format)); // 내�
 
 // 8. Timer.Sample — 시작/종료 분리, 결과별 태그 (DocumentValidationService)
 Timer.Sample sample = Timer.start(meterRegistry);
-String result = valid ? "success" : "fail";
+String result = "error";              // 예외로 끝나면 이 값이 tag가 된다
 try {
-    sleep(valid ? 350 : 600);
-    return new DocumentValidationResult(documentType, valid, result);
+    boolean passed = callExternalValidator(documentType, valid); // 350/600ms
+    result = passed ? "success" : "fail"; // 실제 결과를 본 뒤 결정
+    return new DocumentValidationResult(documentType, passed, result);
 } finally {
     Timer timer = Timer.builder("app.document.validation.time")
             .tag("result", result)
@@ -348,7 +350,7 @@ public ReportResult generate(String reportType) { sleep(750); /* ... */ }</code>
               <thead><tr><th>방식</th><th>쓰임 (README)</th><th>주의</th></tr></thead>
               <tbody>
                 <tr><td><code>Timer.record</code></td><td>특정 코드 블록 측정</td><td>람다 안 코드만 측정</td></tr>
-                <tr><td><code>Timer.Sample</code></td><td>결과 기반 태그, 시작/종료 위치가 다름</td><td><code>try/finally</code>로 <code>stop()</code> 보장</td></tr>
+                <tr><td><code>Timer.Sample</code></td><td>결과 기반 태그, 시작/종료 위치가 다름</td><td><code>try/finally</code>로 <code>stop()</code> 보장, 예외면 <code>result=error</code></td></tr>
                 <tr><td><code>@Timed</code></td><td>메서드 전체 시간</td><td>TimedAspect 빈 + AOP 필요, 프록시 경유 호출만</td></tr>
               </tbody>
             </table>
@@ -374,7 +376,7 @@ private long delayFor(String keyword) {
     };
 }</code></pre>
           <dl class="kv">
-            <dt>조회</dt><dd><code>app.content.search.time.percentile?tag=phi:0.95</code> — 별도 metric 이름에 <code>phi</code> 태그로 분위수가 나뉩니다.</dd>
+            <dt>조회</dt><dd><code>app.content.search.time.percentile?tag=phi:0.95</code> — 별도 metric 이름에 <code>phi</code> 태그로 분위수가 나뉩니다. <b>phi 없이 조회하면 세 분위수 값의 합</b>(실측 약 2.35)이 나와 지연 시간으로 읽을 수 없습니다.</dd>
             <dt>지연 예</dt><dd>키워드 길이 % 3 기준(코드 상수): <code>actuator</code>(8자) → 900ms, <code>observability</code>(13자) → 450ms.</dd>
             <dt>의미</dt><dd>p50 중앙값, p95 = 95% 요청이 이 시간 이하, p99 = 느린 꼬리 구간.</dd>
           </dl>
@@ -422,7 +424,7 @@ public class FeatureToggleEndpoint {
 
     <section id="results">
       <h2><span class="num">04</span>결과·수치</h2>
-      <p class="sub">모든 값은 README의 예시 응답입니다. 자동 테스트는 <code>contextLoads()</code> 하나뿐이라 어떤 수치도 테스트로 검증되지 않았습니다.</p>
+      <p class="sub">Timer 평균 막대는 README의 예시 응답으로 계산했습니다. 아래 표의 값은 <code>CustomMetricsTest</code>가 호출 전후 차이로 검증한 것과 README 예시를 함께 적었습니다.</p>
       <div class="card">
         <h3 style="margin-top:0">Timer 평균 = TOTAL_TIME / COUNT</h3>
         <div class="bars">
@@ -431,34 +433,34 @@ public class FeatureToggleEndpoint {
           <div class="bar" style="--v:.375"><span>@Timed (2회)</span><div class="track"><div class="fill"></div></div><span class="val">0.75 s</span></div>
           <div class="bar good" style="--v:.2375"><span>Timer.Sample (2회)</span><div class="track"><div class="fill"></div></div><span class="val">0.475 s</span></div>
         </div>
-        <div class="source">출처: README 예시 응답(테스트로 검증 안 됨) — Timer.record COUNT 2 / TOTAL 4.0 / MAX 2.0, HTTP COUNT 5 / TOTAL 6.2 / MAX 2.0, @Timed COUNT 2 / TOTAL 1.5 / MAX 0.75, Timer.Sample COUNT 2 / TOTAL 0.95 / MAX 0.6. 평균은 이 값들로 계산.</div>
+        <div class="source">출처: README 예시 응답 — Timer.record COUNT 2 / TOTAL 4.0 / MAX 2.0, HTTP COUNT 5 / TOTAL 6.2 / MAX 2.0, @Timed COUNT 2 / TOTAL 1.5 / MAX 0.75, Timer.Sample COUNT 2 / TOTAL 0.95 / MAX 0.6. 평균은 이 값들로 계산.</div>
       </div>
       <div class="tablewrap" style="margin-top:12px">
         <table>
-          <thead><tr><th>metric</th><th>README 예시 값</th><th>코드상 기대 근거</th></tr></thead>
+          <thead><tr><th>metric</th><th>README 예시 값</th><th>근거 · 테스트 검증</th></tr></thead>
           <tbody>
-            <tr><td><code>app.notification.sent</code></td><td>COUNT 3.0</td><td>send·email·sms 3회 호출 후 (한계 참고: 필터 없는 합산)</td></tr>
-            <tr><td><code>app.notification.pending.size</code></td><td>VALUE 2.0</td><td>enqueue 2회</td></tr>
-            <tr><td><code>app.file.conversion.time</code></td><td>MAX 2.0 s</td><td><code>sleep(2_000)</code></td></tr>
-            <tr><td><code>app.document.validation.time</code></td><td>TOTAL 0.95 s, MAX 0.6 s</td><td>success 350ms + fail 600ms = 950ms</td></tr>
-            <tr><td><code>app.report.generation.time</code></td><td>TOTAL 1.5 s, MAX 0.75 s</td><td><code>sleep(750)</code> × 2</td></tr>
-            <tr><td><code>app.content.search.time.percentile</code></td><td>VALUE 0.45</td><td>지연 120/450/900ms (한계 참고)</td></tr>
+            <tr><td><code>app.notification.sent</code></td><td>COUNT 3.0 (email 2, sms 1)</td><td>send·email·sms 3회 호출 후. <span class="badge good">테스트</span> 3.0 — 예전 구조(태그 없는 counter 병행)에서는 <b>6.0</b>이었음</td></tr>
+            <tr><td><code>app.notification.pending.size</code></td><td>VALUE 2.0</td><td>enqueue 2회. <span class="badge good">테스트</span> +2 → dequeue 후 +1</td></tr>
+            <tr><td><code>app.file.conversion.time</code></td><td>MAX 2.0 s</td><td><code>sleep(2_000)</code>. <span class="badge good">테스트</span> COUNT +1, TOTAL_TIME +2.0 s 이상</td></tr>
+            <tr><td><code>app.document.validation.time</code></td><td>TOTAL 0.95 s, MAX 0.6 s</td><td>success 350ms + fail 600ms = 950ms. <span class="badge good">테스트</span> result=success/fail/error 각 COUNT +1</td></tr>
+            <tr><td><code>app.report.generation.time</code></td><td>TOTAL 1.5 s, MAX 0.75 s</td><td><code>sleep(750)</code> × 2. <span class="badge good">테스트</span> 1회 호출에 COUNT +1, TOTAL_TIME +0.75 s 이상</td></tr>
+            <tr><td><code>app.content.search.time.percentile</code></td><td><code>?tag=phi:0.95</code> VALUE ≈ 0.92</td><td>actuator(900ms) + observability(450ms) 후. <span class="badge good">테스트</span> phi 0.5 ≈ 0.44~0.50, phi 0.95/0.99 ≈ 0.92, 필터 없음 = 세 값의 합(≈ 2.35)</td></tr>
             <tr><td><code>http.server.requests</code></td><td>COUNT 5, TOTAL 6.2, MAX 2.0</td><td>MAX 2.0은 파일 변환(2초)과 일치</td></tr>
           </tbody>
         </table>
       </div>
-      <div class="source">출처: README 예시 응답(테스트로 검증 안 됨) / 코드 sleep 상수.</div>
+      <div class="source">출처: README 예시 응답 / 코드 sleep 상수 / <code>CustomMetricsTest</code> 실측. percentile 값은 히스토그램 버킷 근삿값이라 실행마다 조금 다릅니다. <code>http.server.requests</code>는 테스트로 검증하지 않았습니다.</div>
     </section>
 
     <section id="limits">
       <h2><span class="num">05</span>한계·약점</h2>
       <p class="sub">README가 스스로 밝힌 한계와, 코드에서 확인되는 약점.</p>
-      <details class="qa risk"><summary><span><span class="badge bad">코드</span> 테스트가 contextLoads 하나뿐</span></summary><div class="a"><p><code>ActuatorLabApplicationTest</code>는 컨텍스트가 뜨는지만 봅니다. Health 503, 메트릭 값, 태그 필터, 커스텀 엔드포인트 동작은 모두 Postman/curl(<code>scripts/curl-actuator.sh</code>)로 수동 확인하는 구조입니다.</p></div></details>
+      <details class="qa risk"><summary><span><span class="badge bad">코드</span> 테스트가 contextLoads 하나뿐 <span class="badge good">수정함</span></span></summary><div class="a"><p><b>어떻게 고쳤나</b>: 앱·관리 포트를 랜덤으로 띄우는 <code>@SpringBootTest(RANDOM_PORT, management.server.port=0)</code> + <code>TestRestTemplate</code>로 <code>ActuatorEndpointTest</code>(health DOWN → 503, info의 app/team/build/release, features 쓰기·읽기·삭제)와 <code>CustomMetricsTest</code>(Counter·tag 필터, Gauge, Timer.record, @Timed, Timer.Sample result tag, percentile)를 추가했습니다. metric은 컨텍스트 안에서 누적되므로 호출 전후 차이로 검증합니다.</p><p>원래 <code>ActuatorLabApplicationTest</code>는 컨텍스트가 뜨는지만 봤습니다. Health 503, 메트릭 값, 태그 필터, 커스텀 엔드포인트 동작은 모두 Postman/curl(<code>scripts/curl-actuator.sh</code>)로 수동 확인하는 구조입니다.</p></div></details>
       <details class="qa risk"><summary><span><span class="badge good">README 수정함</span> 로컬 절대경로 하드코딩</span></summary><div class="a"><p>README “실행”이 개인 PC의 절대경로로 이동하는 줄로 시작하던 것을 지웠습니다. 프로젝트 루트에서 <code>./gradlew :spring-boot-actuator:run</code>이면 됩니다.</p></div></details>
-      <details class="qa risk"><summary><span><span class="badge warn">README-코드 불일치</span> “현재 설정”에 info 블록 누락</span></summary><div class="a"><p>README “설정” 섹션의 yml에는 <code>info.app.*</code>, <code>info.team</code>이 없지만 실제 <code>application.yml</code>에는 있습니다(섹션 2에서 따로 보여 줌). 설정 표의 “<code>/actuator/info</code>에 app, team 표시”는 이 블록 덕분입니다.</p></div></details>
-      <details class="qa risk"><summary><span><span class="badge warn">확인 필요</span> 같은 이름에 태그 없는 Counter + 태그 있는 Counter</span></summary><div class="a"><p><code>app.notification.sent</code>는 태그 없는 meter 1개와 channel=email/sms meter 2개로 등록되고, email 발송 시 <b>두 meter가 모두</b> 증가합니다. <span class="badge info">일반 지식</span> <code>/actuator/metrics</code>는 필터 없이 조회하면 이름이 같은 meter들의 COUNT를 합산하므로, send(email)·email·sms 3회 후 값은 README 예시의 3.0이 아니라 이중 집계된 값(코드 분석상 6)이 나올 수 있습니다 — 실행 검증 안 됨. 또 Prometheus 같은 레지스트리는 같은 이름에 태그 키 집합이 다른 meter를 허용하지 않는 경우가 있어 운영에선 “전체”를 별도 meter로 두기보다 태그 합산으로 구합니다.</p></div></details>
-      <details class="qa risk"><summary><span><span class="badge warn">확인 필요</span> Percentile 예시 VALUE 0.45</span></summary><div class="a"><p>README 예시는 필터 없는 <code>app.content.search.time.percentile</code> 조회에 VALUE 0.45를 보여 주지만, 필터가 없으면 phi 0.5/0.95/0.99 값이 함께 집계되고, 기본 키워드 <code>actuator</code>(8자)는 900ms 경로입니다. 실제 값은 다를 수 있습니다(코드 분석 추정, 실행 검증 안 됨). 분위수는 <code>?tag=phi:0.95</code>처럼 하나씩 보는 것이 정확합니다.</p></div></details>
-      <details class="qa risk"><summary><span><span class="badge bad">코드</span> Timer.Sample의 result 태그는 작업 전에 이미 정해짐</span></summary><div class="a"><p>README는 “결과를 본 뒤 tag 결정”이라고 하지만 코드는 <code>valid</code> 파라미터로 작업 <b>전에</b> <code>result</code>를 정합니다. 작업 중 예외(InterruptedException → IllegalStateException)가 나도 success/fail 태그로 기록됩니다. 진짜 결과 기반이라면 예외 시 <code>result=error</code> 같은 분기가 필요합니다.</p></div></details>
+      <details class="qa risk"><summary><span><span class="badge warn">README-코드 불일치</span> “현재 설정”에 info 블록 누락 <span class="badge good">수정함</span></span></summary><div class="a"><p><b>어떻게 고쳤나</b>: README “현재 설정” yml에 <code>info</code> 블록을 넣고 설정 표에 <code>info.app.*</code>, <code>info.team</code> 행을 추가했습니다.</p><p>원래 README “설정” 섹션의 yml에는 <code>info.app.*</code>, <code>info.team</code>이 없지만 실제 <code>application.yml</code>에는 있습니다(섹션 2에서 따로 보여 줌). 설정 표의 “<code>/actuator/info</code>에 app, team 표시”는 이 블록 덕분입니다.</p></div></details>
+      <details class="qa risk"><summary><span><span class="badge bad">코드</span> 같은 이름에 태그 없는 Counter + 태그 있는 Counter — 이중 집계 확인 <span class="badge good">수정함</span></span></summary><div class="a"><p><b>테스트로 확인</b>: 예전 코드로 send(email)·email·sms 3회 후 필터 없는 <code>app.notification.sent</code> COUNT는 <b>6.0</b>이었습니다(email 필터 2.0). README 예시 3.0은 틀린 값이었습니다.</p><p><b>어떻게 고쳤나</b>: 태그 없는 counter를 없애고 모든 시계열이 <code>channel</code>(email/sms/other)·<code>region</code> 태그를 갖게 했습니다. 정해지지 않은 channel 값은 <code>other</code>로 묶어 카디널리티도 막습니다. 이제 같은 3회 후 필터 없는 COUNT가 3.0이고 <code>CustomMetricsTest</code>가 이를 검증합니다.</p><p>원래 구조: <code>app.notification.sent</code>는 태그 없는 meter 1개와 channel=email/sms meter 2개로 등록되고, email 발송 시 <b>두 meter가 모두</b> 증가했습니다. 또 Prometheus 같은 레지스트리는 같은 이름에 태그 키 집합이 다른 meter를 허용하지 않는 경우가 있어 운영에선 “전체”를 별도 meter로 두기보다 태그 합산으로 구합니다.</p></div></details>
+      <details class="qa risk"><summary><span><span class="badge warn">README</span> Percentile 예시 VALUE 0.45 — 틀린 값 확인 <span class="badge good">수정함</span></span></summary><div class="a"><p><b>테스트로 확인</b>: actuator(900ms)·observability(450ms) 2회 후 phi 0.5 ≈ 0.44~0.50, phi 0.95·0.99 ≈ 0.92, 필터 없는 조회 ≈ 2.35(= 세 값의 합). README의 “필터 없음 0.45”는 어떤 조회와도 맞지 않았습니다.</p><p><b>어떻게 고쳤나</b>: README 예시를 <code>?tag=phi:0.95</code> 조회(≈ 0.92)로 바꾸고 phi별 실측 표와 “필터 없는 VALUE는 합이라 해석 불가” 설명, 키워드별 지연 계산을 넣었습니다.</p><p>원래 README 예시는 필터 없는 <code>app.content.search.time.percentile</code> 조회에 VALUE 0.45를 보여 주지만, 필터가 없으면 phi 0.5/0.95/0.99 값이 함께 집계되고, 기본 키워드 <code>actuator</code>(8자)는 900ms 경로입니다. 실제 값은 다를 수 있습니다(코드 분석 추정, 실행 검증 안 됨). 분위수는 <code>?tag=phi:0.95</code>처럼 하나씩 보는 것이 정확합니다.</p></div></details>
+      <details class="qa risk"><summary><span><span class="badge bad">코드</span> Timer.Sample의 result 태그는 작업 전에 이미 정해짐 <span class="badge good">수정함</span></span></summary><div class="a"><p><b>어떻게 고쳤나</b>: <code>result</code> 초깃값을 <code>error</code>로 두고, 외부 검증 호출이 정상으로 끝난 뒤 돌려받은 값으로 <code>success</code>/<code>fail</code>을 정합니다. 예외(문서 종류가 비어 있음)로 끝나면 <code>result=error</code>로 시간이 기록되는 것을 <code>CustomMetricsTest</code>가 검증합니다.</p><p>원래 README는 “결과를 본 뒤 tag 결정”이라고 하지만 코드는 <code>valid</code> 파라미터로 작업 <b>전에</b> <code>result</code>를 정합니다. 작업 중 예외(InterruptedException → IllegalStateException)가 나도 success/fail 태그로 기록됩니다. 진짜 결과 기반이라면 예외 시 <code>result=error</code> 같은 분기가 필요합니다.</p></div></details>
       <details class="qa risk"><summary><span><span class="badge warn">README</span> 보안 · 운영 주의</span></summary><div class="a"><ul><li>커스텀 엔드포인트는 인증/인가 필요(README). 현재 <code>features</code>는 보안 없이 쓰기/삭제 가능, 토글은 메모리에만 저장(재시작 시 사라짐).</li><li><code>show-details: always</code>는 내부 정보를 노출합니다 — 관리 포트를 외부에 열지 않는 전제.</li><li><span class="badge info">일반 지식</span> partnerSystem 같은 외부 의존을 liveness 프로브에 포함하면 외부 장애 때 앱이 재시작 루프에 빠질 수 있어, 보통 readiness에만 반영합니다.</li><li><span class="badge info">일반 지식</span> <code>percentiles</code>는 인스턴스 안에서 계산되어 여러 인스턴스 간 합산이 불가 — 집계가 필요하면 histogram 발행.</li></ul></div></details>
     </section>
 
@@ -468,7 +470,7 @@ public class FeatureToggleEndpoint {
       <div class="qa-tools"><button type="button" data-qa="open">모두 펼치기</button><button type="button" data-qa="close">모두 접기</button></div>
       <details class="qa"><summary>Health와 Metrics는 어떻게 다른가요?</summary><div class="a"><p>Health는 지금 정상/비정상(UP/DOWN)인지 — 상태. Metrics는 시간에 따른 수치 — 추세. Health DOWN이면 HTTP 503을 내려 로드밸런서나 오케스트레이터가 트래픽을 빼거나 재시작 판단을 할 수 있습니다. 이 모듈은 <code>PartnerSystemHealthIndicator</code>로 외부 게이트웨이 상태를 반영합니다.</p></div></details>
       <details class="qa"><summary>Counter와 Gauge는 언제 각각 쓰나요?</summary><div class="a"><p>Counter는 “몇 번 일어났나” — 단조 증가(발송 성공 수). Gauge는 “지금 몇 개인가” — 오르내림(대기열 크기). Gauge는 값을 저장하지 않고 조회 시점에 함수(<code>List::size</code>)를 호출합니다. <span class="badge info">일반 지식</span> Gauge는 대상 객체를 약한 참조로 잡아 GC되면 값이 사라질 수 있으므로 오래 사는 객체에 등록합니다.</p></div></details>
-      <details class="qa"><summary>Timer.record, Timer.Sample, @Timed의 차이는?</summary><div class="a"><ul><li><b>record</b>: 람다로 감싼 특정 블록만 측정.</li><li><b>Sample</b>: <code>start</code>와 <code>stop</code>을 분리 — 시작/끝 위치가 다르거나 결과에 따라 태그(<code>result=success|fail</code>)를 붙일 때. <code>finally</code>로 stop 보장.</li><li><b>@Timed</b>: 메서드 전체를 AOP로 — 코드 침투가 가장 적지만 TimedAspect 빈이 필요하고 프록시를 거친 호출만 측정.</li></ul></div></details>
+      <details class="qa"><summary>Timer.record, Timer.Sample, @Timed의 차이는?</summary><div class="a"><ul><li><b>record</b>: 람다로 감싼 특정 블록만 측정.</li><li><b>Sample</b>: <code>start</code>와 <code>stop</code>을 분리 — 시작/끝 위치가 다르거나 결과에 따라 태그(<code>result=success|fail|error</code>)를 붙일 때. <code>finally</code>로 stop 보장.</li><li><b>@Timed</b>: 메서드 전체를 AOP로 — 코드 침투가 가장 적지만 TimedAspect 빈이 필요하고 프록시를 거친 호출만 측정.</li></ul></div></details>
       <details class="qa"><summary>@Timed/@Counted가 동작하지 않는다면 무엇을 확인하나요?</summary><div class="a"><p>① <code>TimedAspect</code>/<code>CountedAspect</code> 빈 등록(이 모듈은 <code>MetricsAspectConfig</code>) ② <code>spring-boot-starter-aop</code> 의존성 ③ 같은 클래스 내부 호출이 아닌지(프록시 기반이라 self-invocation은 측정 안 됨, 일반 지식) ④ 해당 API를 실제로 호출했는지(호출 전에는 metric 이름이 없음).</p></div></details>
       <details class="qa"><summary>메트릭 태그를 설계할 때 주의할 점은?</summary><div class="a"><p>태그 값 조합마다 시계열이 생기므로 값 종류가 적은 것만 씁니다(channel, region, result, status). userId·email·requestId·전체 URL은 카디널리티 폭발. 공통 식별은 common tags(application, environment, region, hostname)로 모든 meter에 한 번에 붙입니다.</p></div></details>
       <details class="qa"><summary>평균 응답시간 대신 p95/p99를 보는 이유는?</summary><div class="a"><p>평균은 소수의 매우 느린 요청을 가립니다. p99는 “100명 중 가장 느린 1명”의 경험 — 사용자 체감과 SLO는 꼬리 지연이 좌우합니다. 이 모듈은 키워드 길이로 120/450/900ms를 섞어 분위수 차이를 관찰합니다. <span class="badge info">일반 지식</span> 여러 인스턴스를 합치려면 클라이언트 percentile 대신 histogram 버킷을 발행해 서버에서 계산합니다.</p></div></details>
@@ -497,7 +499,9 @@ public class FeatureToggleEndpoint {
         <li><code>src/main/java/dev/deepdive/actuator/endpoint/FeatureToggleEndpoint.java</code><span>12. 커스텀 엔드포인트</span></li>
         <li><code>spring-boot-actuator.postman_collection.json</code><span>섹션 0~12 요청 모음</span></li>
         <li><code>scripts/curl-actuator.sh</code><span>Postman 대신 터미널로 확인</span></li>
-        <li><code>src/test/java/dev/deepdive/actuator/ActuatorLabApplicationTest.java</code><span>contextLoads 1개</span></li>
+        <li><code>src/test/java/dev/deepdive/actuator/ActuatorLabApplicationTest.java</code><span>contextLoads</span></li>
+        <li><code>src/test/java/dev/deepdive/actuator/ActuatorEndpointTest.java</code><span>health DOWN → 503, info, features endpoint</span></li>
+        <li><code>src/test/java/dev/deepdive/actuator/CustomMetricsTest.java</code><span>Counter·Gauge·Timer·percentile 값 검증</span></li>
       </ul>
     </section>
 
