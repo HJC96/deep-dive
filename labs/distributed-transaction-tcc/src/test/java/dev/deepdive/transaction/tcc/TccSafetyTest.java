@@ -17,12 +17,14 @@ import org.junit.jupiter.api.Test;
  *
  * <p>그래서 Confirm이 두 번 오는 경우, Try 없이 Cancel이 먼저 오는 경우, 그 뒤에 늦은 Try가 도착하는
  * 경우가 전부 참여자 코드의 몫이 된다. 락을 쥐지 않는 대신 늘어난 이 경우의 수가 TCC가 치르는 값이다.
+ *
+ * <p>네 가지를 좌석 참여자와 지갑 참여자에 똑같이 확인한다. 한 참여자라도 규칙을 어기면 전체가 어긋난다.
  */
 class TccSafetyTest extends TccJpaTest {
 
     @BeforeEach
     void seedDatabases() {
-        // 좌석 10석, reservedCount = 0, heldCount = 0. 로그도 비어 있다.
+        // 좌석 10석, reservedCount = 0, heldCount = 0. 지갑 잔액 100,000, frozen = 0. 로그도 비어 있다.
         seed(100_000);
     }
 
@@ -80,5 +82,58 @@ class TccSafetyTest extends TccJpaTest {
 
         assertThat(heldCount()).isZero();
         assertThat(seatLogState(REQUEST_ID)).isEqualTo(CANCELLED);
+    }
+
+    // --- 지갑 참여자 ---
+    // 같은 네 가지가 지갑에서도 그대로 일어난다. 좌석과 다른 점은 되돌리는 대상이 돈이라는 것뿐이다.
+    // 참여자마다 이 규칙을 따로 지켜야 하니, 참여자가 늘어날수록 같은 검증도 한 벌씩 늘어난다.
+
+    @Test
+    void 지갑도_Confirm을두번받아도_한번만적용된다() {
+        assertThat(walletParticipant.tryFreeze(REQUEST_ID, USER_ID, AMOUNT)).isTrue();
+        assertThat(walletLogState(REQUEST_ID)).isEqualTo(TRIED);
+
+        // 로그를 보지 않고 frozen을 두 번 빼면 frozen이 -60,000이 된다.
+        // 얼려 둔 적 없는 돈을 지운 셈이라 장부가 맞지 않는다.
+        walletParticipant.confirm(REQUEST_ID);
+        walletParticipant.confirm(REQUEST_ID);
+
+        assertThat(balance()).isEqualTo(100_000 - AMOUNT);
+        assertThat(frozen()).isZero();
+        assertThat(walletLogState(REQUEST_ID)).isEqualTo(CONFIRMED);
+    }
+
+    @Test
+    void 지갑도_Cancel을두번받아도_한번만적용된다() {
+        assertThat(walletParticipant.tryFreeze(REQUEST_ID, USER_ID, AMOUNT)).isTrue();
+
+        // 녹이기가 두 번 적용되면 balance가 160,000이 된다. 돈이 공짜로 생긴다.
+        walletParticipant.cancel(REQUEST_ID);
+        walletParticipant.cancel(REQUEST_ID);
+
+        assertThat(balance()).isEqualTo(100_000);
+        assertThat(frozen()).isZero();
+        assertThat(walletLogState(REQUEST_ID)).isEqualTo(CANCELLED);
+    }
+
+    @Test
+    void 지갑도_Try없이Cancel이오면_빈취소로기록된다() {
+        walletParticipant.cancel(REQUEST_ID);
+
+        assertThat(balance()).isEqualTo(100_000);
+        assertThat(frozen()).isZero();
+        assertThat(walletLogState(REQUEST_ID)).isEqualTo(CANCELLED);
+    }
+
+    @Test
+    void 지갑도_빈취소뒤에도착한Try는_거부된다() {
+        walletParticipant.cancel(REQUEST_ID);
+
+        // 빈 취소 기록을 보지 않고 얼려 주면 60,000이 아무도 녹이지 않는 frozen으로 남는다.
+        assertThat(walletParticipant.tryFreeze(REQUEST_ID, USER_ID, AMOUNT)).isFalse();
+
+        assertThat(balance()).isEqualTo(100_000);
+        assertThat(frozen()).isZero();
+        assertThat(walletLogState(REQUEST_ID)).isEqualTo(CANCELLED);
     }
 }

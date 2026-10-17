@@ -88,10 +88,13 @@ sequenceDiagram
     C->>W: 지갑 조회 → 잔액 부족으로 freeze 거절 (저장·로그 없음)
     W-->>C: false
 
-    Note over C,W: 2단계 — Cancel
+    Note over C,W: 2단계 — Cancel (참여자 전원에게)
     C->>S: held_count -= 2 / 로그 CANCELLED
     Note over C,S: 데이터베이스가 되돌리는 게 아니라 반대 방향 UPDATE를 한 번 더 하는 것이다
+    C->>W: 로그 없음 → 빈 취소. 돈은 안 건드리고 로그 CANCELLED만
 ```
+
+코디네이터는 Try가 실패한 지갑에도 Cancel을 보낸다. Try 응답이 유실됐을 수도 있으니 "거절했다고 답한 참여자는 아무것도 안 했다"고 단정할 수 없어서다. 지갑에는 그 요청의 기록이 없으니 이 Cancel은 아래에서 다룰 **빈 취소**가 되고, `CANCELLED`만 남긴다. 같은 요청의 Try가 뒤늦게 재전송돼도 이 기록을 보고 거부한다.
 
 여기가 2PC와 결정적으로 갈린다. **2PC의 롤백은 데이터베이스가 해 줬지만, TCC의 Cancel은 참여자가 직접 짜는 업무 로직이다.** 잡아 둔 만큼 빼는 UPDATE를 한 번 더 실행할 뿐이다.
 
@@ -99,6 +102,7 @@ sequenceDiagram
 | --- | ---: | ---: | ---: | ---: |
 | `reserved_count` | 0 | **2** | 0 | 0 |
 | `balance` | 50,000 | 50,000 | 50,000 | 50,000 |
+| 참여자 로그 | — | — | — | 좌석 `CANCELLED`, 지갑 `CANCELLED`(빈 취소) |
 
 결과는 2PC와 같다. 가는 길이 다를 뿐이다.
 
@@ -116,7 +120,7 @@ UPDATE workshop_seat SET reserved_count = reserved_count + 1 WHERE id = 100;
 | | 2PC (`XA PREPARE` 후) | TCC (Try 후) |
 | --- | --- | --- |
 | 같은 행 UPDATE | `ERROR 1205` 락 대기 타임아웃 | **통과** |
-| 같은 행 SELECT | 커밋 전 옛 값 `0` | 잡힌 값 `2` 그대로 |
+| 같은 행 SELECT | `reserved_count` = 옛 값 `0`. prepare된 2석이 **안 보인다** | `reserved_count` = `0`, `held_count` = `2`. 잡아 둔 2석이 **보인다** |
 | 다른 요청의 Try | — | 통과. 나란히 잡힌다 |
 
 <mark>예약 1의 로컬 트랜잭션은 Try에서 이미 커밋됐으니 쥐고 있는 락 자체가 없다.</mark> 코디네이터가 늦든 죽든 다른 요청은 영향받지 않는다. 2PC가 못 했던 게 바로 이것이다.
@@ -213,8 +217,8 @@ XA를 지원하지 않는 참여자(외부 결제 API, 메시지 큐, NoSQL)도 
 
 Testcontainers로 MySQL 두 대를 띄우므로 Docker가 실행 중이어야 한다.
 
-- `TryConfirmCancelTest` — 전원 성공 후 Confirm / 지갑 실패 후 Cancel / **Try와 Confirm 사이에 안 막힘**
-- `TccSafetyTest` — Confirm 중복 / Cancel 중복 / 빈 취소 / 매달림 방지
+- `TryConfirmCancelTest` — 전원 성공 후 Confirm / 지갑 실패 후 전원에게 Cancel(지갑은 빈 취소) / **Try와 Confirm 사이에 안 막힘**
+- `TccSafetyTest` — Confirm 중복 / Cancel 중복 / 빈 취소 / 매달림 방지. 좌석·지갑 참여자 각각 네 가지씩
 
 참여자는 `seat`·`wallet` 두 패키지로 나뉘고, 각 패키지의 설정 클래스가 자기 DataSource·EntityManagerFactory·TransactionManager를 한 벌씩 만든다. `@Transactional`에 어느 트랜잭션 매니저를 쓸지 이름으로 지정하는 것이 그래서다.
 
