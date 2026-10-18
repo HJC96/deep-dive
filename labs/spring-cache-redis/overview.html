@@ -165,8 +165,8 @@ ul.plain{margin:6px 0;padding-left:20px}ul.plain li{margin:3px 0}
   <main>
     <header class="hero">
       <div class="eyebrow">deep-dive · labs/spring-cache-redis</div>
-      <h1>Spring Cache + Redis — @Cacheable과 RedisTemplate 직접 구현, 그리고 핫키 분산 락</h1>
-      <p class="lead">로컬 캐시는 서버마다 따로라서, 여러 서버가 같은 캐시를 보려면 Redis 같은 공용 캐시가 필요합니다. 하지만 Redis로 옮기면 <strong>직렬화</strong>, <strong>없는 키 반복 조회</strong>, <strong>동시 만료</strong>, <strong>핫키 동시 miss</strong>를 직접 고민해야 합니다. 이 모듈은 MySQL/JPA를 원본으로 두고 <code>@Cacheable</code>(RedisCacheManager)과 <code>StringRedisTemplate</code> 직접 구현을 비교하며, Null caching · TTL Jitter · <code>SET NX</code> + Lua 분산 락을 Testcontainers로 검증합니다.</p>
+      <h1>Spring Cache + Redis — @Cacheable과 RedisTemplate 기반 구현, 그리고 핫키 분산 락</h1>
+      <p class="lead">로컬 캐시는 서버마다 따로라서, 여러 서버가 같은 캐시를 보려면 Redis 같은 공용 캐시가 필요합니다. 하지만 Redis로 옮기면 <strong>직렬화</strong>, <strong>없는 키 반복 조회</strong>, <strong>동시 만료</strong>, <strong>핫키 동시 miss</strong>를 직접 고민해야 합니다. 이 모듈은 MySQL/JPA를 원본으로 두고 <code>@Cacheable</code>(RedisCacheManager)과 <code>StringRedisTemplate</code> 기반 구현을 비교하며, Null caching · TTL Jitter · <code>SET NX</code> + Lua 분산 락을 Testcontainers로 검증합니다.</p>
       <div class="chips"><span class="chip">Java 21</span><span class="chip">Spring Boot 3.4.1</span><span class="chip">Spring Data Redis</span><span class="chip">Redis 7.2.5</span><span class="chip">MySQL 8.0.36 · JPA</span><span class="chip">Testcontainers</span><span class="chip">Jackson JSON</span></div>
     </header>
 

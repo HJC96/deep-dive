@@ -174,9 +174,9 @@ ul.plain{margin:6px 0;padding-left:20px}ul.plain li{margin:3px 0}
       <h2><span class="num">01</span>한눈에</h2>
       <p class="sub">30초 요약 (AES 실험)</p>
       <div class="grid c3">
-        <div class="card bad"><div class="label">문제</div><p>레거시 유틸이 <code>encrypt()</code>마다 <code>new BouncyCastleProvider()</code>를 만들어 등록을 시도. 알고리즘·키·IV·평문은 같고 <b>Provider 반복 등록 여부만</b> 다릅니다.</p></div>
+        <div class="card bad"><div class="label">문제</div><p>레거시 유틸이 <code>encrypt()</code>마다 <code>new BouncyCastleProvider()</code>를 만들어 등록을 시도. 알고리즘·키·IV·평문은 같고 <b>Provider 반복 등록 시도 여부</b>와 Provider를 찾는 방식(이름 <code>"BC"</code> / 객체)이 다릅니다.</p></div>
         <div class="card"><div class="label">접근</div><p><code>AesUtilBefore</code>(매번 등록, static) vs <code>AesUtilAfter</code>(Provider 생성자 주입). JMH Throughput, 워밍업 3×1s, 측정 5×1s, fork 1, 1스레드·8스레드. 원인은 gc·stack 프로파일러로 확인.</p></div>
-        <div class="card good"><div class="label">결론</div><p>1스레드 약 <b>1,526배</b> 차이(README 18코어 실측). repeated는 op당 약 2.85MB 할당이 범인. 반전: once는 8스레드에서 ×1.4만 확장 — 공유 Provider의 <code>synchronized getService</code>에서 줄을 섬(암달의 법칙).</p></div>
+        <div class="card good"><div class="label">결론</div><p>1스레드 약 <b>1,526배</b> 차이(README 18코어 실측). repeated는 op당 약 2.85MB 할당이 범인. 반전: once는 8스레드에서 ×1.4만 확장 — 공유 Provider의 <code>getService</code>가 캐시에 없는 이름을 찾을 때 들어가는 <code>synchronized(this)</code> 블록에서 줄을 섬(암달의 법칙).</p></div>
       </div>
       <div class="callout"><strong>한 줄 암기:</strong> "무거운 객체를 매 호출 만들지 말고 한 번 만들어 주입하라" + "병목은 느려 보이는 쪽이 아니라 <b>직렬 구간 비중이 큰 쪽</b>에서 터진다. 추측하지 말고 프로파일러로 확인하라."</div>
     </section>
@@ -263,7 +263,7 @@ ul.plain{margin:6px 0;padding-left:20px}ul.plain li{margin:3px 0}
     return cipher.doFinal(plainText);
 }</code></pre>
           <dl class="kv">
-            <dt>문제</dt><dd>매 호출 약 2.85MB 할당(gc 프로파일). static 유틸이 JVM 전역 <code>Security</code> 상태를 건드려 테스트 간 상태 제어도 어려움(README).</dd>
+            <dt>문제</dt><dd>매 호출 약 2.85MB 할당(gc 프로파일). static 유틸이 매 호출 <code>Security.addProvider</code>로 JVM 전역 <code>Security</code> 상태를 건드려 테스트 간 상태 제어도 어려움.</dd>
             <dt>코드</dt><dd><code>labs/java-sandbox/src/main/java/dev/deepdive/sandbox/crypto/AesUtilBefore.java</code></dd>
           </dl>
         </div>

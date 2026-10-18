@@ -9,7 +9,7 @@ Spring Data JPA의 낙관적 락(`@Version`) 동작과, Hibernate `StatementInsp
 흐름:
 
 ```text
-INSERT(version = 0) -> 수정 커밋마다 UPDATE ... SET version = version + 1
+INSERT(version = 0) -> 수정 커밋마다 UPDATE ... SET version = ? WHERE id = ? AND version = ?  (Hibernate가 '이전 값 + 1'을 새 값으로 바인딩)
 ```
 
 코드 흐름:
@@ -164,7 +164,7 @@ assertThatThrownBy(() -> productService.decreaseStockAndSave(staleA))
 한계:
 
 - 충돌을 사후에 감지하는 방식이라 충돌하면 요청이 실패 → 재시도 전략은 호출자 몫
-- 동시 충돌이 잦은 상황(선착순 등)에는 재시도 폭주 → 비관적 락·원자적 UPDATE가 유리 (coupon-issue 실험 참고)
+- 동시 충돌이 잦은 상황(선착순 등)에는 재시도가 늘어 비관적 락·원자적 UPDATE가 유리 (coupon-issue 실험에서 낙관적 락이 가장 느렸다)
 
 ```mermaid
 sequenceDiagram
@@ -439,7 +439,7 @@ sequenceDiagram
 
 설계 포인트:
 
-- **URI는 원시 경로 대신 패턴으로 태깅** — `/products/42`로 태그를 달면 id 하나하나가 별도 시계열이 되어 카디널리티 폭발. `HandlerMapping.BEST_MATCHING_PATTERN_ATTRIBUTE`에서 `/products/{id}`를 꺼내 쓴다. 패턴이 없는 요청은 원시 URI가 아니라 고정값 `UNKNOWN`으로 묶는다(Spring Boot `http.server.requests`와 같은 규칙). `QueryCountInterceptorTest`가 두 경우를 확인한다
+- **URI는 원시 경로 대신 패턴으로 태깅** — `/products/42`로 태그를 달면 id 하나하나가 별도 시계열이 되어 카디널리티 폭발. `HandlerMapping.BEST_MATCHING_PATTERN_ATTRIBUTE`에서 `/products/{id}`를 꺼내 쓴다. 패턴이 없는 요청은 원시 URI가 아니라 고정값 `UNKNOWN`으로 묶는다(Spring Boot `http.server.requests`도 패턴이 없으면 `UNKNOWN`을 쓴다. 다만 404·3xx는 `NOT_FOUND`·`REDIRECTION`으로 따로 둔다). `QueryCountInterceptorTest`가 두 경우를 확인한다
 - **ThreadLocal은 반드시 clear** — 톰캣은 스레드를 풀에서 재사용하므로, 안 지우면 다음 요청이 이전 컨텍스트를 물려받는 누수 발생. `afterCompletion`의 finally에서 지운다
 - **인스펙터는 상태 없음** — EntityManagerFactory당 하나만 만들어져 모든 스레드가 공유하므로 자체 상태를 두지 않고, 요청별 상태는 전부 ThreadLocal 쪽에 둔다
 - **메트릭 기록은 요청 끝에 한 번** — 인스펙터는 ThreadLocal 카운트만 올리고, `MeterRegistry` 기록은 인터셉터가 요청 종료 시점에 모아서 한다

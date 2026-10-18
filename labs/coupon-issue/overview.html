@@ -176,7 +176,7 @@ ul.plain{margin:6px 0;padding-left:20px}ul.plain li{margin:3px 0}
       <div class="grid c3">
         <div class="card bad"><div class="label">문제</div><p>두 요청이 같은 <code>quantity = 200</code>을 읽고 둘 다 <code>199</code>를 저장 → 요청은 2번인데 차감은 1번. 테스트는 200번 발급 후 재고가 <b>0이 아님</b>을 단언합니다.</p></div>
         <div class="card"><div class="label">접근</div><p>같은 조건(재고 200, 스레드 풀 32)에서 <b>9가지</b> 방식을 구현: 제어 없음 · <code>synchronized</code> · 원자적 UPDATE · 비관적/낙관적 락 · 네임드 락 · Redis <code>SET NX</code> · Redis Lua · Redisson.</p></div>
-        <div class="card good"><div class="label">결론</div><p>"락으로 줄 세우기"보다 <b>확인+차감을 한 번에 원자적으로</b>(UPDATE … WHERE, Lua) 하는 쪽이 단순하고 빨랐고, 경합이 심한 곳에서 낙관적 락은 재시도 폭주로 가장 느렸습니다(README 예시 출력 기준).</p></div>
+        <div class="card good"><div class="label">결론</div><p>"락으로 줄 세우기"보다 <b>확인+차감을 한 번에 원자적으로</b>(UPDATE … WHERE, Lua) 하는 쪽이 단순하고 빨랐고, 경합이 심한 곳에서 낙관적 락이 가장 느렸습니다(README 예시 출력 기준 — 재시도가 늘어난 탓으로 보지만 재시도 횟수는 세지 않았습니다).</p></div>
       </div>
       <div class="callout"><strong>한 줄 암기:</strong> 문제의 본질은 "읽기-계산-쓰기"가 원자적이지 않다는 것. 해법은 ① 구간 전체를 직렬화(락)하거나 ② 연산 자체를 원자적으로 만들거나(조건부 UPDATE / Lua) ③ 충돌을 사후 감지 후 재시도(낙관적 락) 중 하나.</div>
     </section>
@@ -396,7 +396,7 @@ public void issueOnce(Long couponId) { ... }   // 이 시점에 커밋됨</code>
           <dl class="kv">
             <dt>왜 self?</dt><dd><code>this.issueOnce()</code>는 프록시를 우회해 <code>@Transactional</code>이 무시됨(self-invocation). 생성자에 <code>@Lazy OptimisticLockCouponIssueService self</code>를 주입해 프록시를 직접 호출. <code>@Lazy</code>는 자기 자신 주입의 순환 참조를 끊기 위함.</dd>
             <dt>왜 별도 엔티티?</dt><dd><code>@Version</code>을 공용 <code>CouponStock</code>에 두면 "락 없음" 케이스까지 버전 검사를 받아 lost update가 재현되지 않음 → <code>VersionedCouponStock</code>로 분리 (README).</dd>
-            <dt>트레이드오프</dt><dd>충돌 = 실패라 재시도 코드가 필수. 한 row에 200개가 몰리면 재시도 폭주 → 충돌이 드문 상황에 적합 (README).</dd>
+            <dt>트레이드오프</dt><dd>충돌 = 실패라 재시도 코드가 필수. 한 row에 200개가 몰리면 충돌이 잦아 재시도가 늘고, 이 실험에서 가장 느렸음(재시도 횟수는 세지 않음) → 충돌이 드문 상황에 적합 (README).</dd>
             <dt>코드</dt><dd><code>labs/coupon-issue/src/main/java/dev/deepdive/coupon/service/OptimisticLockCouponIssueService.java</code>, <code>.../core/VersionedCouponStock.java</code></dd>
           </dl>
         </div>
@@ -545,7 +545,7 @@ return 1</code></pre>
         <li><b>synchronized</b>: 단일 JVM에서만 유효, 전 구간 직렬화.</li>
         <li><b>원자적 UPDATE</b>: 단순 증감에만 적합, 복잡한 정책은 한 문장으로 어려움.</li>
         <li><b>비관적·네임드 락</b>: 직렬화로 처리량 저하, 커넥션 점유 → 풀 고갈·락 타임아웃·데드락 위험. 네임드 락은 MySQL 종속.</li>
-        <li><b>낙관적 락</b>: 충돌 = 실패라 재시도 필수, 경합이 심하면 재시도 폭주로 가장 느림.</li>
+        <li><b>낙관적 락</b>: 충돌 = 실패라 재시도 필수, 경합이 심하면 재시도가 늘어 가장 느렸음(README 예시 출력, 재시도 횟수는 세지 않음).</li>
         <li><b>Redis SET NX</b>: TTL 길이 딜레마(짧으면 작업 중 만료, 길면 장애 시 대기).</li>
         <li><b>네임드 락</b>: 10초 안에 락을 못 잡은 요청은 실패 → 호출부의 재시도 정책 필요.</li>
         <li><b>Redis Lua</b>: Redis가 기준 저장소가 됨 → DB 동기화 전략·장애·복제 지연 설계 필요.</li>
@@ -559,7 +559,7 @@ return 1</code></pre>
         <p>수정: 락 값에 요청별 UUID 토큰을 넣고, 해제는 "값이 내 토큰일 때만 DEL"을 Lua 스크립트로 원자 실행합니다. 테스트가 "내 락 만료 → 다른 토큰이 같은 key를 잡음 → 내 unlock은 false, 남의 락은 그대로"를 재현합니다.</p>
       </div></details>
       <details id="lim-2" class="qa risk"><summary><span class="badge good">수정함</span> 네임드 락이 GET_LOCK 반환값을 무시</summary><div class="a">
-        <p><code>NamedLockRepository</code> 주석에 "성공 1, 타임아웃 0, 에러 NULL"이라고 적어 놓고, 예전 <code>NamedLockCouponIssueService.issue()</code>는 반환값을 확인하지 않고 바로 <code>self.issueOnce()</code>를 호출했습니다. 10초 안에 락을 못 얻으면 <b>락 없이 차감</b>이 실행되고, <code>finally</code>에서 잡지도 않은 락을 해제했습니다.</p>
+        <p><code>NamedLockRepository</code> 주석에 "성공 1, 타임아웃 0, 에러 NULL"이라고 적어 놓고, 예전 <code>NamedLockCouponIssueService.issue()</code>는 반환값을 확인하지 않고 바로 <code>self.issueOnce()</code>를 호출했습니다. 10초 안에 락을 못 얻으면 <b>락 없이 차감</b>이 실행되고, <code>finally</code>에서 잡지 못한 락에도 <code>RELEASE_LOCK</code>을 호출했습니다.</p>
         <p>수정: 반환값이 <code>1</code>이 아니면 차감 없이 <code>IllegalStateException</code>으로 실패하고, 획득한 경우에만 <code>RELEASE_LOCK</code>합니다. <code>NamedLockCouponIssueServiceUnitTest</code>가 <code>0</code>·<code>NULL</code>을 mock으로 재현합니다.</p>
       </div></details>
       <details id="lim-3" class="qa risk"><summary>실행 시간 비교 조건이 같지 않다 (웜업·요청 수·1회 측정)</summary><div class="a">

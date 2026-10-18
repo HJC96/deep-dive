@@ -1,6 +1,6 @@
 # payment-system
 
-장애·메시지 유실·동시성이 있는 상태에서도 돈이 맞아떨어지는 결제 시스템을 직접 만들어 보는 실험실.
+인프런 「견고한 결제 시스템 구축」 강의(원본 Kotlin)를 Java로 옮기며, 장애·메시지 유실·동시성이 있는 상태에서도 돈이 맞아떨어지는 결제 흐름을 따라가 본 실험실.
 
 자금 흐름은 세 단계다.
 
@@ -38,8 +38,8 @@ flowchart LR
 
 ## 결제 흐름
 
-1. **Checkout** — `CheckoutService`가 요청으로 멱등 키(`IdempotencyCreator`)를 만들어 `orderId`로 쓰고, `payment_events`·`payment_orders`(`NOT_STARTED`)를 한 트랜잭션에 저장한다.
-2. **Confirm** — `PaymentConfirmService`가 주문 행을 `SELECT … FOR UPDATE`로 잠그고 `NOT_STARTED`·`UNKNOWN`에서만 `EXECUTING`으로 넘긴다. 이미 처리 중이거나 끝난 결제는 PSP를 부르지 않고 현재 상태로 응답하고, 없는 `orderId`는 `PAYMENT_NOT_FOUND` 실패로 응답한다. 저장된 금액 합과 요청 금액을 비교한 뒤 `TossPaymentExecutor`로 PSP 승인을 호출한다. `Idempotency-Key: orderId` 헤더를 붙인다.
+1. **Checkout** — `CheckoutController`가 요청으로 멱등 키(`IdempotencyCreator`)를 만들어 `orderId`로 넘기고, `CheckoutService`가 `payment_events`·`payment_orders`(`NOT_STARTED`)를 한 트랜잭션에 저장한다.
+2. **Confirm** — `PaymentConfirmService`가 상태 전이를 요청하면 `R2DBCPaymentStatusUpdateRepository`가 주문 행을 `SELECT … FOR UPDATE`로 잠그고 `NOT_STARTED`·`UNKNOWN`에서만 `EXECUTING`으로 넘긴다. 이미 처리 중이거나 끝난 결제는 PSP를 부르지 않고 현재 상태로 응답하고, 없는 `orderId`는 `PAYMENT_NOT_FOUND` 실패로 응답한다. 저장된 금액 합과 요청 금액을 비교한 뒤 `TossPaymentExecutor`로 PSP 승인을 호출한다. `Idempotency-Key: orderId` 헤더를 붙인다.
 3. **에러 분류·재시도** — `TossPaymentError`가 응답 코드를 성공·실패·알 수 없음으로 나눈다. 알 수 없음과 타임아웃만 `Retry.backoff(2, 1s).jitter(0.1)`로 재시도하고, 끝까지 실패하면 `PaymentErrorHandler`가 `UNKNOWN`으로 기록한다. `ALREADY_PROCESSED_PAYMENT`는 Toss 결제 조회(`GET /v1/payments/{paymentKey}`)로 확인해 정상 성공으로 바꾸고, 확인이 안 되면 `UNKNOWN`으로 남긴다.
 4. **아웃박스** — 성공 시 상태 변경과 `outboxes` INSERT를 한 트랜잭션에서 커밋하고, 커밋 후(`AFTER_COMMIT`) `PaymentEventMessageSender`가 `payment` 토픽으로 발행한다. payload에는 주문 라인(`paymentOrderId`, `sellerId`, `productId`, `amount`)과 `totalAmount`를 싣는다. 파티션은 `orderId` 해시로 고정해 같은 결제는 같은 파티션으로 간다. 발행이 빠진 행은 릴레이가 3분마다 다시 보낸다.
 5. **정산** — Wallet이 payload의 주문 라인을 판매자별로 묶어 `@Version` 낙관적 락으로 지갑 잔액을 갱신한다. 충돌하면 최신 값을 다시 읽어 최대 3번 재시도한다(지수 백오프 + 상한 + 지터). 지갑이 없는 판매자가 있으면 실패시켜 DLQ로 보낸다. 중복은 `wallet_transactions.idempotency_key` UNIQUE가 막는다.
@@ -57,7 +57,7 @@ flowchart LR
 | 순서 보장 | Kafka | 같은 결제 건의 이벤트가 뒤바뀌어 처리되는 경우 | 일부. 같은 `orderId`를 같은 파티션으로 보내는 것까지 |
 | 복식부기 | Ledger | 차변·대변 합이 0이 아니면 커밋되지 않게 한다 | 구현. 저장 전에 거래별 차변 합 = 대변 합, 대변 합 = 결제 총액을 도메인(`Ledger.verifyBalanced`)과 어댑터에서 확인한다 |
 | 불변 장부 | Ledger | DB 트리거로 `UPDATE`·`DELETE`를 막아 append-only를 강제한다 | 구현. `spring.sql.init.mode: always`로 기동 때 트리거를 건다. 테스트로 거부를 확인한다 |
-| Retry Queue / DLQ | Wallet, Ledger, Payment | 소비 실패한 메시지를 유실하지 않고 재시도·격리한다 | 바인더 설정(`max-attempts: 5`, `enable-dlq`). 실패 메시지가 DLQ로 가는 것은 테스트로 확인했다. DLQ를 소비·재처리하는 코드는 없다 |
+| Retry Queue / DLQ | Wallet, Ledger, Payment | 소비 실패한 메시지를 유실하지 않고 재시도·격리한다 | 바인더 설정(Wallet·Ledger 소비자 `max-attempts: 5`, 세 서비스 `enable-dlq`). Wallet·Ledger에서 실패 메시지가 DLQ로 가는 것은 테스트로 확인했다. DLQ를 소비·재처리하는 코드는 없다 |
 | Bulkhead | Payment | 한 PSP가 느려질 때 다른 결제까지 같이 죽지 않게 막는다 | 미구현 |
 | Reconciliation | 전체 | 서비스 간 데이터가 어긋났을 때 대조로 찾아내고 복구한다 | 미구현 |
 
@@ -68,8 +68,8 @@ flowchart LR
 ```text
 dev.deepdive.paymentsystem.{payment,wallet,ledger}
 ├── adapter
-│   ├── in             # web(컨트롤러), stream(Kafka 컨슈머), scheduler(복구·릴레이, payment)
-│   └── out            # persistent·persistence(DB), stream(Kafka 프로듀서), web(PSP·상품 조회)
+│   ├── in             # stream(Kafka 컨슈머), web(컨트롤러, payment), scheduler(복구·릴레이, payment)
+│   └── out            # persistent·persistence(DB), stream(Kafka 프로듀서, payment), web(PSP·상품 조회, payment)
 ├── application
 │   ├── port/in        # 유스케이스 인터페이스
 │   ├── port/out       # 외부 의존 인터페이스
@@ -96,7 +96,7 @@ payment 서비스의 `common`은 `dev.deepdive.paymentsystem.common`에 있고, 
 - ledger 테이블은 DELETE 금지 트리거가 있어 비울 수 없다. 테스트마다 새 `orderId`를 쓰고 그 `orderId`로만 확인한다. 트리거를 만들려고 MySQL 컨테이너에 `--log-bin-trust-function-creators=1`을 준다.
 - 실제 Toss 테스트 서버를 부르는 `TossPaymentExecutorTest`만 `@Tag("ExternalIntegration")`으로 빠진다. 포함하려면 `-PincludeIntegration`을 준다.
 
-애플리케이션으로 직접 띄우려면 `application` 플러그인의 `run`을 쓴다. 이때는 `application.yml`이 기대하는 MySQL과 Kafka가 로컬에 있어야 한다. 스키마는 세 서비스 모두 기동 때 `schema.sql`을 적용한다(`spring.sql.init.mode: always`, 멱등 DDL). Hibernate는 `validate`만 한다. 토픽 자동 생성이 꺼져 있으므로 `payment`(파티션 6), `wallet`, `ledger`와 DLQ 토픽을 미리 만든다. 바인더는 DLQ에도 원래 레코드와 같은 파티션 번호로 보내므로 `payment_wallet_dlq`·`payment_ledger_dlq`는 `payment`와 같은 6개 파티션이어야 한다.
+애플리케이션으로 직접 띄우려면 `application` 플러그인의 `run`을 쓴다. 이때는 `application.yml`이 기대하는 MySQL과 Kafka가 로컬에 있어야 한다. 스키마는 세 서비스 모두 기동 때 `schema.sql`을 적용한다(`spring.sql.init.mode: always`, 멱등 DDL). Wallet·Ledger의 Hibernate는 `validate`만 한다. 토픽 자동 생성이 꺼져 있으므로 `payment`(파티션 6), `wallet`, `ledger`와 DLQ 토픽을 미리 만든다. 바인더는 DLQ에도 원래 레코드와 같은 파티션 번호로 보내므로 `payment_wallet_dlq`·`payment_ledger_dlq`는 `payment`와 같은 6개 파티션이어야 한다.
 
 ```bash
 ./gradlew :payment-system-payment-service:run
@@ -115,7 +115,7 @@ payment 서비스의 `common`은 `dev.deepdive.paymentsystem.common`에 있고, 
 
 ## 현재 상태
 
-Checkout → Confirm(PSP 호출·에러 분류·재시도) → 아웃박스 발행 → 지갑 정산 → 장부 기록 → 결제 완료 집계, 그리고 복구·릴레이 스케줄러까지 한 바퀴가 돈다. 처음 정리한 "알려진 문제"는 아래처럼 고쳤고, 세 서비스 테스트가 Testcontainers로 CI에서 돈다.
+Checkout → Confirm(PSP 호출·에러 분류·재시도) → 아웃박스 발행 → 지갑 정산 → 장부 기록 → 결제 완료 집계, 그리고 복구·릴레이 스케줄러까지 각 단계를 서비스별 통합 테스트로 확인한다(세 서비스를 함께 띄운 종단 테스트는 없다). 처음 정리한 "알려진 문제"는 아래처럼 고쳤고, 세 서비스 테스트가 Testcontainers로 CI에서 돈다.
 
 ### 고친 것
 
@@ -131,9 +131,9 @@ Checkout → Confirm(PSP 호출·에러 분류·재시도) → 아웃박스 발�
 - **소비자 멱등성.** `wallet_transactions`·`ledger_transactions`의 `idempotency_key`에 UNIQUE를 걸었다(schema + JPA). 키는 `orderId`·참조 종류·참조 id(지갑은 거래 방향까지)로 만든다. 같은 메시지가 동시에 들어와도 늦은 쪽은 UNIQUE 위반으로 롤백되고 "이미 처리됨" 성공으로 응답한다. INSERT는 키 순으로 정렬하고, 교착으로 희생된 트랜잭션은 다시 시도한다.
 - **지갑 없는 판매자.** 조용히 건너뛰지 않고 `WalletNotFoundException`으로 처리 전체를 실패시킨다. 메시지는 재시도 후 DLQ로 간다.
 - **형식적인 복식부기 검사.** `DoubleLedgerEntry`가 방향·양수·계정까지 확인하고, 저장 전에 거래별 차변 합 = 대변 합, 배치 안 거래 중복 없음, 대변 합 = 결제 총액을 확인한다. 어댑터도 매핑된 JPA 행으로 거래별 합을 다시 본다.
-- **낙관적 락 재시도 대기.** `Thread.sleep(random × 100ms)`를 지수 백오프(50ms부터, 상한 1초) + equal jitter로 바꿨다. 총 시도는 1 + `MAX_RETRIES`(3) 그대로다. 지갑을 id 순으로 정렬해 동시 정산끼리의 교착도 없앴다.
+- **낙관적 락 재시도 대기.** `Thread.sleep(random × 100ms)`를 지수 백오프(50ms부터, 상한 1초) + equal jitter로 바꿨다. 총 시도는 1 + `MAX_RETRIES`(3) = 4회다(이전 코드는 재시도 루프 경계 때문에 최대 5회 시도했다). 지갑을 id 순으로 정렬해 동시 정산끼리의 교착 가능성을 줄이고, 교착으로 희생된 트랜잭션은 같은 방식으로 다시 시도한다.
 - **헥사고날 의존 방향.** 애플리케이션 계층이 쓰는 예외를 `application/exception`으로, `PaymentEventMessagePublisher`를 domain에서 `adapter/out/stream`으로 옮겼다.
-- **스키마 적용.** 세 서비스 모두 `spring.sql.init.mode: always`로 `schema.sql`을 기동 때 적용하고 Hibernate는 `validate`다. Ledger 트리거가 자동으로 걸린다.
+- **스키마 적용.** 세 서비스 모두 `spring.sql.init.mode: always`로 `schema.sql`을 기동 때 적용하고 Wallet·Ledger의 Hibernate는 `validate`다. Ledger 트리거가 자동으로 걸린다.
 - **테스트.** Testcontainers 기반으로 바꾸고 태그를 뗐다. sleep만 하던 테스트에 결과 assert(Awaitility)를 넣고, 동시성(완료 집계, 중복 confirm, 소비자 중복)과 단위(PSP 응답 매핑, 결제수단, 없는 주문, 복식부기, 백오프, 스케줄러) 테스트를 더했다.
 
 고치면서 함께 드러난 것도 고쳤다.
@@ -150,8 +150,8 @@ Checkout → Confirm(PSP 호출·에러 분류·재시도) → 아웃박스 발�
 
 ### 알려진 문제
 
-- **threshold를 넘긴 결제는 `UNKNOWN`으로 남는다.** `failed_count`가 `threshold`(5)에 닿으면 복구 대상에서 빠지고 알림이나 수동 검토 경로가 없다.
-- **복구는 재승인부터 한다.** PSP 조회는 `ALREADY_PROCESSED_PAYMENT` 응답일 때만 한다. 가상계좌처럼 승인 응답이 `DONE`이 아닌 경우(`WAITING_FOR_DEPOSIT`)도 따로 다루지 않는다.
+- **threshold에 닿은 결제는 `UNKNOWN`으로 남는다.** `failed_count`가 `threshold`(5)에 닿으면 복구 대상에서 빠지고 알림이나 수동 검토 경로가 없다.
+- **복구는 재승인부터 한다.** PSP 조회는 `ALREADY_PROCESSED_PAYMENT` 응답일 때만 한다. 가상계좌처럼 승인 응답이 `DONE`이 아닌 경우(`WAITING_FOR_DEPOSIT`)도 2xx면 성공으로 기록해, 입금 전에 정산·장부가 진행된다. 입금 확인(웹훅·조회) 경로는 없다.
 - **DLQ 재처리, Bulkhead, Reconciliation은 아직 없다.**
 - **Kafka 트랜잭션과 DB 트랜잭션이 따로다.** Wallet·Ledger는 DB 커밋 뒤 결과를 발행하므로 발행 실패 시 재전달과 멱등성에 기댄다.
 - **payment의 리액티브 소비자에는 바인더 재시도·DLQ가 기대대로 적용되지 않을 수 있다.** 요소별 에러 처리가 없다.

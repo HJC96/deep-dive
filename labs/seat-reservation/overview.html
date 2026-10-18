@@ -351,15 +351,17 @@ public SeatReservationRequestResult reserve(long userId, String seatNo) {
 // 프로듀서: 좌석 번호를 메시지 키로, 전송 결과 future를 반환
 return kafkaTemplate.send(TOPIC, seatNo, new SeatReservationCommand(userId, seatNo).serialize());
 
-// 기록기: 좌석/사용자 단위 멱등 + DB 유니크 제약 (트랜잭션은 일부러 걸지 않음)
+// 기록기: 좌석/사용자 단위 멱등 + DB 유니크 제약 (메서드 전체에는 트랜잭션을 걸지 않음)
 public SeatReservationStatus save(long userId, String seatNo) {
     Optional&lt;SeatReservationStatus&gt; existing = existingStatus(userId, seatNo);
     if (existing.isPresent()) {
         return existing.get();      // 같은 예약이면 ACCEPTED(멱등), 겹치면 거절 상태
     }
-    simulateSlowDb();               // seat.db.write-delay-millis (기본 0)
     try {
-        seatReservationRepository.save(new SeatReservation(seatNo, userId));
+        transactionTemplate.executeWithoutResult(status -&gt; {   // "느린 쓰기 + INSERT"만 한 트랜잭션으로 커밋
+            simulateSlowDb();       // seat.db.write-delay-millis (기본 0)
+            seatReservationRepository.saveAndFlush(new SeatReservation(seatNo, userId));
+        });
         return SeatReservationStatus.ACCEPTED;
     } catch (DataIntegrityViolationException e) {
         return existingStatus(userId, seatNo).orElseThrow(() -&gt; e);   // 중복 키 → 이미 예약됨
@@ -367,7 +369,7 @@ public SeatReservationStatus save(long userId, String seatNo) {
 }</code></pre>
           <dl class="kv">
             <dt>결과</dt><dd>250 요청 → <code>acceptedCount == 50</code>, Awaitility로 최대 15초 기다려 DB 50건·좌석마다 1건. 중복 메시지 테스트: 같은 메시지 2번 → 1건 유지(2초간 <code>during</code>으로 확인).</dd>
-            <dt>왜 Kafka</dt><dd>요청은 Redis 선점 + publish까지만 → DB 대기 없음. Consumer가 DB 속도로 소비 → 스파이크 흡수. Kafka 로그는 내구성이 있어 앱이 죽어도 커맨드가 남음 (README).</dd>
+            <dt>왜 Kafka</dt><dd>요청은 Redis 선점 + publish까지만 → DB 대기 없음. Consumer가 DB 속도로 소비 → 스파이크 흡수. 브로커에 기록된 커맨드는 앱이 죽어도 남아 다시 소비할 수 있음. <code>send()</code>는 브로커 ack을 기다리지 않아, 기록되기 전에 앱이 죽으면 그 커맨드는 사라질 수 있음 (README).</dd>
             <dt>설정 게이팅</dt><dd><code>KafkaTopicConfig</code>, Consumer는 <code>@ConditionalOnProperty(seat.kafka.enabled=true)</code>. 토픽은 <code>partitions(1)</code>, <code>replicas(1)</code>.</dd>
             <dt>코드</dt><dd><code>labs/seat-reservation/src/main/java/dev/deepdive/seat/service/RedisKafkaSeatReservationService.java</code>, <code>.../kafka/SeatReservationCommandPublisher.java</code>, <code>.../kafka/SeatReservationConfirmConsumer.java</code>, <code>.../kafka/KafkaTopicConfig.java</code></dd>
           </dl>
@@ -541,7 +543,7 @@ try {
       </div></details>
       <details id="iv-2" class="qa"><summary>Kafka를 넣으면 무엇이 좋아지고, 무엇을 대가로 치르나요?</summary><div class="a">
         <ul>
-          <li>좋아지는 것: 요청 경로에서 DB 쓰기 제거 → 느린 DB에서도 즉시 응답(README 예시: 직접 쓰기 실패 88건 vs Kafka 0건). 스파이크를 토픽이 버퍼링. 커맨드가 로그에 남아 내구성.</li>
+          <li>좋아지는 것: 요청 경로에서 DB 쓰기 제거 → 느린 DB에서도 즉시 응답(README 예시: 직접 쓰기 실패 88건 vs Kafka 0건). 스파이크를 토픽이 버퍼링. 브로커에 기록된 커맨드는 앱이 죽어도 남아 다시 소비할 수 있음(<code>send()</code>는 브로커 ack을 기다리지 않아, 기록되기 전에 앱이 죽으면 그 커맨드는 사라질 수 있음 — README).</li>
           <li>대가: 최종 일관성(응답 시점엔 DB에 아직 없음, 예시에서 확정까지 3,780ms). at-least-once라 멱등 처리 필요. 확정 실패 처리(FailedEvent, 재처리) 필요. 운영 구성요소 증가.</li>
         </ul>
       </div></details>

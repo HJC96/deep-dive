@@ -29,7 +29,7 @@ spring:
           brokers: ${KAFKA_BROKERS:localhost:9092}
           required-acks: all
           auto-create-topics: false
-          # 정산 저장과 지갑 이벤트 발행을 하나의 Kafka 트랜잭션으로 묶는다.
+          # 지갑 이벤트 발행을 Kafka 트랜잭션으로 처리한다. DB 정산 저장과는 별개의 트랜잭션이다(README '알려진 문제' 참고).
           transaction:
             transaction-id-prefix: wallet-
             producer:

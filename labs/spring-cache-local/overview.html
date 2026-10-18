@@ -422,7 +422,7 @@ public CacheManager cacheManager() {
         <li><code>src/main/java/dev/deepdive/springcache/SpringCacheApplication.java</code><span><code>@EnableCaching</code></span></li>
         <li><code>src/main/java/dev/deepdive/springcache/config/CacheConfig.java</code><span><code>ConcurrentMapCacheManager</code>와 cacheName 목록</span></li>
         <li><code>src/main/java/dev/deepdive/springcache/book/StudyBookService.java</code><span>어노테이션 4종 학습용 서비스</span></li>
-        <li><code>src/main/java/dev/deepdive/springcache/book/BookLookupService.java</code><span>cacheName 분리, key="#id", DTO 키, 테이블 버전 키, 관련 캐시 함께 무효화(<code>@Caching</code>)</span></li>
+        <li><code>src/main/java/dev/deepdive/springcache/book/BookLookupService.java</code><span>cacheName 분리, key="#id", DTO 키, 테이블 버전 키, id key 세 캐시 함께 무효화(<code>@Caching</code>)</span></li>
         <li><code>src/main/java/dev/deepdive/springcache/book/BookRepository.java</code><span><code>findNameById</code>, <code>findMaxUpdatedAt</code></span></li>
         <li><code>src/main/java/dev/deepdive/springcache/book/BookEntity.java</code><span><code>idx_books_updated_at</code> 인덱스, <code>timestamp(6)</code></span></li>
         <li><code>src/main/java/dev/deepdive/springcache/book/BookSearchCondition.java</code><span>record 키 (+ <code>BookSearchConditionWithoutEquals.java</code>)</span></li>

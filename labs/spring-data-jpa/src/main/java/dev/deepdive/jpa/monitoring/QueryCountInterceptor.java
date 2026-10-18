@@ -29,7 +29,8 @@ public class QueryCountInterceptor implements HandlerInterceptor {
     /**
      * 매칭된 패턴이 없을 때 쓰는 고정 uri tag. 원시 URI로 폴백하면 패턴 없는 요청마다
      * 새 시계열이 생겨 패턴 태깅으로 막으려던 카디널리티 폭발이 그대로 돌아온다.
-     * Spring Boot의 {@code http.server.requests}도 같은 경우 {@code UNKNOWN}을 쓴다.
+     * Spring Boot의 {@code http.server.requests}도 패턴이 없으면 {@code UNKNOWN}을 쓴다. 다만 404·3xx는
+     * {@code NOT_FOUND}·{@code REDIRECTION}으로 따로 둔다.
      */
     static final String UNKNOWN_URI = "UNKNOWN";
 
