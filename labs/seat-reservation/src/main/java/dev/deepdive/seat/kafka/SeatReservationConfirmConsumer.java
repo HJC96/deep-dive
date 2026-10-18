@@ -53,7 +53,7 @@ public class SeatReservationConfirmConsumer {
                         command.userId(), command.seatNo(), status);
             }
         } catch (Exception e) {
-            // DB 확정 실패 → 카운트만 먹고 좌석이 붕 뜨지 않도록 실패 이벤트로 남겨 배치가 재처리하게 한다.
+            // DB 확정 실패 → 카운트만 먹고 좌석이 붕 뜨지 않도록 실패 이벤트로 남긴다(재처리 배치는 향후 구현 — README).
             log.error("좌석 예약 확정 실패. userId={}, seatNo={}", command.userId(), command.seatNo(), e);
             failedEventRepository.save(new FailedEvent(command.userId(), command.seatNo(), truncate(message)));
         }

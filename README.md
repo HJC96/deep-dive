@@ -3,6 +3,10 @@
 
 공부하다 직접 돌려보고 싶은 내용을 정리하는 실험실. 주제 하나당 `labs/` 아래 모듈 하나.
 
+> 실험 코드와 문서는 AI 코딩 도구로 작성했다. 주제와 비교할 방식은 직접 정했고, 테스트를 돌려 결과를 확인하면서 코드와 설명을 검토하고 고쳤다.
+> `payment-system`은 인프런 「견고한 결제 시스템 구축」 강의(원본 Kotlin)를 Java로 옮기며 따라간 모듈이다.
+> 2026-10의 모듈별 결함 수정·테스트 보강과 복습 페이지(`overview.html`·`labs/index.html`·`labs/game.html` 등)는 AI 코딩 도구에 맡겨 만들었다.
+
 모듈마다 흐름 다이어그램·비교·한계·면접 Q&A를 시각적으로 정리한 `overview.html`이 있다. 레포를 내려받아 [`labs/index.html`](labs/index.html)을 브라우저로 열면 전체 지도에서 각 모듈로 이동할 수 있다. 스크롤 없이 퀴즈·면접 질문·함정 카드를 클릭하며 복습하려면 [`labs/game.html`](labs/game.html)(게임 모드)을 연다.
 
 ## 모듈
@@ -11,15 +15,15 @@
 - `java-sandbox` — AES 암호화 시 BouncyCastle Provider 등록 비용을 JMH로 측정하는 실험용 공간
 - `cache-patterns` — Cache Aside / Read Through / Write Through / Write Around / Write Behind 캐시 패턴 비교
 - `spring-cache-local` — Spring Cache를 로컬 인메모리 캐시로 사용할 때의 동작 실험
-- `spring-cache-redis` — Spring Cache를 Redis 기반 공용 캐시로 사용할 때의 동작 실험. Cache Aside/Null Caching/TTL Jitter/Hot Key 방어를 `RedisTemplate`으로 직접 구현
+- `spring-cache-redis` — Spring Cache를 Redis 기반 공용 캐시로 사용할 때의 동작 실험. Cache Aside/Null Caching/TTL Jitter/Hot Key 방어는 Spring Cache 추상화 대신 `RedisTemplate`으로 구현
 - `spring-test-infra` — `@DynamicPropertySource`와 Testcontainers 기반 테스트 인프라 실험, ArchUnit 아키텍처 검증
 - `spring` — `@Async`와 Java `ExecutorService` 비교 등 Spring 핵심 기능 실험
 - `seat-reservation` — 좌석 예약 동시성, Redis 선점, Kafka 비동기 확정 실험
 - `distributed-transaction-monolith` — 좌석·지갑·예약을 하나의 로컬 트랜잭션으로 처리하는 Monolithic 기준선
 - `distributed-transaction-msa` — Reservation·Seat·Wallet을 분리하고 서비스별 로컬 트랜잭션의 부분 커밋을 재현하는 MSA 기준선
 - `distributed-transaction-2pc` — MySQL `XA` SQL로 prepare·commit 두 단계를 직접 실행해 부분 커밋을 없애고, 대신 생기는 블로킹과 in-doubt를 재현
-- `distributed-transaction-tcc` — Try로 자원을 잡고 바로 커밋한 뒤 Confirm·Cancel로 마무리. 락을 안 쥐는 대신 멱등성·빈 취소·매달림을 직접 처리
-- `payment-system` — Payment·Wallet·Ledger를 Kafka로 잇는 결제 시스템. 아웃박스·DLQ·Bulkhead·낙관적 락·복식부기 불변 장부·대사(reconciliation)로 장애와 유실을 견디게 만든다
+- `distributed-transaction-tcc` — Try로 자원을 잡고 바로 커밋한 뒤 Confirm·Cancel로 마무리. 단계 사이에 락을 안 쥐는 대신 멱등성·빈 취소·매달림을 참여자 코드가 처리
+- `payment-system` — Payment·Wallet·Ledger를 Kafka로 잇는 결제 흐름(강의 포팅). 아웃박스·DLQ·낙관적 락·복식부기 불변 장부로 장애·중복에 대비한다. Bulkhead·대사(reconciliation)는 아직 구현하지 않았다
 - `spring-data-jpa` — 낙관적 락과 Hibernate SQL 관찰 실험
 - `spring-boot-actuator` — Actuator 기본 엔드포인트와 커스텀 헬스 체크 관찰
 

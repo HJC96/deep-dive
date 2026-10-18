@@ -16,8 +16,8 @@
 - `seat-reservation`: 좌석 예약 동시성 실험실
 - `spring-data-jpa`: Spring Data JPA 실험실
 - `spring-boot-actuator`: Spring Boot Actuator 관찰 실험실
-- `distributed-transaction-monolith`: 단일 DB 트랜잭션으로 좌석 예약 정합성을 보장하는 Monolithic 실험실
+- `distributed-transaction-monolith`: 좌석·지갑·예약을 단일 DB 트랜잭션으로 처리하는 Monolithic 실험실
 - `distributed-transaction-msa`: 서비스별 DB와 로컬 트랜잭션으로 부분 커밋을 재현하는 MSA 실험실
 - `distributed-transaction-2pc`: MySQL `XA` SQL로 2단계 커밋을 직접 실행하는 실험실
-- `distributed-transaction-tcc`: Try·Confirm·Cancel로 락 없이 정합성을 맞추는 실험실
-- `payment-system`: 장애·메시지 유실·동시성에도 돈이 맞아떨어지는 결제 시스템 실험실
+- `distributed-transaction-tcc`: Try·Confirm·Cancel로 단계 사이에 락을 쥐지 않고 정합성을 맞추는 실험실
+- `payment-system`: 결제 → 정산 → 장부를 Kafka로 잇는 흐름을 강의(인프런 「견고한 결제 시스템 구축」, 원본 Kotlin)를 Java로 옮기며 따라간 실험실

@@ -535,9 +535,9 @@ findBookSummary(1L, "en") -> key = 1L
 
 ## 같은 데이터를 담는 캐시가 여러 개일 때
 
-`BookLookupService`는 같은 책을 세 가지 모양으로 캐싱한다: `bookById`(Book 전체), `bookName`(이름), `bookSummary`(이름으로 만든 요약). 이름을 바꾸는 쓰기가 `bookById`만 갱신하면 나머지 두 캐시에는 옛 이름이 남는다.
+`BookLookupService`는 같은 책을 여러 모양으로 캐싱한다. 이 절은 그중 `id` 하나를 key로 쓰는 세 캐시를 다룬다: `bookById`(Book 전체), `bookName`(이름), `bookSummary`(이름으로 만든 요약). 이름을 바꾸는 쓰기가 `bookById`만 갱신하면 나머지 두 캐시에는 옛 이름이 남는다.
 
-그래서 쓰기 메서드는 관련 캐시를 함께 무효화한다.
+그래서 쓰기 메서드는 이 세 캐시를 함께 무효화한다. 테이블 버전을 key에 넣은 `bookNameByTableVersion`은 무효화 대상에 넣지 않았다.
 
 ```java
 @Caching(

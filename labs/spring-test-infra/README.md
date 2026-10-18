@@ -191,7 +191,7 @@ flowchart LR
 
 - `SampleController` → `SampleService` → `SampleRepository` 방향만 허용된다.
 - Repository가 Controller를 직접 호출하는 코드가 생기면 `check()`가 `AssertionError`를 던진다. 위반 예시 `ControllerCallingRepository`를 별도 패키지(`archunit.violation.repository`)에 두고, 위반 케이스에서만 Repository 계층에 함께 넣어 실제로 실패하는지 확인한다. 정상 케이스는 이 패키지를 임포트하지 않는다.
-- 세 계층 모두 생성자 주입만 사용하므로 규칙 검증이 통과한다.
+- 세 계층이 정해진 방향으로만 서로를 참조하므로 규칙 검증이 통과한다. 생성자 주입 여부는 케이스 4의 필드 주입 규칙이 따로 검사한다.
 - 계층에 속하지 않은 패키지(`legacy`)는 이 검증 대상에서 제외한다. `mayOnlyBeAccessedByLayers`는 정의되지 않은 패키지의 접근도 위반으로 잡기 때문이다.
 
 ## 케이스 4. 필드 주입 금지 규칙 검증

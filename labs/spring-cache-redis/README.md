@@ -1,6 +1,6 @@
 # spring-cache-redis
 
-MySQL/JPA를 원본 저장소로 두고, Spring Cache 추상화와 `StringRedisTemplate` 직접 구현을 비교하며 Redis 캐시 패턴을 검증하는 실험이다.
+MySQL/JPA를 원본 저장소로 두고, Spring Cache 추상화와 `StringRedisTemplate` 기반 구현을 비교하며 Redis 캐시 패턴을 검증하는 실험이다.
 
 ## 어떤 테스트가 있나?
 

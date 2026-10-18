@@ -12,7 +12,7 @@
 
 1. 동시성 제어 없음 → 같은 좌석이 여러 명에게 배정됨
 2. Redis 선점(SADD) → 두 불변식(이중 배정·1인 1좌석)을 보장 (동시성 해결)
-3. Redis + Kafka → DB 확정을 요청 경로에서 분리 (결합·내구성 문제 해결)
+3. Redis + Kafka → DB 확정을 요청 경로에서 분리 (결합 문제 해결. 내구성은 커맨드가 브로커에 기록된 뒤부터)
 4. 버스트 부하 비교 & 실패 처리 → DB가 병목일 때 Kafka가 몰린 요청을 받아 내고, 확정이 실패해도 FailedEvent로 남긴다 (재처리 배치는 향후 구현)
 5. 정합성 보강 → 선점 Lua 원자화, DB 유니크 제약, 확정·전송 실패 시 선점 해제, 깨진 메시지도 FailedEvent로 (아래 "케이스 5" 절)
 
@@ -183,7 +183,7 @@ public SeatReservationRequestResult reserve(long userId, String seatNo) {
 - 같은 사용자가 여러 좌석을 노려도 `seat:applied-users`에 한 번만 들어감 (1인 1좌석 차단)
 - 좌석에서 밀린 요청은 아무 집합에도 들어가지 않으므로, 같은 사용자가 다른 좌석을 바로 다시 시도할 수 있음
 
-한계 (→ 케이스 3에서 Kafka로 해결):
+한계 (→ 케이스 3에서 Kafka로 대응):
 
 - **요청 경로에 DB 쓰기가 결합** — 선점에 성공한 요청 스레드가 그대로 DB `INSERT`까지 끝내야 응답. 매진 오픈처럼 트래픽이 몰리면 확정 쓰기가 한꺼번에 DB로 쏟아짐
 - **RDB가 병목이면 그 지연이 요청으로 전파** — DB 처리량을 넘는 요청이 들어오면 뒤 요청은 앞 작업이 끝날 때까지 대기 → 타임아웃·리소스 고갈
@@ -258,7 +258,7 @@ public SeatReservationRequestResult reserve(long userId, String seatNo) {
         return new SeatReservationRequestResult(userId, seatNo, status);
     }
     // DB 쓰기를 요청 경로에서 분리: 확정 커맨드만 Kafka에 적재하고 즉시 반환
-    commandPublisher.publish(userId, seatNo);
+    commandPublisher.publish(userId, seatNo);   // 전송 실패 시 선점 해제는 아래 조각
     return new SeatReservationRequestResult(userId, seatNo, ACCEPTED);
 }
 ```
@@ -293,7 +293,8 @@ public void consume(String message) {
     seatReservationWriter.save(command.userId(), command.seatNo());
 }
 
-// 트랜잭션을 일부러 걸지 않음: 중복 키 예외를 잡아도 바깥 트랜잭션이 rollback-only가 되지 않게
+// 메서드 전체에는 트랜잭션을 걸지 않음: 중복 키 예외를 잡아도 바깥 트랜잭션이 rollback-only가 되지 않게.
+// "느린 쓰기 + INSERT"만 TransactionTemplate으로 묶어 커밋한다(쓰는 동안 커넥션을 쥐어 버스트 부하의 풀 고갈을 재현).
 public SeatReservationStatus save(long userId, String seatNo) {
     // 같은 예약이 이미 있으면 ACCEPTED(멱등), 다른 예약과 겹치면 거절 상태
     Optional<SeatReservationStatus> existing = existingStatus(userId, seatNo);
@@ -301,7 +302,10 @@ public SeatReservationStatus save(long userId, String seatNo) {
         return existing.get();
     }
     try {
-        seatReservationRepository.save(new SeatReservation(seatNo, userId));
+        transactionTemplate.executeWithoutResult(status -> {
+            simulateSlowDb();
+            seatReservationRepository.saveAndFlush(new SeatReservation(seatNo, userId));
+        });
         return ACCEPTED;
     } catch (DataIntegrityViolationException e) {
         // 조회 이후 다른 쓰기가 먼저 들어와 유니크 제약에 걸림 → 다시 조회해 "이미 예약됨"으로 분류
@@ -322,7 +326,7 @@ public SeatReservationStatus save(long userId, String seatNo) {
 - 좌석 번호를 메시지 키로 써서 같은 좌석 커맨드는 같은 파티션에서 순서대로 처리. 단, 지금 토픽은 파티션 1개(`KafkaTopicConfig`)라 모든 커맨드가 한 파티션에 들어간다. 키는 파티션을 늘렸을 때를 위한 것
 - Consumer가 토픽을 **DB가 감당할 속도로** 소비 → 트래픽 스파이크를 Kafka가 흡수(버퍼링)
 - **Kafka는 at-least-once 보장**: 같은 메시지가 여러 번 전달될 수 있음 (네트워크 재시도, 컨슈머 재시작 등). 예: Consumer가 메시지 처리 후 오프셋 커밋 전에 재시작 → 같은 메시지 재전달. 이를 좌석/사용자 기준 **멱등** 저장으로 흡수 (조회로 먼저 거르고, 조회-저장 사이에 끼어든 중복은 DB 유니크 제약 + 중복 키 예외를 "이미 예약됨"으로 분류)
-- Kafka 로그는 내구성이 있어, 앱이 죽어도 커맨드가 사라지지 않고 재처리 가능
+- 브로커에 기록된 커맨드는 앱이 죽어도 남아 다시 소비할 수 있다. `send()`는 브로커 ack을 기다리지 않으므로, 기록되기 전에 앱이 죽으면 그 커맨드는 사라질 수 있다
 
 ```mermaid
 sequenceDiagram

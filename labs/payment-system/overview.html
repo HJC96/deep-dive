@@ -166,7 +166,7 @@ ul.plain{margin:6px 0;padding-left:20px}ul.plain li{margin:3px 0}
     <header class="hero">
       <div class="eyebrow">deep-dive · labs/payment-system</div>
       <h1>payment-system: 한 트랜잭션으로 묶을 수 없는 결제를 상태·아웃박스·멱등성으로 맞추기</h1>
-      <p class="lead">결제(Payment) → 정산(Wallet) → 장부(Ledger)를 서로 다른 DB와 Kafka로 나눈 결제 시스템입니다. 외부 PSP(Toss) 호출이 끼어 있어서 전체를 한 트랜잭션으로 묶을 수 없습니다. 그래서 각 서비스는 <strong>로컬 트랜잭션만</strong> 쓰고, 그 사이를 <strong>트랜잭셔널 아웃박스·재시도·멱등 소비자</strong>로 이어 "결국에는 맞는" 상태를 만들려고 합니다.</p>
+      <p class="lead">결제(Payment) → 정산(Wallet) → 장부(Ledger)를 서로 다른 DB와 Kafka로 나눈 결제 시스템입니다. 외부 PSP(Toss) 호출이 끼어 있어서 전체를 한 트랜잭션으로 묶을 수 없습니다. 그래서 각 서비스는 <strong>로컬 트랜잭션만</strong> 쓰고, 그 사이를 <strong>트랜잭셔널 아웃박스·재시도·멱등 소비자</strong>로 이어 "결국에는 맞는" 상태를 만들려고 합니다. 인프런 「견고한 결제 시스템 구축」 강의(원본 Kotlin)를 Java로 옮기며 따라간 모듈입니다.</p>
       <div class="chips"><span class="chip">Java 21</span><span class="chip">Spring Boot 3.4.1</span><span class="chip">Spring Cloud 2024.0.0</span><span class="chip">WebFlux + R2DBC (payment)</span><span class="chip">MVC + JPA (wallet·ledger)</span><span class="chip">Kafka · Spring Cloud Stream</span><span class="chip">MySQL</span><span class="chip">Toss Payments</span><span class="chip">헥사고날</span></div>
     </header>
 
@@ -175,8 +175,8 @@ ul.plain{margin:6px 0;padding-left:20px}ul.plain li{margin:3px 0}
       <p class="sub">30초 요약. 아래 그림은 서비스 3개가 Kafka 토픽 3개로 이어지는 전체 구조입니다.</p>
       <div class="grid c3">
         <div class="card bad"><div class="label">문제</div><p>PSP 승인, 결제 DB 커밋, Kafka 발행, 정산, 장부는 서로 다른 시스템에서 일어납니다. 그래서 하나만 실패해도 <strong>돈은 빠졌는데 주문은 실패</strong>하거나 <strong>정산은 됐는데 장부가 비는</strong> 어긋남이 생길 수 있습니다.</p></div>
-        <div class="card"><div class="label">접근</div><p>결제 상태를 5개로 나눕니다(NOT_STARTED·EXECUTING·SUCCESS·FAILURE·<strong>UNKNOWN</strong>). 성공하면 같은 트랜잭션 안에서 <strong>outbox</strong>에 이벤트를 쓰고, 커밋된 뒤에 Kafka로 보냅니다. 받는 쪽은 orderId로 중복을 거르고, 지갑은 <strong>낙관적 락</strong>, 장부는 <strong>복식부기</strong>로 기록합니다.</p></div>
-        <div class="card good"><div class="label">결론</div><p>핵심 흐름(승인 → 아웃박스 → 정산·장부 → 완료)은 <strong>실제로 구현되어 있습니다</strong>. 처음 분석에서 찾은 구멍(돌지 않던 복구·릴레이 스케줄러, 상태 전이 경쟁, 완료 판정 레이스, 비어 있던 정산 데이터, check-then-act 멱등성 등)은 <span class="badge good">수정함</span> 표시처럼 고쳤고, 테스트는 Testcontainers로 CI에서 돕니다. DLQ 재처리·Bulkhead·대사는 아직 없습니다. 면접에서는 "설계 의도 + 찾은 구멍 + 어떻게 고쳤나"를 한 세트로 말하면 됩니다.</p></div>
+        <div class="card"><div class="label">접근</div><p>결제 상태를 5개로 나눕니다(NOT_STARTED·EXECUTING·SUCCESS·FAILURE·<strong>UNKNOWN</strong>). 성공하면 같은 트랜잭션 안에서 <strong>outbox</strong>에 이벤트를 쓰고, 커밋된 뒤에 Kafka로 보냅니다. 받는 쪽은 <code>idempotency_key</code> UNIQUE로 중복을 막고, 지갑은 <strong>낙관적 락</strong>, 장부는 <strong>복식부기</strong>로 기록합니다.</p></div>
+        <div class="card good"><div class="label">결론</div><p>핵심 흐름(승인 → 아웃박스 → 정산·장부 → 완료)은 <strong>실제로 구현되어 있습니다</strong>. 처음 분석에서 드러난 구멍(돌지 않던 복구·릴레이 스케줄러, 상태 전이 경쟁, 완료 판정 레이스, 비어 있던 정산 데이터, check-then-act 멱등성 등)은 <span class="badge good">수정함</span> 표시처럼 AI 코딩 도구가 고쳤고, 테스트는 Testcontainers로 CI에서 돕니다. DLQ 재처리·Bulkhead·대사는 아직 없습니다.</p></div>
       </div>
 
       <h3>서비스 구조: Payment → Kafka → Wallet / Ledger → 다시 Payment</h3>
@@ -571,7 +571,7 @@ private Mono&lt;PaymentConfirmationResult&gt; recover(PaymentConfirmCommand comm
             <dt>트레이드오프</dt><dd>재시도 횟수를 늘리면 성공률은 오르지만 응답 지연과 PSP 부하도 늘어납니다. 그래서 요청 안 재시도는 짧게(2회) 두고, 나머지는 비동기 복구로 넘기는 2단 구조로 만들었습니다.</dd>
             <dt>코드</dt><dd><code>payment-service/src/main/java/dev/deepdive/paymentsystem/payment/application/service/PaymentRecoveryService.java</code></dd>
           </dl>
-          <div class="callout good"><strong><span class="badge good">수정함</span> 현재 상태.</strong> 예전에는 스케줄러가 돌지 않아(<code>@EnableScheduling</code> 없음 + <code>@Profile("dev")</code> 비활성) 2단계가 사실상 없었습니다. 지금은 <code>PaymentScheduler</code>가 기본으로 돌고(<code>payment.scheduler.enabled</code>, 기본 true), 회차를 block으로 기다려 겹치지 않습니다. 여러 인스턴스는 선점 UPDATE가 같은 결제를 두 번 집지 않게 막습니다. threshold를 넘긴 건의 후속 처리는 아직 없습니다.</div>
+          <div class="callout good"><strong><span class="badge good">수정함</span> 현재 상태.</strong> 예전에는 스케줄러가 돌지 않아(<code>@EnableScheduling</code> 없음 + <code>@Profile("dev")</code> 비활성) 2단계가 사실상 없었습니다. 지금은 <code>PaymentScheduler</code>가 기본으로 돌고(<code>payment.scheduler.enabled</code>, 기본 true), 회차를 block으로 기다려 겹치지 않습니다. 여러 인스턴스는 선점 UPDATE가 같은 결제를 두 번 집지 않게 막습니다. threshold에 닿은 건의 후속 처리는 아직 없습니다.</div>
         </div>
 
         <div class="tabpanel card" id="ps-tab-outbox">
@@ -644,7 +644,7 @@ private void retrySaveOperation(List&lt;Wallet&gt; wallets) {
     }
 }
 // [설명] 수정 후: 대기 = min(1000ms, 50ms * 2^(retry-1)) 의 절반 + 랜덤(나머지 절반)  (OptimisticLockRetryBackoff)
-//        총 시도 1 + MAX_RETRIES(3) 는 그대로. 교착 희생(CannotAcquireLockException)도 같은 방식으로 재시도.</code></pre>
+//        총 시도는 1 + MAX_RETRIES(3) = 4회(위 예전 코드는 루프 경계 때문에 최대 5회). 교착 희생(CannotAcquireLockException)도 같은 방식으로 재시도.</code></pre>
           <dl class="kv">
             <dt>어떻게</dt><dd>UPDATE 시 <code>WHERE version = ?</code>로 확인해서 0행이 갱신되면 충돌로 판단합니다(JPA <code>@Version</code>). 충돌하면 최신 잔액을 다시 읽어 <strong>이번 결제분만 더해</strong> 최대 3번 다시 저장합니다. 지갑 갱신과 <code>wallet_transactions</code> 기록은 한 <code>TransactionTemplate</code>에서 처리합니다.</dd>
             <dt>검증</dt><dd><code>JpaWalletRepositoryTest</code>: <code>@RepeatedTest(5)</code>, 스레드 3개가 같은 시작 버전에서 1000·2000·3000을 동시에 저장한 뒤 두 지갑 모두 <strong>version 3, 잔액 6000</strong>인지 assert합니다. <span class="badge good">수정함</span> 백오프는 <code>OptimisticLockRetryBackoff</code>로 빼서 지수 증가·상한·지터 범위를 단위 테스트합니다. 지갑·거래를 정렬해 락 순서를 고정했습니다(Set 순서 때문에 동시 정산끼리 교착이 났음).</dd>
@@ -682,7 +682,7 @@ FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'ledger_entries is appen
           <dl class="kv">
             <dt>어떻게</dt><dd>주문 행 1개마다 거래 1개와 엔트리 2개를 만듭니다. 계정은 <code>accounts</code>에 시드된 id 1 <code>REVENUE</code>, 2 <code>ITEM_BUYER</code>를 이름으로 조회합니다.</dd>
             <dt>검증</dt><dd><code>DoubleLedgerEntryRecordServiceTest</code>: 주문 2건 → 엔트리 4개, CREDIT − DEBIT 합이 0, 대변 합 = 총액, 총액 불일치 시 아무것도 저장 안 됨, UPDATE·DELETE가 트리거로 거부됨, 동시 중복 기록 1회만. <code>LedgerTest</code>·<code>JpaLedgerEntryRepositoryBalanceTest</code>는 방향이 뒤집히거나 거래별로 어긋난 경우를 단위 테스트합니다.</dd>
-            <dt>한계</dt><dd><span class="badge good">수정함</span> ① 예전 생성자 검사는 같은 <code>item.amount()</code>에서 만든 두 값을 비교해 실패할 수 없었습니다(동어반복). 지금은 위의 거래별·총액 불변식을 저장 전에 봅니다. ② 예전에는 <code>spring.sql.init</code> 설정이 없어 트리거가 자동 적용되지 않았습니다. 지금은 세 서비스 모두 <code>spring.sql.init.mode: always</code> + 멱등 DDL이고 Hibernate는 <code>validate</code>입니다. ③ 트리거와 충돌하던 테스트의 <code>deleteAll()</code>은 없애고 테스트마다 새 orderId로 조회합니다.</dd>
+            <dt>한계</dt><dd><span class="badge good">수정함</span> ① 예전 생성자 검사는 같은 <code>item.amount()</code>에서 만든 두 값을 비교해 실패할 수 없었습니다(동어반복). 지금은 위의 거래별·총액 불변식을 저장 전에 봅니다. ② 예전에는 <code>spring.sql.init</code> 설정이 없어 트리거가 자동 적용되지 않았습니다. 지금은 세 서비스 모두 <code>spring.sql.init.mode: always</code> + 멱등 DDL이고 Wallet·Ledger의 Hibernate는 <code>validate</code>입니다. ③ 트리거와 충돌하던 테스트의 <code>deleteAll()</code>은 없애고 테스트마다 새 orderId로 조회합니다.</dd>
             <dt>코드</dt><dd><code>ledger-service/src/main/java/dev/deepdive/paymentsystem/ledger/domain/Ledger.java</code>, <code>ledger-service/src/main/resources/schema.sql</code></dd>
           </dl>
         </div>
@@ -858,7 +858,7 @@ WHERE order_id = :orderId AND is_payment_done = 0
       </div></details>
       <details id="lim-3" class="qa risk"><summary>결제수단 enum이 EASY_PAY 하나뿐: 승인 <em>후</em> 매핑 실패로 UNKNOWN <span class="badge good">확실</span> <span class="badge warn">일부 추정</span> <span class="badge good">수정함</span></summary><div class="a">
         <p><code>PaymentMethod.get</code>은 응답의 method 문자열이 "간편결제"일 때만 성공하고, 나머지는 <code>IllegalStateException</code>을 던집니다(<code>PaymentType</code>도 NORMAL만 허용). 이 예외는 Toss가 <strong>이미 승인한 뒤</strong> 응답을 매핑하다 나므로 "그 외 예외" → UNKNOWN이 됩니다. 이후 재시도하면 Toss가 ALREADY_PROCESSED_PAYMENT를 줄 것이고(<span class="badge warn">추정</span>), 바로 위 버그 때문에 영영 SUCCESS가 되지 못합니다. 카드 결제 응답의 method가 "카드"라는 점은 Toss API에 대한 <span class="badge warn">추정</span>입니다.</p>
-        <p><span class="badge good">수정함</span> <code>PaymentMethod</code>에 Toss 값 8개(카드·가상계좌·간편결제·휴대폰·계좌이체·문화상품권·도서문화상품권·게임문화상품권), <code>PaymentType</code>에 NORMAL·BILLING·BRANDPAY를 넣고, 모르는 값은 예외 대신 <code>UNKNOWN</code>으로 매핑하고 경고 로그를 남깁니다. <code>CULTURE_GIFT_CERTIFICATE</code>(24자)가 <code>VARCHAR(20)</code>에 안 들어가서 <code>method</code> 컬럼을 <code>VARCHAR(50)</code>으로 넓혔습니다(기존 DB는 멱등 <code>ALTER … MODIFY</code>).</p>
+        <p><span class="badge good">수정함</span> <code>PaymentMethod</code>에 Toss 값 8개(카드·가상계좌·간편결제·휴대폰·계좌이체·문화상품권·도서문화상품권·게임문화상품권), <code>PaymentType</code>에 NORMAL·BILLING·BRANDPAY를 넣고, 모르는 값은 예외 대신 <code>UNKNOWN</code>으로 매핑하고 경고 로그를 남깁니다. <b>주의</b>: 가상계좌처럼 승인 응답이 <code>DONE</code>이 아닌 경우(<code>WAITING_FOR_DEPOSIT</code>)도 2xx면 성공으로 기록해, 입금 전에 정산·장부가 진행됩니다. 입금 확인(웹훅·조회) 경로는 없습니다(README '알려진 문제'). <code>CULTURE_GIFT_CERTIFICATE</code>(24자)가 <code>VARCHAR(20)</code>에 안 들어가서 <code>method</code> 컬럼을 <code>VARCHAR(50)</code>으로 넓혔습니다(기존 DB는 멱등 <code>ALTER … MODIFY</code>).</p>
         <p class="source">근거: <code>payment-service/src/main/java/dev/deepdive/paymentsystem/payment/domain/PaymentMethod.java</code></p>
       </div></details>
       <details id="lim-4" class="qa risk"><summary>복구 쿼리의 LIMIT 10이 주문 '행' 단위라 결제가 잘려 FAILURE로 오판될 수 있다 <span class="badge good">확실</span> <span class="badge good">수정함</span></summary><div class="a">
@@ -871,13 +871,13 @@ WHERE order_id = :orderId AND is_payment_done = 0
         <p><span class="badge good">수정함</span> 모든 전이가 한 트랜잭션에서 <code>SELECT … FOR UPDATE</code>로 주문 행을 잠그고 이전 상태를 확인한 뒤, <code>WHERE payment_order_status IN (…)</code> 조건부 UPDATE를 합니다. 최종 상태는 EXECUTING·UNKNOWN에서만, confirm 선점은 NOT_STARTED·UNKNOWN에서만 허용합니다. 이미 SUCCESS·FAILURE면 덮어쓰지 않고 no-op, 처리 중(EXECUTING)인 결제의 재요청은 PSP를 부르지 않고 EXECUTING으로 응답합니다. 복구는 UNKNOWN·3분 넘은 EXECUTING만 선점합니다. 없는 orderId는 DB에 쓰지 않고 <code>PAYMENT_NOT_FOUND</code> FAILURE입니다. 동시 confirm 8개 → PSP 1회를 테스트로 확인합니다.</p>
       </div></details>
       <details id="lim-6" class="qa risk"><summary>failed_count가 threshold에 닿으면 UNKNOWN인 채 방치된다 <span class="badge good">확실</span></summary><div class="a">
-        <p>조회 조건이 <code>failed_count &lt; threshold</code>뿐이라 한도를 넘긴 건은 조용히 빠지고, 알림이나 다른 처리가 없습니다.</p>
-        <p><strong>개선 방향:</strong> 한도를 넘으면 <code>NEEDS_MANUAL_REVIEW</code> 같은 상태나 별도 테이블로 옮기고 알림을 보냅니다. 대사 작업이 PSP 정산 파일과 대조해 최종 상태를 확정합니다.</p>
+        <p>조회 조건이 <code>failed_count &lt; threshold</code>뿐이라 한도에 닿은 건은 조용히 빠지고, 알림이나 다른 처리가 없습니다.</p>
+        <p><strong>개선 방향:</strong> 한도에 닿으면 <code>NEEDS_MANUAL_REVIEW</code> 같은 상태나 별도 테이블로 옮기고 알림을 보냅니다. 대사 작업이 PSP 정산 파일과 대조해 최종 상태를 확정합니다.</p>
       </div></details>
 
       <h3>메시지·소비자</h3>
       <details id="lim-7" class="qa risk"><summary>wallet·ledger가 읽는 로컬 payment_orders를 채우는 코드가 없다 <span class="badge good">확실</span> <span class="badge good">수정함</span></summary><div class="a">
-        <p>두 서비스 모두 자기 DB의 <code>payment_orders</code>를 orderId로 조회합니다. 하지만 메시지 payload에는 <code>orderId</code>만 있고, 이 테이블에 INSERT하는 코드는 어디에도 없습니다(wallet은 schema.sql에도 테이블이 없고 <code>ddl-auto: update</code>로만 생깁니다). 그래서 실제로 돌리면 정산·기장이 <strong>0건인데 SUCCESS 메시지</strong>가 나가고, 결제는 "완료"로 표시됩니다. 테스트는 이 조회를 mock으로 대체해 이 문제를 가립니다.</p>
+        <p>예전에는 두 서비스 모두 자기 DB의 <code>payment_orders</code>를 orderId로 조회했습니다. 하지만 메시지 payload에는 <code>orderId</code>만 있었고, 이 테이블에 INSERT하는 코드는 어디에도 없었습니다(wallet은 schema.sql에도 테이블이 없고 <code>ddl-auto: update</code>로만 생겼습니다). 그래서 실제로 돌리면 정산·기장이 <strong>0건인데 SUCCESS 메시지</strong>가 나가고, 결제는 "완료"로 표시됐습니다. 테스트는 이 조회를 mock으로 대체해 이 문제를 가렸습니다.</p>
         <p><span class="badge good">수정함</span> Event-carried state transfer로 바꿨습니다. outbox payload에 <code>paymentOrders[{paymentOrderId, sellerId, productId, amount}]</code>와 <code>totalAmount</code>를 싣고(metadata <code>payloadVersion: 2</code>), wallet·ledger는 payload만 읽습니다. 로컬 <code>payment_orders</code> 테이블·엔티티·포트는 지웠습니다. 주문 라인이 없는 예전 형식이나 합계가 맞지 않는 메시지는 예외 → 재시도 → DLQ로 격리됩니다(호환성 메모는 README).</p>
       </div></details>
       <details id="lim-8" class="qa risk"><summary>지갑이 없는 판매자는 조용히 건너뛴다 <span class="badge good">확실</span> <span class="badge good">수정함</span></summary><div class="a">
@@ -980,7 +980,7 @@ WHERE order_id = :orderId AND is_payment_done = 0
 
       <details id="iv-7" class="qa"><summary>지갑 정산에 왜 낙관적 락을 썼나요? 다른 선택지와 비교하면?</summary><div class="a">
         <ul>
-          <li>문제는 같은 판매자 지갑에 정산이 동시에 몰릴 때의 Lost Update입니다. <code>@Version</code>으로 충돌을 감지하고, 최신 잔액을 다시 읽어 이번 금액만 더해 최대 3회 재시도합니다. <span class="badge good">수정함</span> 대기는 예전 0~100ms 랜덤에서 지수 백오프(50ms부터, 상한 1초) + equal jitter로 바꿨고, 지갑·거래 순서를 고정해 동시 정산끼리의 교착도 없앴습니다.</li>
+          <li>문제는 같은 판매자 지갑에 정산이 동시에 몰릴 때의 Lost Update입니다. <code>@Version</code>으로 충돌을 감지하고, 최신 잔액을 다시 읽어 이번 금액만 더해 최대 3회 재시도합니다. <span class="badge good">수정함</span> 대기는 예전 0~100ms 랜덤에서 지수 백오프(50ms부터, 상한 1초) + equal jitter로 바꿨습니다. 지갑·거래 순서를 고정해 동시 정산끼리의 교착 가능성을 줄였고, 교착으로 희생된 트랜잭션은 같은 방식으로 다시 시도합니다.</li>
           <li>근거: <code>JpaWalletRepositoryTest</code>가 스레드 3개 동시 저장 후 version 3, 잔액 6000을 5회 반복 검증합니다.</li>
           <li>비교 <span class="badge info">일반 지식</span>: 비관적 락은 충돌이 잦을 때 안정적이지만 락 대기와 데드락 관리가 필요합니다. <code>UPDATE … SET balance = balance + ?</code>는 가장 간단하고 충돌 자체가 없지만 이력과 도메인 규칙이 SQL로 흩어집니다. 인기 판매자처럼 hot row라면 원자적 UPDATE나 판매자별 파티션 직렬 처리가 더 낫다고 답합니다.</li>
         </ul>
@@ -1013,8 +1013,8 @@ WHERE order_id = :orderId AND is_payment_done = 0
       <details id="iv-11" class="qa"><summary>대사(Reconciliation)는 어떻게 설계하겠어요?</summary><div class="a">
         <ul>
           <li>현재: README에 계획만 있고 코드는 없습니다.</li>
-          <li>설계안 <span class="badge info">일반 지식</span>: ① 내부 대사: 일 단위로 payment SUCCESS 합계 = wallet 정산 합계 = ledger CREDIT 합계를 orderId 단위로 대조합니다. ② 외부 대사: PSP 정산 파일이나 조회 API와 payment 상태를 대조해서 UNKNOWN이나 threshold를 초과한 건의 최종 상태를 확정합니다. ③ 불일치는 자동 보정(이벤트 재발행, 반대 분개)이나 수동 검토 큐로 보냅니다.</li>
-          <li>이 프로젝트에서 찾았던 약점(정산 0건인데 SUCCESS, 지갑 없는 판매자 누락, 완료 레이스)이 모두 대사가 있었다면 잡혔을 종류라는 점을 연결해서 말하면 좋습니다. 셋 다 코드로는 고쳤지만(<span class="badge good">수정함</span>), 대사는 "모르는 다음 버그"를 잡는 안전망이라 여전히 필요합니다.</li>
+          <li>설계안 <span class="badge info">일반 지식</span>: ① 내부 대사: 일 단위로 payment SUCCESS 합계 = wallet 정산 합계 = ledger CREDIT 합계를 orderId 단위로 대조합니다. ② 외부 대사: PSP 정산 파일이나 조회 API와 payment 상태를 대조해서 UNKNOWN이나 threshold에 닿은 건의 최종 상태를 확정합니다. ③ 불일치는 자동 보정(이벤트 재발행, 반대 분개)이나 수동 검토 큐로 보냅니다.</li>
+          <li>이 프로젝트에서 드러났던 약점(정산 0건인데 SUCCESS, 지갑 없는 판매자 누락, 완료 레이스)은 모두 대사가 있었다면 잡혔을 종류입니다. 셋 다 코드로는 고쳤지만(<span class="badge good">수정함</span>), 대사는 "모르는 다음 버그"를 잡는 안전망이라 여전히 필요합니다.</li>
         </ul>
       </div></details>
 
@@ -1028,9 +1028,9 @@ WHERE order_id = :orderId AND is_payment_done = 0
 
       <details id="iv-13" class="qa"><summary>(꼬리 질문) 복구 스케줄러, 실제로 돌려 보셨어요?</summary><div class="a">
         <ul>
-          <li>정직하게 답합니다. "코드를 다시 보니 <code>@EnableScheduling</code>이 없고 <code>@Profile("dev")</code>도 활성화하지 않아서 실제로는 돌지 않았습니다. 테스트는 메서드를 직접 호출했고, assert 없이 sleep만 해서 이 문제를 못 잡았습니다."</li>
-          <li>배운 점: "스케줄러나 비동기 경로는 <strong>실행됐다는 증거</strong>(메트릭, 로그)와 <strong>결과 assert</strong>(Awaitility)가 있어야 한다. 테스트를 메서드 직접 호출로만 짜면 배선(wiring) 오류를 못 잡는다."</li>
-          <li><span class="badge good">수정함</span> 한 일: 인바운드 어댑터 <code>PaymentScheduler</code>(<code>@EnableScheduling</code>, 프로퍼티로 끄기), 회차를 block으로 기다려 겹침 방지, 복구 대상 선점 UPDATE(다중 인스턴스 중복 방지), "UNKNOWN이 결국 SUCCESS가 된다"를 검증하는 Testcontainers 통합 테스트와 스케줄러 기동 테스트. 남은 일: 실행 메트릭과 알림.</li>
+          <li>예전 코드에는 <code>@EnableScheduling</code>이 없고 <code>@Profile("dev")</code>도 활성화하지 않아서, 스케줄러가 실제로는 돌지 않았습니다. 테스트는 메서드를 직접 호출했고, assert 없이 sleep만 해서 이 문제를 잡지 못했습니다.</li>
+          <li>교훈: 스케줄러나 비동기 경로는 <strong>실행됐다는 증거</strong>(메트릭, 로그)와 <strong>결과 assert</strong>(Awaitility)가 있어야 한다. 테스트를 메서드 직접 호출로만 짜면 배선(wiring) 오류를 못 잡는다.</li>
+          <li><span class="badge good">수정함</span> AI 코딩 도구가 고친 내용: 인바운드 어댑터 <code>PaymentScheduler</code>(<code>@EnableScheduling</code>, 프로퍼티로 끄기), 회차를 block으로 기다려 겹침 방지, 복구 대상 선점 UPDATE(다중 인스턴스 중복 방지), "UNKNOWN이 결국 SUCCESS가 된다"를 검증하는 Testcontainers 통합 테스트와 스케줄러 기동 테스트. 남은 일: 실행 메트릭과 알림.</li>
         </ul>
       </div></details>
 
