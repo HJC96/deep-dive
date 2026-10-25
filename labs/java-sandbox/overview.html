@@ -584,7 +584,7 @@ public static LazyHolderSingleton getInstance() {
         <ul>
           <li>Mode <code>thrpt</code> = 처리량, Units <code>ops/s</code>는 클수록 빠름. <code>@Threads(8)</code>의 값은 8스레드 합계.</li>
           <li>Cnt = 집계된 측정 반복 수(5), 워밍업 제외.</li>
-          <li>Error = 신뢰구간 절반. JMH 기본은 99.9%(출력의 <code>±(99.9%)</code>). javadoc의 95% 표기는 99.9%로 고쳤습니다.</li>
+          <li>Error = 신뢰구간 절반. JMH 기본은 99.9%(출력의 <code>±(99.9%)</code>). javadoc의 95% 표기는 99.9%로 바로잡혔습니다.</li>
         </ul>
       </div></details>
       <details id="iv-7" class="qa"><summary>(기타 예제) <code>List&lt;? extends T&gt;</code>와 <code>List&lt;? super T&gt;</code>는 언제 쓰나요?</summary><div class="a">

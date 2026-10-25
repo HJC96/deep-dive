@@ -940,7 +940,7 @@ WHERE order_id = :orderId AND is_payment_done = 0
         <ul>
           <li>"DB 커밋 + 메시지 발행"이라는 dual write 문제의 해법입니다. 이벤트를 같은 DB의 outbox 테이블에 <strong>같은 트랜잭션으로</strong> 써서 원자성을 확보하고, 발행은 나중에 합니다.</li>
           <li>구현: <code>updatePaymentStatusToSuccess</code> 한 트랜잭션에서 상태 SUCCESS + outbox INSERT + 트랜잭션 이벤트 등록 → <code>@TransactionalEventListener(AFTER_COMMIT)</code>에서 즉시 발행 → 브로커 ack 결과로 outbox를 SUCCESS/FAILURE로 표시 → 릴레이가 1분 넘은 INIT/FAILURE를 재발행합니다.</li>
-          <li>솔직하게 말할 점: 처음에는 릴레이 스케줄러가 <code>@EnableScheduling</code> 누락과 <code>@Profile("dev")</code>로 돌지 않았고, Kafka 바인딩 설정 키도 틀려 발행 자체가 안 됐습니다. <span class="badge good">수정함</span> 스케줄러 어댑터와 설정 키를 고치고 Testcontainers Kafka 테스트로 "커밋 → 발행 → outbox SUCCESS"와 릴레이 재발행을 확인합니다. 지금은 폴링이고, 규모가 커지면 CDC(Debezium)를 고려하겠습니다. <span class="badge info">일반 지식</span></li>
+          <li>솔직하게 말할 점: 처음에는 릴레이 스케줄러가 <code>@EnableScheduling</code> 누락과 <code>@Profile("dev")</code>로 돌지 않았고, Kafka 바인딩 설정 키도 틀려 발행 자체가 안 됐습니다. <span class="badge good">수정함</span> 스케줄러 어댑터와 설정 키가 고쳐졌고, Testcontainers Kafka 테스트가 "커밋 → 발행 → outbox SUCCESS"와 릴레이 재발행을 확인합니다. 지금은 폴링이고, 규모가 커지면 CDC(Debezium)를 고려하겠습니다. <span class="badge info">일반 지식</span></li>
         </ul>
       </div></details>
 
@@ -948,7 +948,7 @@ WHERE order_id = :orderId AND is_payment_done = 0
         <ul>
           <li>맞습니다. outbox는 at-least-once라서 <strong>소비자가 멱등</strong>해야 합니다.</li>
           <li>wallet과 ledger는 처리 전에 <code>existsByOrderId</code>로 이미 처리한 orderId인지 봅니다. 이미 처리했으면 저장 없이 SUCCESS 응답만 다시 보냅니다(<code>SettlementServiceTest</code>가 2번 호출해도 1번만 반영됨을 검증).</li>
-          <li><span class="badge good">수정함</span> 처음에는 check-then-act에 유니크 제약이 없어 동시 재전달에 뚫렸습니다. 지금은 거래 테이블 <code>idempotency_key</code>(orderId·참조·방향으로 만든 키)에 UNIQUE를 걸고, 같은 트랜잭션의 잔액 갱신까지 롤백된 중복 키 위반을 "이미 처리됨"으로 해석합니다. <code>existsByOrderId</code>는 빠른 길로만 남았고, 동시 6개 → 1번 반영을 테스트로 확인합니다.</li>
+          <li><span class="badge good">수정함</span> 처음에는 check-then-act에 유니크 제약이 없어 동시 재전달에 뚫렸습니다. 지금은 거래 테이블 <code>idempotency_key</code>(orderId·참조·방향으로 만든 키)에 UNIQUE를 걸고, 같은 트랜잭션의 잔액 갱신까지 롤백된 중복 키 위반을 "이미 처리됨"으로 해석합니다. <code>existsByOrderId</code>는 빠른 길로만 남았고, 동시 6개 → 1번 반영을 테스트가 확인합니다.</li>
         </ul>
       </div></details>
 
@@ -974,13 +974,13 @@ WHERE order_id = :orderId AND is_payment_done = 0
           <li>confirm: 주문 행을 <code>FOR UPDATE</code>로 잠그고 NOT_STARTED·UNKNOWN에서만 EXECUTING으로 넘어갑니다. SUCCESS·FAILURE·EXECUTING이면 <code>PaymentAlreadyProcessedException</code>으로 현재 상태만 돌려줍니다(DB 갱신·PSP 호출 없음). 최종 상태도 EXECUTING·UNKNOWN에서만 기록해 SUCCESS를 덮어쓰지 않습니다.</li>
           <li>PSP: <code>Idempotency-Key: orderId</code> 헤더로, 재시도나 복구로 같은 요청이 다시 가도 PSP가 한 번만 승인하게 합니다(PSP 동작에 의존).</li>
           <li>이벤트: outbox <code>(idempotency_key, type)</code> UNIQUE, 소비자 거래 테이블 <code>idempotency_key</code> UNIQUE.</li>
-          <li><span class="badge good">수정함</span> 처음에는 EXECUTING 상태의 동시 요청이 통과했습니다. 행 락 + 조건부 UPDATE로 막았고, 동시 confirm 8개 → PSP 1회를 테스트로 확인합니다.</li>
+          <li><span class="badge good">수정함</span> 처음에는 EXECUTING 상태의 동시 요청이 통과했습니다. 지금은 행 락 + 조건부 UPDATE로 막혀 있고, 테스트가 동시 confirm 8개 → PSP 1회를 확인합니다.</li>
         </ul>
       </div></details>
 
       <details id="iv-7" class="qa"><summary>지갑 정산에 왜 낙관적 락을 썼나요? 다른 선택지와 비교하면?</summary><div class="a">
         <ul>
-          <li>문제는 같은 판매자 지갑에 정산이 동시에 몰릴 때의 Lost Update입니다. <code>@Version</code>으로 충돌을 감지하고, 최신 잔액을 다시 읽어 이번 금액만 더해 최대 3회 재시도합니다. <span class="badge good">수정함</span> 대기는 예전 0~100ms 랜덤에서 지수 백오프(50ms부터, 상한 1초) + equal jitter로 바꿨습니다. 지갑·거래 순서를 고정해 동시 정산끼리의 교착 가능성을 줄였고, 교착으로 희생된 트랜잭션은 같은 방식으로 다시 시도합니다.</li>
+          <li>문제는 같은 판매자 지갑에 정산이 동시에 몰릴 때의 Lost Update입니다. <code>@Version</code>으로 충돌을 감지하고, 최신 잔액을 다시 읽어 이번 금액만 더해 최대 3회 재시도합니다. <span class="badge good">수정함</span> 대기는 예전 0~100ms 랜덤에서 지수 백오프(50ms부터, 상한 1초) + equal jitter로 바뀌었습니다. 지갑·거래 순서가 고정돼 동시 정산끼리의 교착 가능성이 줄고, 교착으로 희생된 트랜잭션은 같은 방식으로 다시 시도됩니다.</li>
           <li>근거: <code>JpaWalletRepositoryTest</code>가 스레드 3개 동시 저장 후 version 3, 잔액 6000을 5회 반복 검증합니다.</li>
           <li>비교 <span class="badge info">일반 지식</span>: 비관적 락은 충돌이 잦을 때 안정적이지만 락 대기와 데드락 관리가 필요합니다. <code>UPDATE … SET balance = balance + ?</code>는 가장 간단하고 충돌 자체가 없지만 이력과 도메인 규칙이 SQL로 흩어집니다. 인기 판매자처럼 hot row라면 원자적 UPDATE나 판매자별 파티션 직렬 처리가 더 낫다고 답합니다.</li>
         </ul>
@@ -997,7 +997,7 @@ WHERE order_id = :orderId AND is_payment_done = 0
       <details id="iv-9" class="qa"><summary>DLQ는 어떻게 동작하나요?</summary><div class="a">
         <ul>
           <li>설정상 wallet·ledger 소비자는 <code>max-attempts: 5</code> 후 <code>payment_wallet_dlq</code> / <code>payment_ledger_dlq</code>로 격리됩니다. payment 쪽 응답 소비자도 <code>wallet_payment_dlq</code> 등이 설정되어 있습니다.</li>
-          <li>솔직한 상태: <strong>설정만 있습니다.</strong> DLQ를 모니터링하거나 재처리하는 코드가 없고, 토픽 자동 생성이 꺼져 있어 DLQ 토픽도 미리 만들어야 합니다. 바인더는 DLQ에도 원래 파티션 번호로 보내므로 DLQ 파티션 수가 원본(6)보다 적으면 격리 자체가 실패합니다(테스트를 붙이며 확인). wallet·ledger에서 지갑 누락·예전 형식 메시지가 DLQ로 가는 것은 테스트로 확인했습니다. payment의 리액티브 소비자에는 바인더 재시도와 DLQ가 기대대로 적용되지 않을 수 있습니다(<span class="badge warn">추정</span>).</li>
+          <li>솔직한 상태: <strong>설정만 있습니다.</strong> DLQ를 모니터링하거나 재처리하는 코드가 없고, 토픽 자동 생성이 꺼져 있어 DLQ 토픽도 미리 만들어야 합니다. 바인더는 DLQ에도 원래 파티션 번호로 보내므로 DLQ 파티션 수가 원본(6)보다 적으면 격리 자체가 실패합니다(README 실행 절에 적혀 있음). wallet·ledger에서 지갑 누락·예전 형식 메시지가 DLQ로 가는 것은 테스트가 확인합니다. payment의 리액티브 소비자에는 바인더 재시도와 DLQ가 기대대로 적용되지 않을 수 있습니다(<span class="badge warn">추정</span>).</li>
           <li>개선: DLQ 적재 시 알림 → 원인 수정 → 재처리 도구(원래 토픽으로 replay)를 만들고, 일시적 오류는 지연 재시도 토픽(retry-5s, retry-1m)으로 단계화합니다. <span class="badge info">일반 지식</span></li>
         </ul>
       </div></details>
@@ -1006,7 +1006,7 @@ WHERE order_id = :orderId AND is_payment_done = 0
         <ul>
           <li>모든 돈의 이동을 차변·대변 한 쌍으로 같은 금액만큼 기록하면, 총합이 0이 아닐 때 오류를 즉시 알 수 있고 "어디서 어디로"가 추적됩니다. 수정이나 삭제 대신 반대 분개를 추가해서 감사 추적을 보존합니다. <span class="badge info">일반 지식</span></li>
           <li>여기서는 주문마다 REVENUE CREDIT + ITEM_BUYER DEBIT을 만들고, DB 트리거(SIGNAL 45000)로 UPDATE와 DELETE를 막습니다.</li>
-          <li><span class="badge good">수정함</span> 처음에는 두 금액이 같은 값에서 나와 검사가 형식적이었고, 트리거도 자동 적용되지 않았습니다. 지금은 저장 전에 거래별 DEBIT 합 = CREDIT 합(방향 기준), 대변 합 = 결제 총액을 도메인과 어댑터 두 곳에서 확인하고, <code>spring.sql.init.mode: always</code>로 트리거를 기동 때 적용하며 거부되는 것을 테스트로 확인합니다. 더 하려면 DB 권한으로 UPDATE·DELETE 자체를 막습니다.</li>
+          <li><span class="badge good">수정함</span> 처음에는 두 금액이 같은 값에서 나와 검사가 형식적이었고, 트리거도 자동 적용되지 않았습니다. 지금은 저장 전에 거래별 DEBIT 합 = CREDIT 합(방향 기준), 대변 합 = 결제 총액을 도메인과 어댑터 두 곳에서 확인하고, <code>spring.sql.init.mode: always</code>로 트리거를 기동 때 적용하며 거부되는 것은 테스트가 확인합니다. 더 하려면 DB 권한으로 UPDATE·DELETE 자체를 막습니다.</li>
         </ul>
       </div></details>
 
@@ -1014,7 +1014,7 @@ WHERE order_id = :orderId AND is_payment_done = 0
         <ul>
           <li>현재: README에 계획만 있고 코드는 없습니다.</li>
           <li>설계안 <span class="badge info">일반 지식</span>: ① 내부 대사: 일 단위로 payment SUCCESS 합계 = wallet 정산 합계 = ledger CREDIT 합계를 orderId 단위로 대조합니다. ② 외부 대사: PSP 정산 파일이나 조회 API와 payment 상태를 대조해서 UNKNOWN이나 threshold에 닿은 건의 최종 상태를 확정합니다. ③ 불일치는 자동 보정(이벤트 재발행, 반대 분개)이나 수동 검토 큐로 보냅니다.</li>
-          <li>이 프로젝트에서 드러났던 약점(정산 0건인데 SUCCESS, 지갑 없는 판매자 누락, 완료 레이스)은 모두 대사가 있었다면 잡혔을 종류입니다. 셋 다 코드로는 고쳤지만(<span class="badge good">수정함</span>), 대사는 "모르는 다음 버그"를 잡는 안전망이라 여전히 필요합니다.</li>
+          <li>이 프로젝트에서 드러났던 약점(정산 0건인데 SUCCESS, 지갑 없는 판매자 누락, 완료 레이스)은 모두 대사가 있었다면 잡혔을 종류입니다. 셋 다 코드로는 고쳐졌지만(<span class="badge good">수정함</span>), 대사는 "모르는 다음 버그"를 잡는 안전망이라 여전히 필요합니다.</li>
         </ul>
       </div></details>
 
@@ -1022,7 +1022,7 @@ WHERE order_id = :orderId AND is_payment_done = 0
         <ul>
           <li>각자 처리 후 <code>wallet</code>/<code>ledger</code> 토픽으로 SUCCESS를 보내면, payment가 해당 플래그를 세우고 둘 다 서 있으면 <code>is_payment_done</code>을 세웁니다. 오프셋은 처리 후 <code>ReceiverOffset.commit()</code>으로 수동 커밋합니다.</li>
           <li>문제(수정 전): 두 메시지가 동시에 오면 둘 다 "상대가 아직"이라고 판단해 완료 플래그가 영구히 안 섰습니다. 판단은 메모리 스냅샷에서 하고, UPDATE에는 트랜잭션이 없었습니다.</li>
-          <li><span class="badge good">수정함</span> 한 트랜잭션에서 자기 플래그 UPDATE → "모든 플래그가 1"을 조건으로 한 완료 UPDATE를 실행합니다. 첫 UPDATE의 행 락이 두 완료를 직렬화하고, 뒤쪽의 조건부 UPDATE는 최신 커밋 값을 봅니다. 동시 도착 테스트로 확인합니다.</li>
+          <li><span class="badge good">수정함</span> 한 트랜잭션에서 자기 플래그 UPDATE → "모든 플래그가 1"을 조건으로 한 완료 UPDATE를 실행합니다. 첫 UPDATE의 행 락이 두 완료를 직렬화하고, 뒤쪽의 조건부 UPDATE는 최신 커밋 값을 봅니다. 동시 도착 테스트가 확인합니다.</li>
         </ul>
       </div></details>
 
@@ -1037,8 +1037,8 @@ WHERE order_id = :orderId AND is_payment_done = 0
       <details id="iv-14" class="qa"><summary>payment는 왜 WebFlux/R2DBC이고 wallet·ledger는 MVC/JPA인가요? 구조는 왜 헥사고날인가요?</summary><div class="a">
         <ul>
           <li>payment는 외부 PSP 호출(최대 30초 타임아웃)을 기다리는 I/O 중심 서비스라 논블로킹이 스레드를 덜 씁니다. wallet·ledger는 DB 트랜잭션과 낙관적 락이 핵심이라 JPA·블로킹이 단순합니다(각 build.gradle 주석에 의도가 적혀 있음).</li>
-          <li>대가: R2DBC는 JPA가 없어서 <code>DatabaseClient</code>로 SQL을 직접 쓰고, 리액티브 트랜잭션과 이벤트 연동(<code>TransactionalEventPublisher</code>)이 까다롭습니다. <span class="badge good">수정함</span> 문자열 포맷으로 만들던 INSERT는 바인딩으로 바꿨습니다(따옴표가 든 Toss 실패 메시지에서 SQL 오류가 났음).</li>
-          <li>헥사고날: PSP(Toss)나 상품 조회(Mock)를 포트 뒤로 숨겨 테스트에서 <code>PaymentExecutorPort</code>를 mock으로 바꿔 끼웠습니다. <span class="badge good">수정함</span> 서비스가 어댑터 예외를 import하던 위반은 예외를 <code>application/exception</code>으로 옮겨 풀었고, ArchUnit으로 고정하는 것은 남은 일입니다.</li>
+          <li>대가: R2DBC는 JPA가 없어서 <code>DatabaseClient</code>로 SQL을 직접 쓰고, 리액티브 트랜잭션과 이벤트 연동(<code>TransactionalEventPublisher</code>)이 까다롭습니다. <span class="badge good">수정함</span> 문자열 포맷으로 만들던 INSERT는 바인딩으로 바뀌었습니다(따옴표가 든 Toss 실패 메시지에서 SQL 오류가 났음).</li>
+          <li>헥사고날: PSP(Toss)나 상품 조회(Mock)가 포트 뒤에 있어, 테스트는 <code>PaymentExecutorPort</code>를 mock으로 바꿔 끼웁니다. <span class="badge good">수정함</span> 서비스가 어댑터 예외를 import하던 위반은 예외가 <code>application/exception</code>으로 옮겨져 풀렸고, ArchUnit으로 고정하는 것은 남은 일입니다.</li>
         </ul>
       </div></details>
     </section>
